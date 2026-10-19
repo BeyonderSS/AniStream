@@ -16,12 +16,14 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    env:
-      # v1.0.0 was the first manual release; CI builds count up from there
-      VERSION_NAME: 1.0.${{ github.run_number }}
-      VERSION_CODE: ${{ 100 + github.run_number }}
     steps:
       - uses: actions/checkout@v4
+
+      # v1.0.0 was the first manual release (versionCode 1); CI builds count up from there
+      - name: Version
+        run: |
+          echo "VERSION_NAME=1.0.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v4
         with:
