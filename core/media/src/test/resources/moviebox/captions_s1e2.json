@@ -1,0 +1,17 @@
+{
+ "code": 0,
+ "message": "ok",
+ "data": {
+  "extCaptions": [
+   {
+    "id": "3065143352913004040",
+    "lan": "en",
+    "lanName": "English",
+    "url": "https://cacdn.hakunaymatata.com/subtitle/eba48b0eeb0c9798de5f3249133de3a5.srt?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9jYWNkbi5oYWt1bmF5bWF0YXRhLmNvbS9zdWJ0aXRsZS8qIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzkzMDE0MDMzfX19XX0_&Signature=R1nZ3l8li7PPvGx8du4N2D9h~5Q6QbQAcloN1hR35d5ixq~sZTOYN~bSw~JE2KnDAom7DcqchFGJk14LH9gR4R-OjB-FPHHhF99qkEPpy8OZz~BPsejpNPmTXY4CV~~SRu433iHJwWV8srMXorj6ttz9uS0IGSDrgc1eNZkJD8MQHvNwrYl-50x9Aqsli2nfGR7OBIZboKMIHiw04Y0oakW9TJg50gmO05FFov-NafmgurSOA70k9~4j5ew1eDww2KiRfxoeTtfKDPJb9pDKGVXjv59eMu9MA2WHPVyI7uEAm08mYoNtAELD8MCsitt4wE5P7h4ERE0dngswKsPz4A__&Key-Pair-Id=KMHN1LQ1HEUPL",
+    "size": "40158",
+    "delay": 0
+   }
+  ],
+  "subjectId": "1382465867459478920"
+ }
+}

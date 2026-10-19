@@ -23,9 +23,9 @@ class WatchHistoryRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getContinueWatching(): Result<List<WatchHistory>> {
+    override suspend fun getContinueWatching(kind: String?): Result<List<WatchHistory>> {
         return try {
-            val result = dao.getContinueWatching().first().map { it.toDomain() }
+            val result = dao.getContinueWatching(kind).first().map { it.toDomain() }
             Result.success(result)
         } catch (e: Exception) {
             Result.error(e)
@@ -90,7 +90,11 @@ class WatchHistoryRepositoryImpl @Inject constructor(
         watchProgress = watchProgress,
         lastWatchedTimestamp = lastWatchedTimestamp,
         isFavorite = isFavorite,
-        anidbSlug = anidbSlug
+        anidbSlug = anidbSlug,
+        kind = kind,
+        season = season,
+        mediaId = mediaId,
+        subtitle = subtitle
     )
 
     private fun WatchHistory.toEntity() = WatchHistoryEntity(
@@ -103,6 +107,10 @@ class WatchHistoryRepositoryImpl @Inject constructor(
         watchProgress = watchProgress,
         lastWatchedTimestamp = lastWatchedTimestamp,
         isFavorite = isFavorite,
-        anidbSlug = anidbSlug
+        anidbSlug = anidbSlug,
+        kind = kind,
+        season = season,
+        mediaId = mediaId,
+        subtitle = subtitle
     )
 }

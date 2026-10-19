@@ -3,8 +3,10 @@ package com.anistream.app.di
 import android.content.Context
 import androidx.room.Room
 import com.anistream.core.database.AniStreamDatabase
+import com.anistream.core.database.dao.AddonDao
 import com.anistream.core.database.dao.DownloadDao
 import com.anistream.core.database.dao.FavoriteDao
+import com.anistream.core.database.dao.PlaylistDao
 import com.anistream.core.database.dao.RecentSearchDao
 import com.anistream.core.database.dao.WatchHistoryDao
 import dagger.Module
@@ -27,7 +29,7 @@ object DatabaseModule {
             context,
             AniStreamDatabase::class.java,
             AniStreamDatabase.DATABASE_NAME
-        ).build()
+        ).addMigrations(AniStreamDatabase.MIGRATION_1_2).build()
     }
 
     @Provides
@@ -41,4 +43,10 @@ object DatabaseModule {
 
     @Provides
     fun provideDownloadDao(db: AniStreamDatabase): DownloadDao = db.downloadDao()
+
+    @Provides
+    fun provideAddonDao(db: AniStreamDatabase): AddonDao = db.addonDao()
+
+    @Provides
+    fun providePlaylistDao(db: AniStreamDatabase): PlaylistDao = db.playlistDao()
 }

@@ -111,8 +111,8 @@ import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Space
 import kotlinx.coroutines.delay
 
-private val Scrim = Color.Black.copy(alpha = 0.45f)
-private val Tabular = AppType.bodyStrong.copy(fontFeatureSettings = "tnum")
+internal val Scrim = Color.Black.copy(alpha = 0.45f)
+internal val Tabular = AppType.bodyStrong.copy(fontFeatureSettings = "tnum")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,14 +123,7 @@ fun PlayerScreen(
     val ui by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var showSettings by rememberSaveable { mutableStateOf(false) }
-    val fullscreen = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val activity = LocalContext.current.findActivity()
-    val view = LocalView.current
-
-    // rotation (incl. the fullscreen button) recreates the activity: don't pause for that
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
-        if (activity?.isChangingConfigurations != true) viewModel.onStop()
-    }
+    val (fullscreen, setFullscreen) = rememberFullscreen(viewModel::onStop)
 
     LaunchedEffect(ui.message) {
         val msg = ui.message ?: return@LaunchedEffect
@@ -138,45 +131,24 @@ fun PlayerScreen(
         viewModel.messageShown()
     }
 
-    // Rotation recreates the activity; only give orientation back when actually leaving the player.
-    DisposableEffect(Unit) {
-        onDispose {
-            if (activity != null && !activity.isChangingConfigurations) {
-                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            }
-        }
-    }
-    DisposableEffect(fullscreen) {
-        val controller = activity?.window?.let { WindowCompat.getInsetsController(it, view) }
-        if (fullscreen) {
-            controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            controller?.hide(WindowInsetsCompat.Type.systemBars())
-        } else {
-            controller?.show(WindowInsetsCompat.Type.systemBars())
-        }
-        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
-    }
-
-    // ponytail: exiting fullscreen pins SENSOR_PORTRAIT until the next fullscreen tap or leaving the screen,
-    // so rotate-to-fullscreen stops working after a manual exit (YouTube does the same).
-    fun setFullscreen(on: Boolean) {
-        activity?.requestedOrientation =
-            if (on) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-    }
-    BackHandler(enabled = fullscreen) { setFullscreen(false) }
-
     val video: @Composable (Modifier) -> Unit = { m ->
         VideoPlayer(
             player = viewModel.player,
-            ui = ui,
+            title = "${ui.animeTitle} · Ep ${ui.episodeNumber}",
+            isLoading = ui.isLoading,
+            error = ui.error,
             fullscreen = fullscreen,
             onBack = { if (fullscreen) setFullscreen(false) else onBack() },
             onToggleFullscreen = { setFullscreen(!fullscreen) },
             onSettings = { showSettings = true },
             onRetry = viewModel::retry,
-            onNext = viewModel::nextEpisode,
-            onCancelNext = viewModel::dismissEnd,
-            onFinished = onBack,
+            endOverlay = if (!ui.ended) null else {
+                {
+                    val next = ui.episodeNumbers.firstOrNull { it > ui.episodeNumber }
+                    if (next != null) NextCountdown("UP NEXT · EPISODE $next", viewModel::nextEpisode, viewModel::dismissEnd)
+                    else FinishedCard(ui.animeTitle, onBack)
+                }
+            },
             modifier = m
         )
     }
@@ -209,25 +181,9 @@ fun PlayerScreen(
                 Text("QUALITY", style = AppType.heading)
                 Spacer(Modifier.height(Space.sm))
                 ui.availableQualities.forEach { source ->
-                    val selected = source.qualityLabel == ui.selectedQuality
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                            .clip(Radius.md)
-                            .clickable {
-                                viewModel.selectQuality(source.qualityLabel)
-                                showSettings = false
-                            }
-                            .padding(horizontal = Space.sm)
-                    ) {
-                        Text(
-                            source.qualityLabel.uppercase(),
-                            style = Tabular.copy(color = if (selected) Accent.text else Ink.body),
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (selected) Icon(Icons.Rounded.Check, contentDescription = "Selected", tint = Accent.main)
+                    SheetOption(source.qualityLabel.uppercase(), selected = source.qualityLabel == ui.selectedQuality) {
+                        viewModel.selectQuality(source.qualityLabel)
+                        showSettings = false
                     }
                 }
                 if (ui.availableQualities.isEmpty()) Text("No qualities yet", style = AppType.caption)
@@ -240,19 +196,88 @@ fun PlayerScreen(
     }
 }
 
+/** A row in a player bottom sheet: label (gold when selected) + check. */
 @Composable
-private fun VideoPlayer(
+internal fun SheetOption(label: String, selected: Boolean, caption: String? = null, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(if (caption == null) 48.dp else 56.dp)
+            .clip(Radius.md)
+            .clickable(onClick = onClick)
+            .padding(horizontal = Space.sm)
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = Tabular.copy(color = if (selected) Accent.text else Ink.body), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (caption != null) Text(caption, style = AppType.numeric, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (selected) Icon(Icons.Rounded.Check, contentDescription = "Selected", tint = Accent.main)
+    }
+}
+
+/**
+ * Landscape = fullscreen: hides system bars, back exits fullscreen first, gives orientation back when leaving.
+ * [onStop] runs on a real ON_STOP (not a rotation). Returns (fullscreen, setFullscreen).
+ */
+@Composable
+internal fun rememberFullscreen(onStop: () -> Unit): Pair<Boolean, (Boolean) -> Unit> {
+    val fullscreen = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val activity = LocalContext.current.findActivity()
+    val view = LocalView.current
+
+    // rotation (incl. the fullscreen button) recreates the activity: don't pause for that
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        if (activity?.isChangingConfigurations != true) onStop()
+    }
+
+    // Rotation recreates the activity; only give orientation back when actually leaving the player.
+    DisposableEffect(Unit) {
+        onDispose {
+            if (activity != null && !activity.isChangingConfigurations) {
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
+        }
+    }
+    DisposableEffect(fullscreen) {
+        val controller = activity?.window?.let { WindowCompat.getInsetsController(it, view) }
+        if (fullscreen) {
+            controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller?.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller?.show(WindowInsetsCompat.Type.systemBars())
+        }
+        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
+    }
+
+    // ponytail: exiting fullscreen pins SENSOR_PORTRAIT until the next fullscreen tap or leaving the screen,
+    // so rotate-to-fullscreen stops working after a manual exit (YouTube does the same).
+    fun setFullscreen(on: Boolean) {
+        activity?.requestedOrientation =
+            if (on) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+    }
+    BackHandler(enabled = fullscreen) { setFullscreen(false) }
+    return fullscreen to ::setFullscreen
+}
+
+/**
+ * Video surface + the Nocturne controls overlay, shared by the anime and media players.
+ * [live]: no seek bar / ±10s, a LIVE badge instead. [endOverlay] non-null = playback ended, shown over the video.
+ */
+@Composable
+internal fun VideoPlayer(
     player: Player,
-    ui: PlayerUiState,
+    title: String,
+    isLoading: Boolean,
+    error: String?,
     fullscreen: Boolean,
     onBack: () -> Unit,
     onToggleFullscreen: () -> Unit,
     onSettings: () -> Unit,
     onRetry: () -> Unit,
-    onNext: () -> Unit,
-    onCancelNext: () -> Unit,
-    onFinished: () -> Unit,
-    modifier: Modifier
+    modifier: Modifier,
+    live: Boolean = false,
+    endOverlay: (@Composable () -> Unit)? = null
 ) {
     var controlsVisible by remember { mutableStateOf(true) }
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
@@ -302,8 +327,8 @@ private fun VideoPlayer(
         interactions++
     }
 
-    val showSpinner = ui.isLoading || buffering
-    val blocked = ui.error != null || ui.ended
+    val showSpinner = isLoading || buffering
+    val blocked = error != null || endOverlay != null
 
     Box(modifier.background(Color.Black)) {
         AndroidView(
@@ -316,10 +341,10 @@ private fun VideoPlayer(
         Box(
             Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
+                .pointerInput(live) {
                     detectTapGestures(
                         onTap = { controlsVisible = !controlsVisible },
-                        onDoubleTap = { offset ->
+                        onDoubleTap = if (live) null else { offset ->
                             val dir = if (offset.x < size.width / 2) -1 else 1
                             seekBy(dir * 10_000L)
                             bubble = dir
@@ -349,14 +374,14 @@ private fun VideoPlayer(
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = Ink.high)
                     }
                     Text(
-                        "${ui.animeTitle} · Ep ${ui.episodeNumber}",
+                        title,
                         style = AppType.bodyStrong,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
                     IconButton(onClick = onSettings) {
-                        Icon(Icons.Rounded.Settings, contentDescription = "Quality and audio", tint = Ink.high)
+                        Icon(Icons.Rounded.Settings, contentDescription = "Settings", tint = Ink.high)
                     }
                 }
 
@@ -366,7 +391,7 @@ private fun VideoPlayer(
                         horizontalArrangement = Arrangement.spacedBy(Space.xxl),
                         modifier = Modifier.align(Alignment.Center)
                     ) {
-                        IconButton(onClick = { seekBy(-10_000L) }, modifier = Modifier.size(48.dp)) {
+                        if (!live) IconButton(onClick = { seekBy(-10_000L) }, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.Outlined.Replay10, contentDescription = "Back 10 seconds", tint = Ink.high, modifier = Modifier.size(32.dp))
                         }
                         if (showSpinner) {
@@ -395,7 +420,7 @@ private fun VideoPlayer(
                                 )
                             }
                         }
-                        IconButton(onClick = { seekBy(10_000L) }, modifier = Modifier.size(48.dp)) {
+                        if (!live) IconButton(onClick = { seekBy(10_000L) }, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.Outlined.Forward10, contentDescription = "Forward 10 seconds", tint = Ink.high, modifier = Modifier.size(32.dp))
                         }
                     }
@@ -409,10 +434,18 @@ private fun VideoPlayer(
                         .padding(bottom = if (fullscreen) Space.md else 0.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "${formatTime(scrubMs ?: position)} / ${formatTime(duration)}",
-                            style = AppType.numeric.copy(color = Ink.high)
-                        )
+                        if (live) {
+                            Text(
+                                "LIVE",
+                                style = AppType.label.copy(color = Accent.on),
+                                modifier = Modifier.background(Accent.main).padding(horizontal = Space.sm, vertical = 2.dp)
+                            )
+                        } else {
+                            Text(
+                                "${formatTime(scrubMs ?: position)} / ${formatTime(duration)}",
+                                style = AppType.numeric.copy(color = Ink.high)
+                            )
+                        }
                         Spacer(Modifier.weight(1f))
                         IconButton(onClick = onToggleFullscreen) {
                             Icon(
@@ -422,7 +455,7 @@ private fun VideoPlayer(
                             )
                         }
                     }
-                    SeekBar(
+                    if (!live) SeekBar(
                         position = position,
                         buffered = bufferedPos,
                         duration = duration,
@@ -436,11 +469,10 @@ private fun VideoPlayer(
             }
         }
 
-        if (showSpinner && ui.error == null) {
+        if (showSpinner && error == null) {
             CircularProgressIndicator(color = Accent.main, strokeWidth = 3.dp, modifier = Modifier.align(Alignment.Center).size(48.dp))
         }
 
-        val error = ui.error
         if (error != null) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -452,8 +484,7 @@ private fun VideoPlayer(
             }
         }
 
-        if (ui.ended) {
-            val next = ui.episodeNumbers.firstOrNull { it > ui.episodeNumber }
+        if (endOverlay != null) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -461,14 +492,15 @@ private fun VideoPlayer(
                     .background(Bg.base.copy(alpha = 0.85f))
                     .pointerInput(Unit) { detectTapGestures { } } // swallow taps meant for the video
             ) {
-                if (next != null) NextCountdown(next, onNext, onCancelNext) else FinishedCard(ui.animeTitle, onFinished)
+                endOverlay()
             }
         }
     }
 }
 
+/** [label] e.g. "UP NEXT · EPISODE 3"; runs [onNext] after 5s. */
 @Composable
-private fun NextCountdown(next: Int, onNext: () -> Unit, onCancel: () -> Unit) {
+internal fun NextCountdown(label: String, onNext: () -> Unit, onCancel: () -> Unit) {
     var seconds by remember { mutableIntStateOf(5) }
     LaunchedEffect(Unit) {
         while (seconds > 0) {
@@ -478,7 +510,7 @@ private fun NextCountdown(next: Int, onNext: () -> Unit, onCancel: () -> Unit) {
         onNext()
     }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("UP NEXT · EPISODE $next", style = AppType.label.copy(color = Ink.muted))
+        Text(label, style = AppType.label.copy(color = Ink.muted))
         Spacer(Modifier.height(Space.xs))
         Text("NEXT EPISODE IN $seconds", style = AppType.heading)
         Spacer(Modifier.height(Space.lg))
@@ -490,7 +522,7 @@ private fun NextCountdown(next: Int, onNext: () -> Unit, onCancel: () -> Unit) {
 }
 
 @Composable
-private fun FinishedCard(title: String, onBack: () -> Unit) {
+internal fun FinishedCard(title: String, onBack: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(Space.lg)) {
         Text("YOU FINISHED", style = AppType.label.copy(color = Ink.muted))
         Spacer(Modifier.height(Space.xs))
@@ -741,7 +773,7 @@ private fun EpisodeStrip(numbers: List<Int>, current: Int, watchedBelow: Int, on
     }
 }
 
-private fun formatTime(ms: Long): String {
+internal fun formatTime(ms: Long): String {
     val s = (ms / 1000).coerceAtLeast(0)
     val h = s / 3600
     val m = (s % 3600) / 60
@@ -749,7 +781,7 @@ private fun formatTime(ms: Long): String {
     return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%02d:%02d".format(m, sec)
 }
 
-private tailrec fun Context.findActivity(): Activity? = when (this) {
+internal tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null

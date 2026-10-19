@@ -1,0 +1,44 @@
+{
+ "code": 0,
+ "message": "ok",
+ "data": {
+  "pager": null,
+  "list": [
+   {
+    "episode": 0,
+    "title": "Interstellar",
+    "resourceLink": "https://bcdn.hakunaymatata.com/resource/h265/b25bf9032d91c7c9170fca40e9ae4946.mp4?sign=7a7a6a97e31538f60fd17af50ddc850e&t=1792408513",
+    "linkType": 2,
+    "size": "414710197",
+    "uploadBy": "",
+    "resourceId": "7449708358422462792",
+    "postId": "236832896584141800",
+    "extCaptions": [],
+    "se": 0,
+    "ep": 0,
+    "sourceUrl": "https:///mkvcinemas.cat/c42b2569cdead3d61eca0aa2bce844d8/Interstellar-480P-h265",
+    "resolution": 480,
+    "codecName": "hevc",
+    "duration": 10145,
+    "requireMemberType": 0,
+    "memberIcon": ""
+   }
+  ],
+  "subjectId": "",
+  "subjectType": 0,
+  "cover": null,
+  "subjectTitle": "",
+  "totalSize": "0",
+  "totalEpisode": 0,
+  "position": 0,
+  "resolution": 0,
+  "collectionResolutions": [],
+  "description": "",
+  "genre": "",
+  "tags": [],
+  "favInfo": null,
+  "releaseDate": "",
+  "countryName": "",
+  "durationSeconds": 0
+ }
+}

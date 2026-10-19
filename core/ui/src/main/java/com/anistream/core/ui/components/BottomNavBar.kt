@@ -7,11 +7,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.LiveTv
+import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -35,11 +35,11 @@ enum class BottomNavItem(
     val label: String,
     val icon: ImageVector
 ) {
-    Home("home", "Home", Icons.Outlined.Home),
+    Home("home", "Anime", Icons.Outlined.Home),
+    Movies("movies", "Movies", Icons.Outlined.Movie),
+    LiveTv("live_tv", "Live TV", Icons.Outlined.LiveTv),
     Search("search", "Search", Icons.Outlined.Search),
-    Favorites("favorites", "Favorites", Icons.Outlined.FavoriteBorder),
-    Schedule("schedule", "Schedule", Icons.Outlined.CalendarMonth),
-    Downloads("downloads", "Downloads", Icons.Outlined.FileDownload)
+    Library("library", "Library", Icons.Outlined.VideoLibrary)
 }
 
 /** Black 95% bar, hairline top border; selected = gold icon + gold uppercase label + a 2dp gold bar above the icon. */

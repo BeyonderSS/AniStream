@@ -30,18 +30,21 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import java.io.File
 
-/** Full-screen offline playback of a downloaded .ts (+ sibling .vtt). Local files need no Referer. */
+/** Full-screen offline playback of a downloaded .ts/.mp4 (+ sibling .vtt/.srt). Local files need no Referer. */
 @Composable
 fun LocalPlayerDialog(filePath: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val player = remember(filePath) {
-        val subs = File(filePath.removeSuffix(".ts") + ".vtt")
+        val base = filePath.substringBeforeLast('.')
+        val subs = listOf("vtt" to MimeTypes.TEXT_VTT, "srt" to MimeTypes.APPLICATION_SUBRIP)
+            .map { (ext, mime) -> File("$base.$ext") to mime }
+            .firstOrNull { it.first.exists() }
         val item = MediaItem.Builder()
             .setUri(Uri.fromFile(File(filePath)))
             .setSubtitleConfigurations(
-                if (subs.exists()) listOf(
-                    MediaItem.SubtitleConfiguration.Builder(Uri.fromFile(subs))
-                        .setMimeType(MimeTypes.TEXT_VTT)
+                if (subs != null) listOf(
+                    MediaItem.SubtitleConfiguration.Builder(Uri.fromFile(subs.first))
+                        .setMimeType(subs.second)
                         .setLanguage("en")
                         .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
                         .build()

@@ -1,0 +1,95 @@
+{
+ "code": 0,
+ "message": "ok",
+ "data": {
+  "pager": {
+   "hasMore": true,
+   "nextPage": "1",
+   "page": "0",
+   "perPage": 0,
+   "totalCount": 61
+  },
+  "list": [
+   {
+    "episode": 102,
+    "title": "",
+    "resourceLink": "https://macdn.aoneroom.com/other/2026/10/10/80da52722ee7de7a4303290af6783424.mp4",
+    "linkType": 2,
+    "size": "824720",
+    "uploadBy": "lasisielenu",
+    "resourceId": "3524510602414752008",
+    "postId": "4925010968293377664",
+    "extCaptions": [],
+    "se": 1,
+    "ep": 2,
+    "sourceUrl": "https://www.fzmovies.cms/tv-Breaking Bad [Hindi]_1_2_1080P-.html/season-1/episode-2-r360P-h265",
+    "resolution": 360,
+    "codecName": "hevc",
+    "duration": 2893,
+    "requireMemberType": 0,
+    "memberIcon": ""
+   }
+  ],
+  "subjectId": "1382465867459478920",
+  "subjectType": 2,
+  "cover": {
+   "url": "https://pbcdn.aoneroom.com/image/2026/03/30/bbe3def74e939ed9bd94d2b4f213023b.jpg",
+   "width": 2000,
+   "height": 3000,
+   "size": 4309116,
+   "format": "jpg",
+   "thumbnail": "eB8XgykU02aO%L?ZjYIpbcxZIcj?xCayf,9HWD?Zs+M}9FV].7t3R*",
+   "gif": null,
+   "averageHueLight": "#2f3d23",
+   "averageHueDark": "#313d26"
+  },
+  "subjectTitle": "Breaking Bad [Hindi]",
+  "totalSize": "6650846132",
+  "totalEpisode": 62,
+  "position": 0,
+  "resolution": 360,
+  "collectionResolutions": [
+   {
+    "resolution": 360,
+    "averageSize": "109030264",
+    "epNum": 61,
+    "requireMemberType": 0,
+    "memberIcon": ""
+   },
+   {
+    "resolution": 480,
+    "averageSize": "104073237",
+    "epNum": 53,
+    "requireMemberType": 0,
+    "memberIcon": ""
+   },
+   {
+    "resolution": 720,
+    "averageSize": "259196485",
+    "epNum": 59,
+    "requireMemberType": 0,
+    "memberIcon": ""
+   },
+   {
+    "resolution": 1080,
+    "averageSize": "482542121",
+    "epNum": 61,
+    "requireMemberType": 0,
+    "memberIcon": ""
+   }
+  ],
+  "description": "",
+  "genre": "Crime,Drama,Thriller",
+  "tags": [],
+  "favInfo": null,
+  "releaseDate": "",
+  "countryName": "",
+  "durationSeconds": 174442,
+  "vipInfo": {
+   "requireMemberType": 1,
+   "memberIcon": "https://pbcdn.aoneroom.com/image/2026/06/30/b83ec160ad5735c93a55e0a27e863532.png",
+   "previewSeconds": 300,
+   "freeEpisodeCount": 2
+  }
+ }
+}

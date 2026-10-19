@@ -9,7 +9,9 @@ data class DownloadItem(
     val fileSizeBytes: Long = 0,
     val progress: Float = 0f,
     val state: DownloadState = DownloadState.PENDING,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    /** movies & TV: "S1 · E2"; null for anime episodes and movies */
+    val subtitle: String? = null
 )
 
 enum class DownloadState {

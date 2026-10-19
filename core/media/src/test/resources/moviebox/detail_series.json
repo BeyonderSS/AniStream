@@ -1,0 +1,291 @@
+{
+ "code": 0,
+ "message": "ok",
+ "data": {
+  "subjectId": "1382465867459478920",
+  "subjectType": 2,
+  "title": "Breaking Bad [Hindi]",
+  "description": "A chemistry teacher diagnosed with inoperable lung cancer turns to manufacturing and selling methamphetamine with a former student in order to secure his family's future.",
+  "releaseDate": "2013-01-01",
+  "duration": "",
+  "genre": "Crime, Drama, Thriller",
+  "cover": {
+   "url": "https://pbcdn.aoneroom.com/image/2026/03/30/bbe3def74e939ed9bd94d2b4f213023b.jpg",
+   "width": 2000,
+   "height": 3000,
+   "size": 4309116,
+   "format": "jpg",
+   "thumbnail": "eB8XgykU02aO%L?ZjYIpbcxZIcj?xCayf,9HWD?Zs+M}9FV].7t3R*",
+   "gif": null,
+   "averageHueLight": "#2f3d23",
+   "averageHueDark": "#313d26"
+  },
+  "preVideoCover": null,
+  "preVideoAddress": [],
+  "countryName": "United States",
+  "language": "English, Spanish",
+  "imdbRatingValue": "9.5",
+  "staffList": [
+   {
+    "staffId": "6008386847394647736",
+    "staffType": 1,
+    "name": "Bryan Cranston",
+    "character": "Walter White",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/32c08deea1ff6ac3ec9ea76692dbbf2c.jpg"
+   },
+   {
+    "staffId": "4974916286029909808",
+    "staffType": 1,
+    "name": "Aaron Paul",
+    "character": "Jesse Pinkman",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/41a7fe1f69992576384e043c330ade3e.jpg"
+   },
+   {
+    "staffId": "8216522855316606760",
+    "staffType": 1,
+    "name": "Anna Gunn",
+    "character": "Skyler White",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/82df634563062ea284fd8e2ea0222ca2.jpg"
+   },
+   {
+    "staffId": "7209009049063791704",
+    "staffType": 1,
+    "name": "Betsy Brandt",
+    "character": "Marie Schrader",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2023/11/15/f3ac66e31cc196c97d877366451a1cd6.jpg"
+   },
+   {
+    "staffId": "9219866282684718168",
+    "staffType": 1,
+    "name": "RJ Mitte",
+    "character": "Walter White, Jr.",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2023/11/15/72c7f816a4eab79c892ba9317402d96f.jpg"
+   },
+   {
+    "staffId": "3282864647904841400",
+    "staffType": 1,
+    "name": "Dean Norris",
+    "character": "Hank Schrader",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/f8b44f1c1c539ed68cd6f98497a73fb3.jpg"
+   },
+   {
+    "staffId": "3077810127372177080",
+    "staffType": 1,
+    "name": "Bob Odenkirk",
+    "character": "Saul Goodman",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/48fdeac701557f32c3f7de4327538a7e.jpg"
+   },
+   {
+    "staffId": "5184641016560753752",
+    "staffType": 1,
+    "name": "Steven Michael Quezada",
+    "character": "Steven Gomez",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2023/11/15/7d86eae1b36ce44e70a0442b64e46b29.jpg"
+   },
+   {
+    "staffId": "5184641016560753752",
+    "staffType": 1,
+    "name": "Steven Michael Quezada",
+    "character": "Gomez",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2023/11/15/7d86eae1b36ce44e70a0442b64e46b29.jpg"
+   },
+   {
+    "staffId": "7360874110489349816",
+    "staffType": 1,
+    "name": "Jonathan Banks",
+    "character": "Mike Ehrmantraut",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/e009965e1fd379a92656205c16f4a01e.jpg"
+   },
+   {
+    "staffId": "6623075419973635872",
+    "staffType": 1,
+    "name": "Giancarlo Esposito",
+    "character": "Gus Fring",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/579b836ba8a1cf263689bdb96c7038fd.jpg"
+   },
+   {
+    "staffId": "258662313754513200",
+    "staffType": 1,
+    "name": "Charles Baker",
+    "character": "Skinny Pete",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/dbf2bc7864281c6e9d1535bd3b68ba97.jpg"
+   },
+   {
+    "staffId": "3006403444216319672",
+    "staffType": 1,
+    "name": "Jesse Plemons",
+    "character": "Todd",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/7b01d37a45eb8aaab6ceba8767d04c1f.jpg"
+   },
+   {
+    "staffId": "1866764040074579640",
+    "staffType": 1,
+    "name": "Christopher Cousins",
+    "character": "Ted Beneke",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/c2f0700cfd758969b0a94525be3cc499.jpg"
+   },
+   {
+    "staffId": "1168813374302552584",
+    "staffType": 1,
+    "name": "Laura Fraser",
+    "character": "Lydia Rodarte-Quayle",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2023/11/20/92be616c6c3a580183a88ea8b9213015.jpg"
+   },
+   {
+    "staffId": "658845175371941600",
+    "staffType": 1,
+    "name": "Matt Jones",
+    "character": "Badger",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2024/01/05/2d3a2429ea872dd985b9aaef5dece3fb.jpg"
+   },
+   {
+    "staffId": "1244845079031336632",
+    "staffType": 1,
+    "name": "Michael Shamus Wiles",
+    "character": "ASAC George Merkert",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/a003ba2fb459b3a315100c2b98629ecd.jpg"
+   },
+   {
+    "staffId": "8938391305974062168",
+    "staffType": 1,
+    "name": "Lavell Crawford",
+    "character": "Huell",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2023/11/15/d6ae5d08c073214c39b356b0052244a7.jpg"
+   },
+   {
+    "staffId": "2885553406788115544",
+    "staffType": 1,
+    "name": "Ray Campbell",
+    "character": "Tyrus Kitt",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2023/11/15/6bd12f77bb0231a8a20bceb31f52d2a4.jpg"
+   }
+  ],
+  "wantToSeeCount": 0,
+  "haveSeenCount": 0,
+  "seenStatus": 0,
+  "mySeeTime": "0",
+  "myScoreValue": 0,
+  "myScorePostId": "0",
+  "myScoreTime": "0",
+  "opt": "",
+  "hasResource": true,
+  "resourceDetectors": [
+   {
+    "type": 1,
+    "totalEpisode": 62,
+    "totalSize": "6650846132",
+    "uploadTime": "1727075700",
+    "uploadBy": "DONBIGG etc.",
+    "resourceLink": "https://www.fzmovies.cms/tv-Breaking Bad [Hindi]_1_1_1080P-.html/season-1/episode-1-r360P",
+    "downloadUrl": "",
+    "source": "fzmovies.cms etc.",
+    "firstSize": "187953280",
+    "resourceId": "5136117200826301680",
+    "postId": "6577269081584927656",
+    "extCaptions": [],
+    "resolutionList": [],
+    "subjectId": "1382465867459478920",
+    "codecName": ""
+   }
+  ],
+  "ops": "",
+  "durationSeconds": 0,
+  "stills": {
+   "url": "https://pbcdn.aoneroom.com/image/2022/09/07/7bd4201b20d51e63a81fd67069e0d3d6.jpg",
+   "width": 500,
+   "height": 375,
+   "size": 24441,
+   "format": "jpg",
+   "thumbnail": "eNA,:.8_xuM|so~qDjt7RkspyDRjjFkAoMXAk9aKs.j]o#oeaKoej[",
+   "gif": null,
+   "averageHueLight": "#45474b",
+   "averageHueDark": "#48494b"
+  },
+  "trailer": {
+   "VideoAddress": {
+    "videoId": "",
+    "definition": "",
+    "url": "https://macdn.aoneroom.com/other/2026/10/10/80da52722ee7de7a4303290af6783424.mp4",
+    "duration": 23,
+    "width": 0,
+    "height": 0,
+    "size": 824720,
+    "fps": 0,
+    "bitrate": 0,
+    "type": 0
+   },
+   "cover": {
+    "url": "https://pbcdn.aoneroom.com/media/vone/2024/03/19/16359bb1fd7c06c11305921b49f87f6c.jpg",
+    "width": 854,
+    "height": 480,
+    "size": 10465,
+    "format": "jpg",
+    "thumbnail": "e02FlPoMM{oeWB%fj]RkayayMyfkofoej[WBWBofofj[offjayaybF",
+    "gif": null,
+    "averageHueLight": "#121511",
+    "averageHueDark": "#121511"
+   }
+  },
+  "contentRating": "TV-MA",
+  "postTitle": "Trailer-Breaking Bad [Hindi]",
+  "aka": "",
+  "explains": [],
+  "seNum": 5,
+  "viewers": 4924,
+  "category": "",
+  "subtitles": "English",
+  "dubs": [
+   {
+    "subjectId": "6207982430134357800",
+    "lanName": "Original Audio",
+    "lanCode": "en",
+    "original": true,
+    "type": 0
+   },
+   {
+    "subjectId": "1382465867459478920",
+    "lanName": "Hindi dub",
+    "lanCode": "hi",
+    "original": false,
+    "type": 0
+   },
+   {
+    "subjectId": "9185019261486531816",
+    "lanName": "esla dub",
+    "lanCode": "esla",
+    "original": false,
+    "type": 0
+   },
+   {
+    "subjectId": "7036205526539454136",
+    "lanName": "ptbr dub",
+    "lanCode": "ptbr",
+    "original": false,
+    "type": 0
+   }
+  ],
+  "relatedApp": null,
+  "restrictLevel": "",
+  "corner": "Hindi",
+  "likeStatus": 0,
+  "style": {
+   "colNum": 3,
+   "shape": "Vertical"
+  },
+  "detailUrl": "https://movie-box.co/detail/breaking-bad-hindi-mz0TdRUH7E1",
+  "playUrl": {
+   "playUrl": "",
+   "urlType": "PLAY_URL_WEB"
+  },
+  "restrictKid": 0,
+  "season": 0,
+  "isCam": true,
+  "vipInfo": {
+   "requireMemberType": 1,
+   "memberIcon": "https://pbcdn.aoneroom.com/image/2026/06/30/b83ec160ad5735c93a55e0a27e863532.png",
+   "previewSeconds": 300,
+   "freeEpisodeCount": 2
+  },
+  "cornerBadge": null
+ }
+}

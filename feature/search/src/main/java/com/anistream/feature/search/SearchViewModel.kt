@@ -4,7 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.anistream.core.common.Result
 import com.anistream.domain.model.AnimeSearchResult
+import com.anistream.domain.model.MediaItem
+import com.anistream.domain.model.MediaType
 import com.anistream.domain.repository.AnidbRepository
+import com.anistream.domain.repository.MoviesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -26,7 +29,11 @@ data class SearchUiState(
     val isLoadingMore: Boolean = false,
     val endReached: Boolean = false,
     val page: Int = 1,
-    val error: String? = null
+    val error: String? = null,
+    /** 0 = anime, 1 = movies & TV */
+    val scope: Int = 0,
+    val mediaPopular: List<AnimeSearchResult> = emptyList(),
+    val isMediaPopularLoading: Boolean = true
 ) {
     val visibleResults: List<AnimeSearchResult>
         get() = typeFilter?.let { f -> results.filter { it.type.equals(f, ignoreCase = true) } } ?: results
@@ -34,7 +41,8 @@ data class SearchUiState(
 
 @HiltViewModel
 class SearchViewModel @Inject constructor(
-    private val repository: AnidbRepository
+    private val repository: AnidbRepository,
+    private val movies: MoviesRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState())
@@ -49,6 +57,26 @@ class SearchViewModel @Inject constructor(
         }
     }
 
+    private var mediaPopularRequested = false
+
+    fun onScopeChange(scope: Int) {
+        if (scope == _uiState.value.scope) return
+        _uiState.update { it.copy(scope = scope, typeFilter = null, results = emptyList()) }
+        if (scope == 1 && !mediaPopularRequested) {
+            mediaPopularRequested = true
+            viewModelScope.launch {
+                val first = movies.home().getOrNull()?.firstOrNull()?.items.orEmpty().map { it.asCard() }.distinctBy { it.slug }
+                _uiState.update { it.copy(mediaPopular = first, isMediaPopularLoading = false) }
+            }
+        }
+        onQueryChange(_uiState.value.query)
+    }
+
+    /** Both scopes land in the same poster grid; movie ids ride in [AnimeSearchResult.slug]. */
+    private suspend fun search(query: String, page: Int): Result<List<AnimeSearchResult>> =
+        if (_uiState.value.scope == 1) movies.search(query, page).map { list -> list.map { it.asCard() } }
+        else repository.searchAnime(query, page)
+
     fun onQueryChange(query: String) {
         _uiState.update { it.copy(query = query) }
         searchJob?.cancel()
@@ -59,7 +87,7 @@ class SearchViewModel @Inject constructor(
         searchJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             delay(400)
-            when (val result = repository.searchAnime(query.trim(), 1)) {
+            when (val result = search(query.trim(), 1)) {
                 is Result.Success -> _uiState.update { s ->
                     s.copy(
                         results = result.data.distinctBy { it.slug },
@@ -81,7 +109,7 @@ class SearchViewModel @Inject constructor(
         val next = s.page + 1
         searchJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoadingMore = true) }
-            val more = repository.searchAnime(s.query.trim(), next).getOrNull()
+            val more = search(s.query.trim(), next).getOrNull()
             _uiState.update { st ->
                 if (more == null) {
                     st.copy(isLoadingMore = false, endReached = true)
@@ -109,3 +137,12 @@ class SearchViewModel @Inject constructor(
 
     fun onClearRecents() = _uiState.update { it.copy(recentSearches = emptyList()) }
 }
+
+private fun MediaItem.asCard() = AnimeSearchResult(
+    slug = id,
+    title = title,
+    posterUrl = posterUrl,
+    type = if (type == MediaType.SERIES) "Series" else "Movie",
+    score = rating,
+    year = year
+)

@@ -87,7 +87,7 @@ fun DownloadsScreen(
         if (downloads.isNotEmpty()) {
             val n = downloads.size
             Text(
-                "$n episode${if (n == 1) "" else "s"} · ${formatSize(downloads.sumOf { it.fileSizeBytes })}",
+                "$n download${if (n == 1) "" else "s"} · ${formatSize(downloads.sumOf { it.fileSizeBytes })}",
                 style = AppType.numeric,
                 modifier = Modifier.padding(start = Space.lg, top = Space.xs)
             )
@@ -238,7 +238,11 @@ private fun DownloadRow(
         }
 
         Column(Modifier.weight(1f).padding(horizontal = Space.md)) {
-            Text("Episode ${download.episodeNumber}", style = AppType.bodyStrong)
+            // media downloads (movies & TV) have no anime episode number
+            Text(
+                if (download.episodeNumber > 0) "Episode ${download.episodeNumber}" else download.subtitle ?: "Movie",
+                style = AppType.bodyStrong
+            )
             val size = download.fileSizeBytes
             Text(
                 if (size > 0) "${download.quality} · ${formatSize(size)}" else download.quality,

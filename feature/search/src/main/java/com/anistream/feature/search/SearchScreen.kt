@@ -63,6 +63,7 @@ import com.anistream.core.ui.components.AnimeCard
 import com.anistream.core.ui.components.EmptyState
 import com.anistream.core.ui.components.ErrorContent
 import com.anistream.core.ui.components.LoadingShimmer
+import com.anistream.core.ui.components.SegmentedControl
 import com.anistream.core.ui.theme.Accent
 import com.anistream.core.ui.theme.AppType
 import com.anistream.core.ui.theme.Bg
@@ -72,6 +73,7 @@ import com.anistream.core.ui.theme.Space
 import com.anistream.domain.model.AnimeSearchResult
 
 private val typeFilters = listOf("All", "TV", "Movie", "OVA", "ONA", "Special")
+private val mediaTypeFilters = listOf("All", "Movie", "Series")
 
 private enum class Mode { Idle, Loading, Error, Empty, Results }
 
@@ -79,16 +81,27 @@ private enum class Mode { Idle, Loading, Error, Empty, Results }
 @Composable
 fun SearchScreen(
     onAnimeClick: (String) -> Unit,
+    onMediaClick: (String) -> Unit = {},
     viewModel: SearchViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val keyboard = LocalSoftwareKeyboardController.current
+    val movies = uiState.scope == 1
+    val open: (String) -> Unit = if (movies) onMediaClick else onAnimeClick
+    val popular = if (movies) uiState.mediaPopular else uiState.popular
+    val popularLoading = if (movies) uiState.isMediaPopularLoading else uiState.isPopularLoading
 
     Column(Modifier.fillMaxSize().background(Bg.base)) {
         Text(
             "SEARCH",
             style = AppType.title,
             modifier = Modifier.padding(start = Space.lg, end = Space.lg, top = Space.sm, bottom = Space.md)
+        )
+        SegmentedControl(
+            options = listOf("Anime", "Movies & TV"),
+            selectedIndex = uiState.scope,
+            onSelect = viewModel::onScopeChange,
+            modifier = Modifier.padding(start = Space.lg, end = Space.lg, bottom = Space.md)
         )
         SearchField(
             query = uiState.query,
@@ -103,7 +116,7 @@ fun SearchScreen(
                 contentPadding = PaddingValues(horizontal = Space.lg),
                 horizontalArrangement = Arrangement.spacedBy(Space.sm)
             ) {
-                items(typeFilters) { type ->
+                items(if (movies) mediaTypeFilters else typeFilters) { type ->
                     val value = if (type == "All") null else type
                     PillChip(label = type, selected = uiState.typeFilter == value, onClick = { viewModel.onTypeFilterChange(value) })
                 }
@@ -123,7 +136,7 @@ fun SearchScreen(
             label = "search_mode"
         ) { m ->
             when (m) {
-                Mode.Idle -> PosterGrid(items = uiState.popular, onClick = { onAnimeClick(it.slug) }) {
+                Mode.Idle -> PosterGrid(items = popular, onClick = { open(it.slug) }) {
                     if (uiState.recentSearches.isNotEmpty()) {
                         fullSpan {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -149,15 +162,15 @@ fun SearchScreen(
                             }
                         }
                     }
-                    if (uiState.isPopularLoading || uiState.popular.isNotEmpty()) {
+                    if (popularLoading || popular.isNotEmpty()) {
                         fullSpan {
                             Text("POPULAR RIGHT NOW", style = AppType.heading, modifier = Modifier.padding(bottom = Space.xs))
                         }
                     }
-                    if (uiState.isPopularLoading) skeletonItems()
-                    else if (uiState.popular.isEmpty() && uiState.recentSearches.isEmpty()) fullSpan {
+                    if (popularLoading) skeletonItems()
+                    else if (popular.isEmpty() && uiState.recentSearches.isEmpty()) fullSpan {
                         EmptyState(
-                            message = "Find your next anime",
+                            message = if (movies) "Find a movie or show" else "Find your next anime",
                             subtitle = "Search by title, then filter by type",
                             icon = Icons.Rounded.Search,
                             modifier = Modifier.height(360.dp)
@@ -181,7 +194,7 @@ fun SearchScreen(
 
                 Mode.Results -> PosterGrid(
                     items = uiState.visibleResults,
-                    onClick = { onAnimeClick(it.slug) },
+                    onClick = { open(it.slug) },
                     isLoadingMore = uiState.isLoadingMore,
                     onLoadMore = viewModel::loadNextPage
                 )

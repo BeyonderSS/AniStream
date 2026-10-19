@@ -62,6 +62,7 @@ dependencies {
     implementation(project(":core:network"))
     implementation(project(":core:parser"))
     implementation(project(":core:database"))
+    implementation(project(":core:media"))
     implementation(project(":core:common"))
     implementation(project(":core:ui"))
     implementation(project(":domain"))
@@ -74,6 +75,8 @@ dependencies {
     implementation(project(":feature:downloads"))
     implementation(project(":feature:schedule"))
     implementation(project(":feature:genre-browse"))
+    implementation(project(":feature:movies"))
+    implementation(project(":feature:livetv"))
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

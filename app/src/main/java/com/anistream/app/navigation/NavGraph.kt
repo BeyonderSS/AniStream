@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +16,11 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import com.anistream.core.ui.components.SegmentedControl
+import com.anistream.core.ui.theme.Space
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -32,6 +38,13 @@ import com.anistream.feature.downloads.DownloadsScreen
 import com.anistream.feature.favorites.FavoritesScreen
 import com.anistream.feature.genre.GenreBrowseScreen
 import com.anistream.feature.home.HomeScreen
+import com.anistream.feature.livetv.LiveTvScreen
+import com.anistream.feature.movies.AddonManagerScreen
+import com.anistream.feature.movies.MovieDetailScreen
+import com.anistream.feature.movies.MoviesCatalogScreen
+import com.anistream.feature.movies.MoviesHomeScreen
+import com.anistream.feature.movies.isMediaKey
+import com.anistream.feature.player.MediaPlayerScreen
 import com.anistream.feature.player.PlayerScreen
 import com.anistream.feature.schedule.ScheduleScreen
 import com.anistream.feature.search.SearchScreen
@@ -46,18 +59,29 @@ object Routes {
     /** path is optional: absent = genre picker, else a category path like "top-airing" or "genres/action". */
     const val GENRE_BROWSE = "genre_browse?path={path}"
     const val SCHEDULE = "schedule"
+    const val MOVIES = "movies"
+    const val MOVIE_DETAIL = "movie_detail/{id}"
+    const val MOVIES_CATALOG = "movies_catalog/{key}?title={title}"
+    const val MEDIA_PLAYER = "media_player"
+    const val LIVE_TV = "live_tv"
+    const val ADDONS = "addons"
+    const val LIBRARY = "library"
 
     fun animeDetail(slug: String) = "anime_detail/$slug"
+    fun movieDetail(id: String) = "movie_detail/${Uri.encode(id)}"
+    fun moviesCatalog(key: String, title: String) = "movies_catalog/${Uri.encode(key)}?title=${Uri.encode(title)}"
+    /** Favourites hold both kinds; media ids ("mb:…", "tt…") open the movie detail. */
+    fun detailFor(id: String) = if (isMediaKey(id)) movieDetail(id) else animeDetail(id)
     fun player(slug: String, episode: Int) = "player/$slug/$episode"
     fun browse(path: String? = null) = if (path == null) "genre_browse" else "genre_browse?path=${Uri.encode(path)}"
 }
 
 private val bottomBarRoutes = setOf(
     Routes.HOME,
+    Routes.MOVIES,
+    Routes.LIVE_TV,
     Routes.SEARCH,
-    Routes.FAVORITES,
-    Routes.SCHEDULE,
-    Routes.DOWNLOADS
+    Routes.LIBRARY
 )
 
 @Composable
@@ -131,6 +155,7 @@ fun AniStreamNavGraph() {
                         navController.navigate(Routes.browse())
                     },
                     onSearchClick = { navigateToTab(Routes.SEARCH) },
+                    onScheduleClick = { navController.navigate(Routes.SCHEDULE) },
                     onPlayEpisode = { slug, episode ->
                         navController.navigate(Routes.player(slug, episode))
                     }
@@ -142,17 +167,26 @@ fun AniStreamNavGraph() {
                     SearchScreen(
                         onAnimeClick = { slug ->
                             navController.navigate(Routes.animeDetail(slug))
-                        }
+                        },
+                        onMediaClick = { id -> navController.navigate(Routes.movieDetail(id)) }
                     )
                 }
             }
 
+            composable(Routes.LIBRARY) {
+                Insetted {
+                    LibraryScreen(
+                        onOpen = { id -> navController.navigate(Routes.detailFor(id)) },
+                        onDiscoverClick = { navigateToTab(Routes.HOME) }
+                    )
+                }
+            }
+
+            // Old tab routes stay reachable for any deep link / saved state.
             composable(Routes.FAVORITES) {
                 Insetted {
                     FavoritesScreen(
-                        onAnimeClick = { slug ->
-                            navController.navigate(Routes.animeDetail(slug))
-                        },
+                        onAnimeClick = { id -> navController.navigate(Routes.detailFor(id)) },
                         onDiscoverClick = { navigateToTab(Routes.HOME) }
                     )
                 }
@@ -160,6 +194,55 @@ fun AniStreamNavGraph() {
 
             composable(Routes.DOWNLOADS) {
                 Insetted { DownloadsScreen() }
+            }
+
+            composable(Routes.MOVIES) {
+                // Like anime Home: hero under the status bar, top bar pads itself.
+                MoviesHomeScreen(
+                    onItemClick = { id -> navController.navigate(Routes.movieDetail(id)) },
+                    onSeeAll = { key, title -> navController.navigate(Routes.moviesCatalog(key, title)) },
+                    onAddonsClick = { navController.navigate(Routes.ADDONS) }
+                )
+            }
+
+            composable(
+                route = Routes.MOVIES_CATALOG,
+                arguments = listOf(
+                    navArgument("key") { type = NavType.StringType },
+                    navArgument("title") { type = NavType.StringType; defaultValue = "" }
+                )
+            ) {
+                Insetted {
+                    MoviesCatalogScreen(
+                        onBack = { navController.popBackStack() },
+                        onItemClick = { id -> navController.navigate(Routes.movieDetail(id)) }
+                    )
+                }
+            }
+
+            composable(
+                route = Routes.MOVIE_DETAIL,
+                arguments = listOf(navArgument("id") { type = NavType.StringType })
+            ) {
+                // Edge to edge, like anime detail.
+                MovieDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPlayer = { navController.navigate(Routes.MEDIA_PLAYER) }
+                )
+            }
+
+            composable(Routes.MEDIA_PLAYER) {
+                MediaPlayerScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable(Routes.LIVE_TV) {
+                Insetted {
+                    LiveTvScreen(onPlay = { navController.navigate(Routes.MEDIA_PLAYER) })
+                }
+            }
+
+            composable(Routes.ADDONS) {
+                Insetted { AddonManagerScreen(onBack = { navController.popBackStack() }) }
             }
 
             composable(
@@ -221,6 +304,24 @@ fun AniStreamNavGraph() {
                     )
                 }
             }
+        }
+    }
+}
+
+/** Favorites | Downloads under one tab; each keeps its own screen and title. */
+@Composable
+private fun LibraryScreen(onOpen: (String) -> Unit, onDiscoverClick: () -> Unit) {
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+    Column(Modifier.fillMaxSize()) {
+        SegmentedControl(
+            options = listOf("Favorites", "Downloads"),
+            selectedIndex = tab,
+            onSelect = { tab = it },
+            modifier = Modifier.padding(start = Space.lg, end = Space.lg, top = Space.sm)
+        )
+        Box(Modifier.weight(1f)) {
+            if (tab == 0) FavoritesScreen(onAnimeClick = onOpen, onDiscoverClick = onDiscoverClick)
+            else DownloadsScreen()
         }
     }
 }

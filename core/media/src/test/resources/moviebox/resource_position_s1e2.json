@@ -1,0 +1,44 @@
+{
+ "code": 0,
+ "message": "ok",
+ "data": {
+  "pager": null,
+  "list": [
+   {
+    "episode": 102,
+    "title": "",
+    "resourceLink": "https://bcdn.hakunaymatata.com/resource/h265/9d7ddbd4b9d9c20732d544072f2fcb74.mp4?sign=c0ffb3722df23e529dc9e228fef15921&t=1792409683",
+    "linkType": 2,
+    "size": "125570821",
+    "uploadBy": "",
+    "resourceId": "3524510602414752008",
+    "postId": "4925010968293377664",
+    "extCaptions": [],
+    "se": 1,
+    "ep": 2,
+    "sourceUrl": "https://www.fzmovies.cms/tv-Breaking Bad [Hindi]_1_2_1080P-.html/season-1/episode-2-r360P-h265",
+    "resolution": 360,
+    "codecName": "hevc",
+    "duration": 2893,
+    "requireMemberType": 0,
+    "memberIcon": ""
+   }
+  ],
+  "subjectId": "",
+  "subjectType": 0,
+  "cover": null,
+  "subjectTitle": "",
+  "totalSize": "0",
+  "totalEpisode": 0,
+  "position": 0,
+  "resolution": 0,
+  "collectionResolutions": [],
+  "description": "",
+  "genre": "",
+  "tags": [],
+  "favInfo": null,
+  "releaseDate": "",
+  "countryName": "",
+  "durationSeconds": 0
+ }
+}

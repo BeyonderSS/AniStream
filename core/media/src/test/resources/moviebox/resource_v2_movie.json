@@ -1,0 +1,118 @@
+{
+ "code": 0,
+ "message": "ok",
+ "data": {
+  "pager": {
+   "hasMore": true,
+   "nextPage": "1",
+   "page": "0",
+   "perPage": 0,
+   "totalCount": 3
+  },
+  "list": [
+   {
+    "episode": 0,
+    "title": "Interstellar",
+    "resourceLink": "https://macdn.aoneroom.com/other/2026/10/10/80da52722ee7de7a4303290af6783424.mp4",
+    "linkType": 2,
+    "size": "824720",
+    "uploadBy": "ayesharus",
+    "resourceId": "7449708358422462792",
+    "postId": "236832896584141800",
+    "extCaptions": [],
+    "se": 0,
+    "ep": 0,
+    "sourceUrl": "https:///mkvcinemas.cat/c42b2569cdead3d61eca0aa2bce844d8/Interstellar-480P-h265",
+    "resolution": 480,
+    "codecName": "hevc",
+    "duration": 10145,
+    "requireMemberType": 0,
+    "memberIcon": "",
+    "vipInfo": {
+     "requireMemberType": 1,
+     "memberIcon": "https://pbcdn.aoneroom.com/image/2026/06/30/b83ec160ad5735c93a55e0a27e863532.png",
+     "previewSeconds": 360
+    }
+   },
+   {
+    "episode": 0,
+    "title": "Interstellar [Hindi]-720P",
+    "resourceLink": "https://macdn.aoneroom.com/other/2026/10/10/80da52722ee7de7a4303290af6783424.mp4",
+    "linkType": 2,
+    "size": "824720",
+    "uploadBy": "🌈🦋Modesta🧚🏼‍♀️✨",
+    "resourceId": "6061779891173949536",
+    "postId": "3352270838908208560",
+    "extCaptions": [],
+    "se": 0,
+    "ep": 0,
+    "sourceUrl": "https://vegamovies.pet/60168b2f1053313be153a54dc0965f8c/Interstellar-720P-tran-audio-channel",
+    "resolution": 720,
+    "codecName": "h264",
+    "duration": 10145,
+    "requireMemberType": 0,
+    "memberIcon": "",
+    "vipInfo": {
+     "requireMemberType": 1,
+     "memberIcon": "https://pbcdn.aoneroom.com/image/2026/06/30/b83ec160ad5735c93a55e0a27e863532.png",
+     "previewSeconds": 360
+    }
+   },
+   {
+    "episode": 0,
+    "title": "Interstellar",
+    "resourceLink": "https://macdn.aoneroom.com/other/2026/10/10/80da52722ee7de7a4303290af6783424.mp4",
+    "linkType": 2,
+    "size": "824720",
+    "uploadBy": "😂_وا_هبييل_هذا_😂",
+    "resourceId": "4567992629467694528",
+    "postId": "2894447531365122520",
+    "extCaptions": [],
+    "se": 0,
+    "ep": 0,
+    "sourceUrl": "https://vegamovies.pet/aa76db430317d10666f700dffcdb6c31/Interstellar-1080P-h265",
+    "resolution": 1080,
+    "codecName": "hevc",
+    "duration": 10145,
+    "requireMemberType": 0,
+    "memberIcon": "",
+    "vipInfo": {
+     "requireMemberType": 1,
+     "memberIcon": "https://pbcdn.aoneroom.com/image/2026/06/30/b83ec160ad5735c93a55e0a27e863532.png",
+     "previewSeconds": 360
+    }
+   }
+  ],
+  "subjectId": "5038022591622040232",
+  "subjectType": 1,
+  "cover": {
+   "url": "https://pbcdn.aoneroom.com/image/2026/01/27/f1aeaf2671b8b1589b5a56b40e730f1b.jpg",
+   "width": 2430,
+   "height": 3600,
+   "size": 1523007,
+   "format": "jpg",
+   "thumbnail": "eiHf0RtRoft7M{_Nofofj[RjIUaxWBaykCWBofWBayofWBofRjWBof",
+   "gif": null,
+   "averageHueLight": "#839199",
+   "averageHueDark": "#5c6266"
+  },
+  "subjectTitle": "Interstellar [Hindi]",
+  "totalSize": "4303744342",
+  "totalEpisode": 1,
+  "position": 0,
+  "resolution": 0,
+  "collectionResolutions": [],
+  "description": "",
+  "genre": "Adventure,Drama,Sci-Fi",
+  "tags": [],
+  "favInfo": null,
+  "releaseDate": "",
+  "countryName": "",
+  "durationSeconds": 10140,
+  "vipInfo": {
+   "requireMemberType": 1,
+   "memberIcon": "https://pbcdn.aoneroom.com/image/2026/06/30/b83ec160ad5735c93a55e0a27e863532.png",
+   "previewSeconds": 360
+  }
+ }
+}

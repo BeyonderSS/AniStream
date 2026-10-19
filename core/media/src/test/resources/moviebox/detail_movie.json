@@ -1,0 +1,362 @@
+{
+ "code": 0,
+ "message": "ok",
+ "data": {
+  "subjectId": "5038022591622040232",
+  "subjectType": 1,
+  "title": "Interstellar [Hindi]",
+  "description": "A team of explorers travel through a wormhole in space in an attempt to ensure humanity&apos;s survival.",
+  "releaseDate": "2014-11-07",
+  "duration": "2h 49m",
+  "genre": "Adventure, Drama, Sci-Fi",
+  "cover": {
+   "url": "https://pbcdn.aoneroom.com/image/2026/01/27/f1aeaf2671b8b1589b5a56b40e730f1b.jpg",
+   "width": 2430,
+   "height": 3600,
+   "size": 1523007,
+   "format": "jpg",
+   "thumbnail": "eiHf0RtRoft7M{_Nofofj[RjIUaxWBaykCWBofWBayofWBofRjWBof",
+   "gif": null,
+   "averageHueLight": "#839199",
+   "averageHueDark": "#5c6266"
+  },
+  "preVideoCover": null,
+  "preVideoAddress": [],
+  "countryName": "United States",
+  "language": "English",
+  "imdbRatingValue": "8.7",
+  "staffList": [
+   {
+    "staffId": "7674926235897973928",
+    "staffType": 2,
+    "name": "Christopher Nolan",
+    "character": "Director",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2023/11/20/75470511da6841fcc06445636e99283c.jpg"
+   },
+   {
+    "staffId": "1482269221887823544",
+    "staffType": 1,
+    "name": "Anne Hathaway",
+    "character": "Brand",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2024/11/13/b4054675707ad435414c248ca31ff971.jpeg"
+   },
+   {
+    "staffId": "7660609776313585448",
+    "staffType": 1,
+    "name": "Jessica Chastain",
+    "character": "Murph",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/0f98a642b5754c45a20577d6f9604280.jpg"
+   },
+   {
+    "staffId": "1182216896713215776",
+    "staffType": 1,
+    "name": "Matthew McConaughey",
+    "character": "Cooper",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/cf9e3846e4047abdd371f56e8fe7179c.jpg"
+   },
+   {
+    "staffId": "4490814510458097336",
+    "staffType": 1,
+    "name": "Francis X. McCarthy",
+    "character": "Boots",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/4c7796ccd316f88f466202a4c7cdef48.jpg"
+   },
+   {
+    "staffId": "5040394402485653176",
+    "staffType": 1,
+    "name": "Wes Bentley",
+    "character": "Doyle",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/50c50b419736428585e4586c87c53868.jpg"
+   },
+   {
+    "staffId": "7688510983379504928",
+    "staffType": 1,
+    "name": "Andrew Borba",
+    "character": "Smith",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2023/11/15/3b3c3320ff377e8afdc228c9f32e5701.jpg"
+   },
+   {
+    "staffId": "2509503353298767664",
+    "staffType": 1,
+    "name": "David Gyasi",
+    "character": "Romilly",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/56516dadbfba52893f23dccf36c84fd1.jpg"
+   },
+   {
+    "staffId": "8635524746430009128",
+    "staffType": 1,
+    "name": "Mackenzie Foy",
+    "character": "Murph (10 Yrs.)",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/c6434e041ec7501249f4c5404c652d1f.jpg"
+   },
+   {
+    "staffId": "4259547632718204720",
+    "staffType": 1,
+    "name": "Collette Wolfe",
+    "character": "Ms. Hanley",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/ec602465c9ffb4c8525b3217e46009f1.jpg"
+   },
+   {
+    "staffId": "90093987077443256",
+    "staffType": 1,
+    "name": "David Oyelowo",
+    "character": "School Principal",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/e88efccc943f3d0c8e7a5ac779f3e565.jpg"
+   },
+   {
+    "staffId": "7634186312874872504",
+    "staffType": 1,
+    "name": "Casey Affleck",
+    "character": "Tom",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/96293b0b3dea4f7c8a42f25eb9bfbfa0.jpg"
+   },
+   {
+    "staffId": "5159704608238882608",
+    "staffType": 1,
+    "name": "Josh Stewart",
+    "character": "CASE",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/16b676c2d916ab4c0c873e48581b94c6.jpg"
+   },
+   {
+    "staffId": "4654210734439681824",
+    "staffType": 1,
+    "name": "Bill Irwin",
+    "character": "TARS",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/490439f3ca39fd0487345196c4d4c090.jpg"
+   },
+   {
+    "staffId": "6517240828729904824",
+    "staffType": 1,
+    "name": "Ellen Burstyn",
+    "character": "Murph (Older)",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/6b3197d067b6960cb371deb4d476f6ef.jpg"
+   },
+   {
+    "staffId": "1744885375157817016",
+    "staffType": 1,
+    "name": "John Lithgow",
+    "character": "Donald",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/9b6374e050d933d3458f589b6d879c37.jpg"
+   },
+   {
+    "staffId": "3097865219462287152",
+    "staffType": 1,
+    "name": "William Devane",
+    "character": "Williams",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/a13e14c41fda87bf8718053715f2faee.jpg"
+   },
+   {
+    "staffId": "936717940463914784",
+    "staffType": 1,
+    "name": "Timothée Chalamet",
+    "character": "Tom (15 Yrs.)",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2024/05/20/866e99be2d2353f403bb5b4bad4a08cb.jpeg"
+   },
+   {
+    "staffId": "4273885264344403640",
+    "staffType": 1,
+    "name": "Michael Caine",
+    "character": "Professor Brand",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2022/09/02/0cb88880ccf596c0a7e19796fd3bdef5.jpg"
+   },
+   {
+    "staffId": "7674926235897973928",
+    "staffType": 3,
+    "name": "Christopher Nolan",
+    "character": "Writer",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2023/11/20/75470511da6841fcc06445636e99283c.jpg"
+   },
+   {
+    "staffId": "3764528524875432424",
+    "staffType": 3,
+    "name": "Jonathan Nolan",
+    "character": "Writer",
+    "avatarUrl": "https://pbcdn.aoneroom.com/image/2023/11/24/9176d0a4d9a47925c80d831cade79c54.jpg"
+   }
+  ],
+  "wantToSeeCount": 0,
+  "haveSeenCount": 0,
+  "seenStatus": 0,
+  "mySeeTime": "0",
+  "myScoreValue": 0,
+  "myScorePostId": "0",
+  "myScoreTime": "0",
+  "opt": "",
+  "hasResource": true,
+  "resourceDetectors": [
+   {
+    "type": 0,
+    "totalEpisode": 1,
+    "totalSize": "4303744342",
+    "uploadTime": "1723618464",
+    "uploadBy": "ayesharus",
+    "resourceLink": "https:///mkvcinemas.cat/c42b2569cdead3d61eca0aa2bce844d8/Interstellar-480P-h265",
+    "downloadUrl": "https://bcdn.hakunaymatata.com/resource/h265/b25bf9032d91c7c9170fca40e9ae4946.mp4?sign=cf5ab73fdbc2e17d02d3b600c60b091b&t=1792406285",
+    "source": "unknown",
+    "firstSize": "414710197",
+    "resourceId": "7449708358422462792",
+    "postId": "236832896584141800",
+    "extCaptions": [],
+    "resolutionList": [
+     {
+      "episode": 0,
+      "title": "Interstellar",
+      "resourceLink": "https://bcdn.hakunaymatata.com/resource/h265/b25bf9032d91c7c9170fca40e9ae4946.mp4?sign=cf5ab73fdbc2e17d02d3b600c60b091b&t=1792406285",
+      "linkType": 2,
+      "size": "414710197",
+      "uploadBy": "ayesharus",
+      "resourceId": "7449708358422462792",
+      "postId": "236832896584141800",
+      "extCaptions": [],
+      "se": 0,
+      "ep": 0,
+      "sourceUrl": "https:///mkvcinemas.cat/c42b2569cdead3d61eca0aa2bce844d8/Interstellar-480P-h265",
+      "resolution": 480,
+      "codecName": "hevc",
+      "duration": 10145,
+      "requireMemberType": 0,
+      "memberIcon": ""
+     },
+     {
+      "episode": 0,
+      "title": "Interstellar [Hindi]-720P",
+      "resourceLink": "https://bcdn.hakunaymatata.com/tran-audio/20250601/42a0a97561bd8bfc9c5ceb201d2104c4.mp4?sign=18b1951732584d0b5a59e7a2a0c42579&t=1792406407",
+      "linkType": 2,
+      "size": "1756991298",
+      "uploadBy": "ayesharus",
+      "resourceId": "6061779891173949536",
+      "postId": "3352270838908208560",
+      "extCaptions": [],
+      "se": 0,
+      "ep": 0,
+      "sourceUrl": "https:///mkvcinemas.cat/c42b2569cdead3d61eca0aa2bce844d8/Interstellar-480P-h265",
+      "resolution": 720,
+      "codecName": "h264",
+      "duration": 10145,
+      "requireMemberType": 0,
+      "memberIcon": ""
+     },
+     {
+      "episode": 0,
+      "title": "Interstellar",
+      "resourceLink": "https://bcdn.hakunaymatata.com/resource/h265/25ca8601b29b252bbbcf9bac5da0d242.mp4?sign=c14c7c808496dbb5eea1bb8b8ece376d&t=1792409776",
+      "linkType": 2,
+      "size": "2132042847",
+      "uploadBy": "ayesharus",
+      "resourceId": "4567992629467694528",
+      "postId": "2894447531365122520",
+      "extCaptions": [],
+      "se": 0,
+      "ep": 0,
+      "sourceUrl": "https:///mkvcinemas.cat/c42b2569cdead3d61eca0aa2bce844d8/Interstellar-480P-h265",
+      "resolution": 1080,
+      "codecName": "hevc",
+      "duration": 10145,
+      "requireMemberType": 0,
+      "memberIcon": ""
+     }
+    ],
+    "subjectId": "5038022591622040232",
+    "codecName": "hevc"
+   }
+  ],
+  "ops": "",
+  "durationSeconds": 10140,
+  "stills": {
+   "url": "https://pbcdn.aoneroom.com/image/2023/03/22/648008a787f444f5d7b9932ddb1604bd.jpg",
+   "width": 640,
+   "height": 478,
+   "size": 35861,
+   "format": "jpg",
+   "thumbnail": "eHB|HO~qRQkDxus;WBofoef5D*M{aeRjM{S1oes:a}RjD%Rjx[xus:",
+   "gif": null,
+   "averageHueLight": "#57554e",
+   "averageHueDark": "#575651"
+  },
+  "trailer": {
+   "VideoAddress": {
+    "videoId": "",
+    "definition": "",
+    "url": "https://macdn.aoneroom.com/other/2026/10/10/80da52722ee7de7a4303290af6783424.mp4",
+    "duration": 23,
+    "width": 0,
+    "height": 0,
+    "size": 824720,
+    "fps": 0,
+    "bitrate": 0,
+    "type": 0
+   },
+   "cover": {
+    "url": "https://pbcdn.aoneroom.com/image/2022/09/06/f42bcd087ae622d447da67ef18fbcba7.webp",
+    "width": 480,
+    "height": 270,
+    "size": 6836,
+    "format": "webp",
+    "thumbnail": "eDAJ~2_2-p~pxu01E1M{E1a}9GM{RkIVM|~p-:xt-:oe01IUM{D*ju",
+    "gif": null,
+    "averageHueLight": "#3c3e33",
+    "averageHueDark": "#3c3e33"
+   }
+  },
+  "contentRating": "PG-13",
+  "postTitle": "Interstellar",
+  "aka": "",
+  "explains": [],
+  "seNum": 0,
+  "viewers": 1241,
+  "category": "",
+  "subtitles": "English",
+  "dubs": [
+   {
+    "subjectId": "1631791573534917632",
+    "lanName": "English dub",
+    "lanCode": "en",
+    "original": false,
+    "type": 0
+   },
+   {
+    "subjectId": "5038022591622040232",
+    "lanName": "Hindi dub",
+    "lanCode": "hi",
+    "original": false,
+    "type": 0
+   },
+   {
+    "subjectId": "8299089346880851160",
+    "lanName": "Tamil dub",
+    "lanCode": "ta",
+    "original": false,
+    "type": 0
+   },
+   {
+    "subjectId": "7844635796052526384",
+    "lanName": "ptbr dub",
+    "lanCode": "ptbr",
+    "original": false,
+    "type": 0
+   }
+  ],
+  "relatedApp": null,
+  "restrictLevel": "",
+  "corner": "Hindi",
+  "likeStatus": 0,
+  "style": {
+   "colNum": 3,
+   "shape": "Vertical"
+  },
+  "detailUrl": "https://movie-box.co/detail/interstellar-hindi-atK4mXcca06",
+  "playUrl": {
+   "playUrl": "",
+   "urlType": "PLAY_URL_WEB"
+  },
+  "restrictKid": 0,
+  "season": 0,
+  "isCam": false,
+  "vipInfo": {
+   "requireMemberType": 1,
+   "memberIcon": "https://pbcdn.aoneroom.com/image/2026/06/30/b83ec160ad5735c93a55e0a27e863532.png",
+   "previewSeconds": 360
+  },
+  "cornerBadge": null
+ }
+}

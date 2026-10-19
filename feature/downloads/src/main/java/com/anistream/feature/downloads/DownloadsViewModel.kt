@@ -42,7 +42,8 @@ class DownloadsViewModel @Inject constructor(
                         fileSizeBytes = it.fileSizeBytes,
                         progress = it.progress,
                         state = runCatching { DownloadState.valueOf(it.state) }.getOrDefault(DownloadState.PENDING),
-                        createdAt = it.createdAt
+                        createdAt = it.createdAt,
+                        subtitle = it.subtitle
                     )
                 }
             )

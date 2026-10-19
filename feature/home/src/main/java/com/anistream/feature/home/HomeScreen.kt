@@ -33,6 +33,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Search
@@ -96,6 +97,7 @@ fun HomeScreen(
     onPlayEpisode: (String, Int) -> Unit,
     onGenresClick: () -> Unit = {},
     onSearchClick: () -> Unit = {},
+    onScheduleClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -223,13 +225,14 @@ fun HomeScreen(
         HomeTopBar(
             solid = solid || mode != HomeMode.Content,
             onSearchClick = onSearchClick,
-            onGenresClick = onGenresClick
+            onGenresClick = onGenresClick,
+            onScheduleClick = onScheduleClick
         )
     }
 }
 
 @Composable
-private fun HomeTopBar(solid: Boolean, onSearchClick: () -> Unit, onGenresClick: () -> Unit) {
+private fun HomeTopBar(solid: Boolean, onSearchClick: () -> Unit, onGenresClick: () -> Unit, onScheduleClick: () -> Unit) {
     val bg by animateColorAsState(if (solid) Bg.bar else Color.Transparent, tween(250, easing = FastOutSlowInEasing), label = "topBarBg")
     Row(
         modifier = Modifier
@@ -248,6 +251,9 @@ private fun HomeTopBar(solid: Boolean, onSearchClick: () -> Unit, onGenresClick:
         )
         IconButton(onClick = onSearchClick) {
             Icon(Icons.Outlined.Search, contentDescription = "Search", tint = Ink.high)
+        }
+        IconButton(onClick = onScheduleClick) {
+            Icon(Icons.Outlined.CalendarMonth, contentDescription = "Schedule", tint = Ink.high)
         }
         IconButton(onClick = onGenresClick) {
             Icon(Icons.Outlined.Category, contentDescription = "Browse genres", tint = Ink.high)

@@ -7,6 +7,7 @@ import com.anistream.core.database.dao.DownloadDao
 import com.anistream.core.database.entity.DownloadEntity
 import com.anistream.domain.model.DownloadItem
 import com.anistream.domain.model.DownloadState
+import com.anistream.domain.model.MediaStream
 import com.anistream.domain.model.StreamSource
 import com.anistream.domain.repository.DownloadRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -47,6 +48,9 @@ internal fun isMasterPlaylist(playlist: String) = playlist.contains("#EXT-X-STRE
 /** Stable key for (anime, episode); hianime episode ids aren't known to the downloads screen. */
 fun downloadId(animeSlug: String, episodeNumber: Int): Long =
     (animeSlug.hashCode().toLong() shl 32) or (episodeNumber.toLong() and 0xFFFFFFFFL)
+
+/** "/x/a.ts" -> "/x/a": subtitle sidecars sit next to the video with a .vtt/.srt extension. */
+internal fun sidecarBase(videoPath: String) = videoPath.substringBeforeLast('.')
 
 @Singleton
 class DownloadRepositoryImpl @Inject constructor(
@@ -158,6 +162,97 @@ class DownloadRepositoryImpl @Inject constructor(
         )
     }
 
+    override suspend fun startMediaDownload(stream: MediaStream, key: String, title: String, subtitle: String?): Result<Unit> {
+        return try {
+            if (!stream.isDirectFile) return Result.error(IOException("Only direct files can be downloaded"))
+            val id = downloadId(key, 0)
+            if (jobs[id]?.isActive == true) return Result.success(Unit)
+            val name = listOfNotNull(title, subtitle).joinToString(" ").replace(Regex("[^A-Za-z0-9._-]+"), "_").trim('_').take(120)
+            val video = File(dir, "${name.ifEmpty { "video" }}.mp4")
+            val entity = DownloadEntity(
+                episodeId = id,
+                animeTitle = title,
+                episodeNumber = 0,
+                quality = stream.qualityLabel,
+                filePath = video.path,
+                state = DownloadState.PENDING.name,
+                subtitle = subtitle
+            )
+            dao.upsert(entity)
+            jobs[id] = scope.launch {
+                try {
+                    downloadFile(stream, entity, video)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // keep the partial file: the next attempt resumes it with a Range request
+                    dao.updateProgress(id, 0f, DownloadState.FAILED.name)
+                } finally {
+                    jobs.remove(id)
+                }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.error(e)
+        }
+    }
+
+    private suspend fun downloadFile(stream: MediaStream, entity: DownloadEntity, video: File) {
+        val existing = if (video.exists()) video.length() else 0L
+        val req = Request.Builder().url(stream.url)
+            .header("User-Agent", USER_AGENT)
+            .apply {
+                stream.headers.forEach { (k, v) -> header(k, v) }
+                if (existing > 0) header("Range", "bytes=$existing-")
+            }
+            .build()
+        dao.updateProgress(entity.episodeId, 0f, DownloadState.DOWNLOADING.name)
+        client.newCall(req).execute().use { resp ->
+            if (resp.code == 416 && existing > 0) return@use // partial file is already whole
+            if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
+            val body = resp.body ?: throw IOException("Empty body")
+            val resumed = resp.code == 206
+            val start = if (resumed) existing else 0L
+            val total = body.contentLength().takeIf { it > 0 }?.plus(start) ?: stream.sizeBytes ?: -1L
+            var done = start
+            var lastWrite = 0L
+            java.io.FileOutputStream(video, resumed).buffered().use { out ->
+                body.byteStream().use { input ->
+                    val buf = ByteArray(64 * 1024)
+                    while (true) {
+                        kotlin.coroutines.coroutineContext.ensureActive()
+                        val n = input.read(buf)
+                        if (n < 0) break
+                        out.write(buf, 0, n)
+                        done += n
+                        val now = System.currentTimeMillis()
+                        if (total > 0 && now - lastWrite > 1000) {
+                            lastWrite = now
+                            dao.updateProgress(entity.episodeId, done.toFloat() / total, DownloadState.DOWNLOADING.name)
+                        }
+                    }
+                }
+            }
+            if (total > 0 && done < total) throw IOException("Connection closed at $done/$total bytes")
+        }
+
+        stream.subtitles.firstOrNull()?.let { track ->
+            val ext = if (track.mimeType.contains("vtt")) "vtt" else "srt"
+            // subtitles are optional; a failure here shouldn't sink the video
+            runCatching {
+                val text = withContext(Dispatchers.IO) {
+                    client.newCall(Request.Builder().url(track.url).header("User-Agent", USER_AGENT).build()).execute().use {
+                        if (!it.isSuccessful) throw IOException("HTTP ${it.code}")
+                        it.body?.string() ?: ""
+                    }
+                }
+                File(sidecarBase(video.path) + ".$ext").writeText(text)
+            }
+        }
+
+        dao.upsert(entity.copy(progress = 1f, state = DownloadState.COMPLETED.name, fileSizeBytes = video.length()))
+    }
+
     private fun request(url: String, referer: String?): Request = Request.Builder()
         .url(url)
         .header("User-Agent", USER_AGENT)
@@ -196,7 +291,7 @@ class DownloadRepositoryImpl @Inject constructor(
     private suspend fun deleteFiles(episodeId: Long) {
         val path = dao.getById(episodeId)?.filePath ?: return
         File(path).delete()
-        File(path.removeSuffix(".ts") + ".vtt").delete()
+        listOf("vtt", "srt").forEach { File(sidecarBase(path) + ".$it").delete() }
     }
 
     private fun DownloadEntity.toDomain() = DownloadItem(
@@ -208,6 +303,7 @@ class DownloadRepositoryImpl @Inject constructor(
         fileSizeBytes = fileSizeBytes,
         progress = progress,
         state = runCatching { DownloadState.valueOf(state) }.getOrDefault(DownloadState.PENDING),
-        createdAt = createdAt
+        createdAt = createdAt,
+        subtitle = subtitle
     )
 }
