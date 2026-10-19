@@ -1,0 +1,44 @@
+package com.anistream.app.di
+
+import android.content.Context
+import androidx.room.Room
+import com.anistream.core.database.AniStreamDatabase
+import com.anistream.core.database.dao.DownloadDao
+import com.anistream.core.database.dao.FavoriteDao
+import com.anistream.core.database.dao.RecentSearchDao
+import com.anistream.core.database.dao.WatchHistoryDao
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
+
+@Module
+@InstallIn(SingletonComponent::class)
+object DatabaseModule {
+
+    @Provides
+    @Singleton
+    fun provideDatabase(
+        @ApplicationContext context: Context
+    ): AniStreamDatabase {
+        return Room.databaseBuilder(
+            context,
+            AniStreamDatabase::class.java,
+            AniStreamDatabase.DATABASE_NAME
+        ).build()
+    }
+
+    @Provides
+    fun provideWatchHistoryDao(db: AniStreamDatabase): WatchHistoryDao = db.watchHistoryDao()
+
+    @Provides
+    fun provideFavoriteDao(db: AniStreamDatabase): FavoriteDao = db.favoriteDao()
+
+    @Provides
+    fun provideRecentSearchDao(db: AniStreamDatabase): RecentSearchDao = db.recentSearchDao()
+
+    @Provides
+    fun provideDownloadDao(db: AniStreamDatabase): DownloadDao = db.downloadDao()
+}

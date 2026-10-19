@@ -1,0 +1,24 @@
+# Gradle / Kotlin
+.gradle/
+.kotlin/
+build/
+**/build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Signing & artifacts (APKs ship via GitHub Releases)
+*.jks
+*.keystore
+release/
+*.apk
+*.aab
+
+# Internal session notes
+PROJECT_HANDOFF.md
