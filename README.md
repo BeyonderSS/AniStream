@@ -15,7 +15,9 @@ A native Android anime streaming app. It is built on the same scraping approach 
 
 ## Install
 
-Download the latest APK from [Releases](../../releases/latest) and open it on your phone. Android 8.0 (API 26) or newer is required. You'll need to allow "install unknown apps" for your browser or file manager.
+Download the latest APK from [Releases](../../releases/latest) and open it on your phone (Android 8.0+, allow "install unknown apps" when asked).
+
+Every push to `main` builds a signed APK and publishes it as a new release (`v1.0.<build>`). Every release from v1.0.1 onward installs as an update over the previous one. v1.0.0 was signed with a different key, so uninstall it once before installing a newer build.
 
 ## Features
 
