@@ -147,6 +147,16 @@ class MoviesRepositoryImpl @Inject constructor(
         return tt
     }
 
+    override suspend fun imdbId(mediaId: String): String? = when {
+        mediaId.startsWith("tt") -> mediaId
+        mediaId.startsWith("mb:") -> runCatching {
+            val sid = mediaId.removePrefix("mb:")
+            mbToTt[sid]?.let { return@runCatching it.ifEmpty { null } }
+            imdbIdFor(sid, movieBox.detail(sid))
+        }.getOrNull()
+        else -> null
+    }
+
     override suspend fun streams(id: String, season: Int, episode: Int): Result<List<MediaStream>> = safeApiCall {
         val sid: String?
         val tt: String?

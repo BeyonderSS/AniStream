@@ -41,6 +41,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,6 +49,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -77,6 +79,7 @@ import com.anistream.core.ui.components.LoadingShimmer
 import com.anistream.core.ui.components.PillChip
 import com.anistream.core.ui.components.PosterImage
 import com.anistream.core.ui.components.PrimaryButton
+import com.anistream.core.ui.components.SecondaryButton
 import com.anistream.core.ui.theme.Accent
 import com.anistream.core.ui.theme.AppType
 import com.anistream.core.ui.theme.Bg
@@ -95,6 +98,8 @@ private val BarHeight = 56.dp
 fun MovieDetailScreen(
     onBack: () -> Unit,
     onOpenPlayer: () -> Unit,
+    /** (imdbId, season, episode) */
+    onWebPlayer: (String, Int, Int) -> Unit = { _, _, _ -> },
     viewModel: MovieDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -108,7 +113,12 @@ fun MovieDetailScreen(
         viewModel.events.collect { e ->
             when (e) {
                 DetailEvent.OpenPlayer -> onOpenPlayer()
-                is DetailEvent.Message -> snackbar.showSnackbar(e.text)
+                is DetailEvent.OpenWebPlayer -> onWebPlayer(e.imdbId, e.season, e.episode)
+                is DetailEvent.Message -> {
+                    val web = e.web
+                    val r = snackbar.showSnackbar(e.text, actionLabel = if (web != null) "Web player" else null)
+                    if (web != null && r == SnackbarResult.ActionPerformed) viewModel.openWebPlayer(web)
+                }
             }
         }
     }
@@ -194,8 +204,9 @@ fun MovieDetailScreen(
                                         EpisodeTile(
                                             number = ep,
                                             next = resume != null && resume.season == season && resume.episode == ep,
-                                            enabled = detail.playable,
-                                            onClick = { viewModel.play(season, ep) },
+                                            enabled = true,
+                                            // not streamable in-app: each episode opens the web player instead
+                                            onClick = { if (detail.playable) viewModel.play(season, ep) else viewModel.openWebPlayer(Resume(season, ep)) },
                                             modifier = Modifier.weight(1f)
                                         )
                                     }
@@ -227,19 +238,26 @@ fun MovieDetailScreen(
             val resume = uiState.resume
             val isSeries = detail.type == MediaType.SERIES
             val firstSeason = detail.seasons.firstOrNull()?.number ?: 1
+            val web = uiState.webFallback
             val (label, target) = when {
-                !detail.playable -> "Not available to stream" to null
+                !detail.playable && web != null -> "Watch in web player" to web
                 isSeries && resume != null -> "Continue S${resume.season} E${resume.episode}" to resume
                 isSeries -> "Play S$firstSeason E1" to Resume(firstSeason, 1)
                 resume != null -> "Continue" to Resume(0, 0)
                 else -> "Play" to Resume(0, 0)
             }
+            val webOnly = !detail.playable
             ActionBar(
                 label = label,
                 enabled = target != null,
                 loading = uiState.resolving,
+                secondary = webOnly,
                 isFavorite = uiState.isFavorite,
-                onPlay = { if (target != null) viewModel.play(target.season, target.episode) },
+                onPlay = {
+                    if (target == null) Unit
+                    else if (webOnly) viewModel.openWebPlayer(target)
+                    else viewModel.play(target.season, target.episode)
+                },
                 onFavorite = viewModel::toggleFavorite
             )
         }
@@ -358,6 +376,7 @@ private fun BoxScope.ActionBar(
     label: String,
     enabled: Boolean,
     loading: Boolean,
+    secondary: Boolean,
     isFavorite: Boolean,
     onPlay: () -> Unit,
     onFavorite: () -> Unit
@@ -375,13 +394,17 @@ private fun BoxScope.ActionBar(
             .padding(start = Space.lg, end = Space.lg, top = Space.xl, bottom = Space.md)
     ) {
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            PrimaryButton(
-                text = if (loading) "Finding sources…" else label,
-                onClick = onPlay,
-                enabled = enabled && !loading,
-                icon = if (enabled && !loading) Icons.Rounded.PlayArrow else null,
-                modifier = Modifier.fillMaxWidth().height(52.dp)
-            )
+            if (secondary) {
+                SecondaryButton(text = label, onClick = onPlay, icon = Icons.Rounded.Language, modifier = Modifier.fillMaxWidth().height(52.dp))
+            } else {
+                PrimaryButton(
+                    text = if (loading) "Finding sources…" else label,
+                    onClick = onPlay,
+                    enabled = enabled && !loading,
+                    icon = if (enabled && !loading) Icons.Rounded.PlayArrow else null,
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                )
+            }
             if (loading) {
                 CircularProgressIndicator(
                     color = Accent.on,

@@ -45,6 +45,7 @@ import com.anistream.feature.movies.MoviesCatalogScreen
 import com.anistream.feature.movies.MoviesHomeScreen
 import com.anistream.feature.movies.isMediaKey
 import com.anistream.feature.player.MediaPlayerScreen
+import com.anistream.feature.player.WebEmbedPlayer
 import com.anistream.feature.player.PlayerScreen
 import com.anistream.feature.schedule.ScheduleScreen
 import com.anistream.feature.search.SearchScreen
@@ -63,6 +64,7 @@ object Routes {
     const val MOVIE_DETAIL = "movie_detail/{id}"
     const val MOVIES_CATALOG = "movies_catalog/{key}?title={title}"
     const val MEDIA_PLAYER = "media_player"
+    const val WEB_PLAYER = "web_player/{imdb}/{season}/{episode}"
     const val LIVE_TV = "live_tv"
     const val ADDONS = "addons"
     const val LIBRARY = "library"
@@ -73,6 +75,7 @@ object Routes {
     /** Favourites hold both kinds; media ids ("mb:…", "tt…") open the movie detail. */
     fun detailFor(id: String) = if (isMediaKey(id)) movieDetail(id) else animeDetail(id)
     fun player(slug: String, episode: Int) = "player/$slug/$episode"
+    fun webPlayer(imdb: String, season: Int, episode: Int) = "web_player/${Uri.encode(imdb)}/$season/$episode"
     fun browse(path: String? = null) = if (path == null) "genre_browse" else "genre_browse?path=${Uri.encode(path)}"
 }
 
@@ -228,12 +231,33 @@ fun AniStreamNavGraph() {
                 // Edge to edge, like anime detail.
                 MovieDetailScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenPlayer = { navController.navigate(Routes.MEDIA_PLAYER) }
+                    onOpenPlayer = { navController.navigate(Routes.MEDIA_PLAYER) },
+                    onWebPlayer = { tt, s, e -> navController.navigate(Routes.webPlayer(tt, s, e)) }
                 )
             }
 
             composable(Routes.MEDIA_PLAYER) {
-                MediaPlayerScreen(onBack = { navController.popBackStack() })
+                MediaPlayerScreen(
+                    onBack = { navController.popBackStack() },
+                    onWebPlayer = { tt, s, e -> navController.navigate(Routes.webPlayer(tt, s, e)) }
+                )
+            }
+
+            composable(
+                route = Routes.WEB_PLAYER,
+                arguments = listOf(
+                    navArgument("imdb") { type = NavType.StringType },
+                    navArgument("season") { type = NavType.IntType },
+                    navArgument("episode") { type = NavType.IntType }
+                )
+            ) { entry ->
+                val args = entry.arguments
+                WebEmbedPlayer(
+                    imdbId = args?.getString("imdb").orEmpty(),
+                    season = args?.getInt("season") ?: 0,
+                    episode = args?.getInt("episode") ?: 0,
+                    onBack = { navController.popBackStack() }
+                )
             }
 
             composable(Routes.LIVE_TV) {

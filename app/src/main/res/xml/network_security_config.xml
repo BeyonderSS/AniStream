@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false">
+    <!-- many IPTV playlists serve plain http:// streams -->
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

@@ -33,12 +33,16 @@ data class MovieDetailUiState(
     val isFavorite: Boolean = false,
     val resume: Resume? = null,
     val selectedSeason: Int = 1,
-    val resolving: Boolean = false
+    val resolving: Boolean = false,
+    /** set when no in-app stream exists: the screen offers "Watch in web player" for this target */
+    val webFallback: Resume? = null
 )
 
 sealed interface DetailEvent {
     data object OpenPlayer : DetailEvent
-    data class Message(val text: String) : DetailEvent
+    /** [web] non-null: offer "Watch in web player" for that target alongside the message */
+    data class Message(val text: String, val web: Resume? = null) : DetailEvent
+    data class OpenWebPlayer(val imdbId: String, val season: Int, val episode: Int) : DetailEvent
 }
 
 private val KeySuffix = Regex(":s(\\d+)e(\\d+)$")
@@ -69,7 +73,10 @@ class MovieDetailViewModel @Inject constructor(
                     val d = r.data
                     id = d.id
                     _uiState.update {
-                        it.copy(isLoading = false, detail = d, selectedSeason = d.seasons.firstOrNull()?.number ?: 1)
+                        it.copy(
+                            isLoading = false, detail = d, selectedSeason = d.seasons.firstOrNull()?.number ?: 1,
+                            webFallback = if (d.playable) null else defaultTarget(d)
+                        )
                     }
                     _uiState.update { it.copy(isFavorite = favorites.isFavorite(d.id).getOrNull() ?: false) }
                     refreshHistory()
@@ -127,7 +134,9 @@ class MovieDetailViewModel @Inject constructor(
             _uiState.update { it.copy(resolving = false) }
             val list = streams.getOrNull().orEmpty()
             if (list.isEmpty()) {
-                _events.send(DetailEvent.Message(if (streams is Result.Error) streams.message ?: "No sources available" else "No sources available"))
+                val web = Resume(season, episode)
+                _uiState.update { it.copy(webFallback = web) }
+                _events.send(DetailEvent.Message(if (streams is Result.Error) streams.message ?: "No sources available" else "No sources available", web))
                 return@launch
             }
             NowPlaying.request = PlaybackRequest(
@@ -144,6 +153,21 @@ class MovieDetailViewModel @Inject constructor(
             _events.send(DetailEvent.OpenPlayer)
         }
     }
+
+    /** Last resort: the web player, keyed by IMDb id. */
+    fun openWebPlayer(target: Resume) {
+        val d = _uiState.value.detail ?: return
+        viewModelScope.launch {
+            val tt = movies.imdbId(d.id)
+            _events.send(
+                if (tt == null) DetailEvent.Message("The web player can't find this title")
+                else DetailEvent.OpenWebPlayer(tt, target.season, target.episode)
+            )
+        }
+    }
+
+    private fun defaultTarget(d: MediaDetail) =
+        if (d.type == MediaType.SERIES) Resume(d.seasons.firstOrNull()?.number ?: 1, 1) else Resume(0, 0)
 
     fun toggleFavorite() {
         val d = _uiState.value.detail ?: return

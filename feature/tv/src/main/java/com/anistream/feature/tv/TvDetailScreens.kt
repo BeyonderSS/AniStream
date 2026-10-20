@@ -40,6 +40,7 @@ import com.anistream.domain.model.MediaType
 import com.anistream.feature.anime.AnimeDetailViewModel
 import com.anistream.feature.movies.DetailEvent
 import com.anistream.feature.movies.MovieDetailViewModel
+import com.anistream.feature.movies.Resume
 import kotlinx.coroutines.delay
 
 /** Backdrop + left column (title, chips, synopsis ≤ 3 lines, actions) + focusable rows below. */
@@ -182,7 +183,12 @@ fun TvAnimeDetailScreen(onPlay: (slug: String, episode: Int) -> Unit, onOpen: (s
 }
 
 @Composable
-fun TvMovieDetailScreen(onPlayer: () -> Unit, vm: MovieDetailViewModel = hiltViewModel()) {
+fun TvMovieDetailScreen(
+    onPlayer: () -> Unit,
+    /** (imdbId, season, episode) */
+    onWebPlayer: (String, Int, Int) -> Unit,
+    vm: MovieDetailViewModel = hiltViewModel()
+) {
     val s by vm.uiState.collectAsStateWithLifecycle()
     var message by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
@@ -190,6 +196,7 @@ fun TvMovieDetailScreen(onPlayer: () -> Unit, vm: MovieDetailViewModel = hiltVie
         vm.events.collect { e ->
             when (e) {
                 DetailEvent.OpenPlayer -> onPlayer()
+                is DetailEvent.OpenWebPlayer -> onWebPlayer(e.imdbId, e.season, e.episode)
                 is DetailEvent.Message -> message = e.text
             }
         }
@@ -211,9 +218,12 @@ fun TvMovieDetailScreen(onPlayer: () -> Unit, vm: MovieDetailViewModel = hiltVie
         title = d.title,
         meta = listOfNotNull(if (series) "Series" else "Movie", d.year?.toString(), d.runtime, scoreLabel(d.rating)) + d.genres.take(3),
         synopsis = d.description,
-        note = message ?: if (!d.playable) "Not available to stream" else null,
+        note = message ?: if (!d.playable) "Not available to stream in the app" else null,
         actions = {
-            TvPill(
+            val web = s.webFallback
+            if (!d.playable && web != null) {
+                TvPill("Watch in web player", { vm.openWebPlayer(web) }, large = true, modifier = Modifier.focusRequester(playFocus))
+            } else TvPill(
                 text = when {
                     s.resolving -> "Finding sources…"
                     r != null && r.episode > 0 -> "Resume S${r.season} E${r.episode}"
@@ -222,10 +232,11 @@ fun TvMovieDetailScreen(onPlayer: () -> Unit, vm: MovieDetailViewModel = hiltVie
                     else -> "Play"
                 },
                 onClick = { if (r != null) vm.play(r.season, r.episode) else if (series) vm.play(firstSeason, 1) else vm.play(0, 0) },
-                enabled = d.playable,
                 icon = Icons.Filled.PlayArrow, large = true,
                 modifier = Modifier.focusRequester(playFocus)
             )
+            // streams came back empty for a playable title: offer the web player next to Play
+            if (d.playable && web != null) TvPill("Web player", { vm.openWebPlayer(web) }, large = true)
             TvPill(
                 if (s.isFavorite) "In favourites" else "Favourite", vm::toggleFavorite,
                 icon = if (s.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, large = true, selected = s.isFavorite
@@ -244,7 +255,8 @@ fun TvMovieDetailScreen(onPlayer: () -> Unit, vm: MovieDetailViewModel = hiltVie
             if (count > 0) item(key = "eps${s.selectedSeason}") {
                 val resumeHere = r?.takeIf { it.season == s.selectedSeason }?.episode ?: 0
                 PillRow(
-                    "Episodes", (1..count).toList(), { "Episode $it" }, { it < resumeHere }, { vm.play(s.selectedSeason, it) },
+                    "Episodes", (1..count).toList(), { "Episode $it" }, { it < resumeHere },
+                    { if (d.playable) vm.play(s.selectedSeason, it) else vm.openWebPlayer(Resume(s.selectedSeason, it)) },
                     initial = (resumeHere - 1).coerceAtLeast(0)
                 )
             }

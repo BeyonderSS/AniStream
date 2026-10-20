@@ -34,6 +34,7 @@ import androidx.tv.material3.Text
 import com.anistream.feature.home.HomeViewModel
 import com.anistream.feature.movies.MoviesHomeViewModel
 import com.anistream.feature.movies.isMediaKey
+import com.anistream.feature.player.WebEmbedPlayer
 import dagger.hilt.android.AndroidEntryPoint
 
 /** Launcher activity of the `tv` flavor (Android TV / Fire TV). D-pad only, no touch assumptions. */
@@ -58,6 +59,7 @@ internal object TvRoutes {
     fun movie(id: String) = "movie/${Uri.encode(id)}"
     fun detail(id: String) = if (isMediaKey(id)) movie(id) else anime(id)
     fun player(slug: String, episode: Int) = "player/${Uri.encode(slug)}/$episode"
+    fun web(imdb: String, season: Int, episode: Int) = "web/${Uri.encode(imdb)}/$season/$episode"
 }
 
 private data class RailEntry(val route: String, val label: String, val icon: ImageVector)
@@ -95,9 +97,23 @@ private fun TvApp() {
                     onOpen = { nav.navigate(TvRoutes.anime(it)) }
                 )
             }
-            composable("movie/{id}") { TvMovieDetailScreen(onPlayer = { nav.navigate(TvRoutes.MEDIA_PLAYER) }) }
+            composable("movie/{id}") {
+                TvMovieDetailScreen(onPlayer = { nav.navigate(TvRoutes.MEDIA_PLAYER) }, onWebPlayer = { tt, s, e -> nav.navigate(TvRoutes.web(tt, s, e)) })
+            }
             composable("player/{slug}/{episode}") { TvAnimePlayerScreen(onExit = { nav.popBackStack() }) }
-            composable(TvRoutes.MEDIA_PLAYER) { TvMediaPlayerScreen(onExit = { nav.popBackStack() }) }
+            composable(TvRoutes.MEDIA_PLAYER) {
+                TvMediaPlayerScreen(onExit = { nav.popBackStack() }, onWebPlayer = { tt, s, e -> nav.navigate(TvRoutes.web(tt, s, e)) })
+            }
+            composable("web/{imdb}/{season}/{episode}") { entry ->
+                val a = entry.arguments
+                WebEmbedPlayer(
+                    imdbId = a?.getString("imdb").orEmpty(),
+                    season = a?.getString("season")?.toIntOrNull() ?: 0,
+                    episode = a?.getString("episode")?.toIntOrNull() ?: 0,
+                    onBack = { nav.popBackStack() },
+                    tv = true
+                )
+            }
         }
     }
 

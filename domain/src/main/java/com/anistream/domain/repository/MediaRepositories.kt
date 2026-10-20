@@ -26,6 +26,9 @@ interface MoviesRepository {
 
     /** All playable sources, best first. Movies: season = episode = 0. */
     suspend fun streams(id: String, season: Int = 0, episode: Int = 0): Result<List<MediaStream>>
+
+    /** IMDb "tt…" id for a MediaItem.id, or null when there is none (web-player fallback). */
+    suspend fun imdbId(mediaId: String): String? = mediaId.takeIf { it.startsWith("tt") }
 }
 
 interface AddonRepository {

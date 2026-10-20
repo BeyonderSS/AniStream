@@ -79,6 +79,9 @@ internal object M3u {
                     attrs = ATTR.findAll(line).associate { it.groupValues[1].lowercase() to it.groupValues[2] }
                     name = line.substringAfterLast(',', "").trim()
                     headers.clear()
+                    // iptv-org also puts headers on the #EXTINF line itself
+                    attrs["http-user-agent"]?.ifBlank { null }?.let { headers["User-Agent"] = it }
+                    (attrs["http-referrer"] ?: attrs["http-referer"])?.ifBlank { null }?.let { headers["Referer"] = it }
                 }
                 line.startsWith("#EXTVLCOPT:", ignoreCase = true) -> {
                     val opt = line.substringAfter(':')

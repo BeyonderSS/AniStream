@@ -60,6 +60,8 @@ import com.anistream.core.ui.theme.Space
 @Composable
 fun MediaPlayerScreen(
     onBack: () -> Unit,
+    /** (imdbId, season, episode) */
+    onWebPlayer: (String, Int, Int) -> Unit = { _, _, _ -> },
     viewModel: MediaPlayerViewModel = hiltViewModel()
 ) {
     val ui by viewModel.uiState.collectAsStateWithLifecycle()
@@ -67,6 +69,12 @@ fun MediaPlayerScreen(
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val (fullscreen, setFullscreen) = rememberFullscreen(viewModel::onStop)
     val request = ui.request
+
+    LaunchedEffect(ui.webImdbId) {
+        val tt = ui.webImdbId ?: return@LaunchedEffect
+        viewModel.webPlayerOpened()
+        onWebPlayer(tt, request?.season ?: 0, request?.episode ?: 0)
+    }
 
     LaunchedEffect(ui.message) {
         val msg = ui.message ?: return@LaunchedEffect
@@ -88,6 +96,7 @@ fun MediaPlayerScreen(
             // no request at all: Retry can't help, so it leaves
             onRetry = if (request == null) onBack else viewModel::retry,
             live = ui.isLive,
+            onWebPlayer = if (ui.canWebPlay) viewModel::openWebPlayer else null,
             endOverlay = if (!ui.ended || request == null) null else {
                 {
                     if (ui.hasNextEpisode) {
@@ -182,6 +191,13 @@ fun MediaPlayerScreen(
                             viewModel.selectStream(i)
                             showSettings = false
                         }
+                    }
+                }
+                if (ui.canWebPlay) {
+                    Spacer(Modifier.height(Space.md))
+                    SheetOption("Web player", selected = false, caption = "Last resort · opens the title in a browser player") {
+                        showSettings = false
+                        viewModel.openWebPlayer()
                     }
                 }
                 val subs = ui.stream?.subtitles.orEmpty()

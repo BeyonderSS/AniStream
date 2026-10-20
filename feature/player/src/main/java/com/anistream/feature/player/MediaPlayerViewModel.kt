@@ -48,8 +48,12 @@ data class MediaPlayerUiState(
     val message: String? = null,
     /** played to the end; the screen shows the next-episode countdown or the finished card */
     val ended: Boolean = false,
-    val downloadStarted: Boolean = false
+    val downloadStarted: Boolean = false,
+    /** IMDb id resolved for the web-player fallback; the screen navigates and calls [MediaPlayerViewModel.webPlayerOpened] */
+    val webImdbId: String? = null
 ) {
+    /** Movies/episodes only: live TV has no IMDb id. */
+    val canWebPlay: Boolean get() = request?.let { it.mediaId != null && !it.isLive } == true
     val stream: MediaStream? get() = request?.streams?.getOrNull(streamIndex)
     val isLive: Boolean get() = request?.isLive == true
     val hasNextEpisode: Boolean
@@ -300,6 +304,20 @@ class MediaPlayerViewModel @Inject constructor(
             _uiState.update { it.copy(message = msg, downloadStarted = res !is Result.Error) }
         }
     }
+
+    /** Last resort: hand the title to the web player. */
+    fun openWebPlayer() {
+        val mediaId = _uiState.value.request?.mediaId ?: return
+        player.pause()
+        viewModelScope.launch {
+            val tt = movies.imdbId(mediaId)
+            _uiState.update {
+                if (tt == null) it.copy(message = "The web player can't find this title") else it.copy(webImdbId = tt)
+            }
+        }
+    }
+
+    fun webPlayerOpened() = _uiState.update { it.copy(webImdbId = null) }
 
     fun messageShown() = _uiState.update { it.copy(message = null) }
 

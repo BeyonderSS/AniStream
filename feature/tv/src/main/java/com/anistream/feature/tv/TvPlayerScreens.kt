@@ -96,7 +96,8 @@ private fun TvPlayerChrome(
     upNext: String?,
     ended: Boolean,
     onUpNext: () -> Unit,
-    onCancelUpNext: () -> Unit
+    onCancelUpNext: () -> Unit,
+    onWebPlayer: (() -> Unit)? = null
 ) {
     var visible by remember { mutableStateOf(true) }
     var panel by remember { mutableStateOf(Panel.NONE) }
@@ -252,6 +253,7 @@ private fun TvPlayerChrome(
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     TvPill("Retry", onRetry, modifier = Modifier.focusRequester(retryFocus))
                     if (settings.any { it.options.size > 1 }) TvPill("Change source", { panel = Panel.SETTINGS })
+                    if (onWebPlayer != null) TvPill("Try web player", onWebPlayer)
                     TvPill("Back", onExit)
                 }
             }
@@ -327,10 +329,21 @@ fun TvAnimePlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel(
     )
 }
 
+
 @Composable
-fun TvMediaPlayerScreen(onExit: () -> Unit, vm: MediaPlayerViewModel = hiltViewModel()) {
+fun TvMediaPlayerScreen(
+    onExit: () -> Unit,
+    /** (imdbId, season, episode) */
+    onWebPlayer: (String, Int, Int) -> Unit,
+    vm: MediaPlayerViewModel = hiltViewModel()
+) {
     val s by vm.uiState.collectAsStateWithLifecycle()
     val r = s.request
+    LaunchedEffect(s.webImdbId) {
+        val tt = s.webImdbId ?: return@LaunchedEffect
+        vm.webPlayerOpened()
+        onWebPlayer(tt, r?.season ?: 0, r?.episode ?: 0)
+    }
     val streams = r?.streams.orEmpty()
     val subs = s.stream?.subtitles.orEmpty()
     TvPlayerChrome(
@@ -346,7 +359,13 @@ fun TvMediaPlayerScreen(onExit: () -> Unit, vm: MediaPlayerViewModel = hiltViewM
         onStop = vm::onStop,
         onExit = onExit,
         settings = listOf(
-            SettingGroup("Source", streams.indices.toList(), { i -> streams[i].let { listOf(it.sourceName, it.qualityLabel).filter(String::isNotBlank).joinToString(" ") } }, { it == s.streamIndex }, vm::selectStream),
+            // WEB_SOURCE = last-resort web player, after the real sources
+            SettingGroup(
+                "Source", streams.indices.toList() + listOfNotNull(WEB_SOURCE.takeIf { s.canWebPlay }),
+                { i -> if (i == WEB_SOURCE) "Web player" else streams[i].let { listOf(it.sourceName, it.qualityLabel).filter(String::isNotBlank).joinToString(" ") } },
+                { it == s.streamIndex },
+                { i -> if (i == WEB_SOURCE) vm.openWebPlayer() else vm.selectStream(i) }
+            ),
             SettingGroup("Subtitles", if (subs.isEmpty()) emptyList() else listOf(-1) + subs.indices, { i -> if (i < 0) "Off" else subs[i].label }, { it == s.subtitleIndex }, vm::selectSubtitle)
         ),
         // MediaPlayerViewModel can only advance one episode, so the strip offers exactly that
@@ -354,6 +373,9 @@ fun TvMediaPlayerScreen(onExit: () -> Unit, vm: MediaPlayerViewModel = hiltViewM
         upNext = if (s.hasNextEpisode && r != null) "Episode ${r.episode + 1}" else null,
         ended = s.ended,
         onUpNext = vm::nextEpisode,
-        onCancelUpNext = vm::dismissEnd
+        onCancelUpNext = vm::dismissEnd,
+        onWebPlayer = if (s.canWebPlay) vm::openWebPlayer else null
     )
 }
+
+private const val WEB_SOURCE = -1

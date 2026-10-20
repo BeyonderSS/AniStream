@@ -280,6 +280,8 @@ internal fun VideoPlayer(
     onRetry: () -> Unit,
     modifier: Modifier,
     live: Boolean = false,
+    /** non-null: the error state also offers "Try web player" */
+    onWebPlayer: (() -> Unit)? = null,
     endOverlay: (@Composable () -> Unit)? = null
 ) {
     var controlsVisible by remember { mutableStateOf(true) }
@@ -485,6 +487,10 @@ internal fun VideoPlayer(
                 Text(error, style = AppType.body, textAlign = TextAlign.Center, maxLines = 3)
                 Spacer(Modifier.height(Space.md))
                 PrimaryButton(text = "Retry", onClick = onRetry)
+                if (onWebPlayer != null) {
+                    Spacer(Modifier.height(Space.sm))
+                    SecondaryButton(text = "Try web player", onClick = onWebPlayer)
+                }
             }
         }
 
