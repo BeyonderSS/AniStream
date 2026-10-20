@@ -82,6 +82,7 @@ import com.anistream.core.ui.components.MetaChips
 import com.anistream.domain.model.MediaItem
 import com.anistream.domain.model.MediaType
 import com.anistream.domain.model.WatchHistory
+import com.anistream.domain.model.forYouRows
 import kotlinx.coroutines.delay
 
 private const val HERO_COUNT = 8
@@ -170,6 +171,17 @@ fun MoviesHomeScreen(
                                         ResumeCard(h, onClick = { onItemClick(h.mediaId ?: h.animeSlug.replace(EpisodeSuffix, "")) })
                                     }
                                 }
+                            }
+                        }
+                        // "For you" (TMDB recommendations): only once there is history
+                        val forYou = uiState.picks.forYouRows()
+                        forYou.forEachIndexed { i, (title, picks) ->
+                            item(key = "fy-$title") {
+                                Spacer(Modifier.height(Space.xl))
+                                SectionHeader(title = title)
+                                AnimeCarousel(items = remember(picks) { picks.map { it.asMediaItem().asCard() } }, onAnimeClick = { onItemClick(it.slug) })
+                                // TMDB's terms ask for attribution wherever their data shows
+                                if (i == forYou.lastIndex) Text("Data from TMDB", style = AppType.caption, modifier = Modifier.padding(horizontal = Space.lg))
                             }
                         }
                         uiState.rows.forEachIndexed { i, row ->

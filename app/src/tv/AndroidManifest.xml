@@ -13,7 +13,8 @@
         </intent>
     </queries>
 
-    <application android:banner="@drawable/tv_banner">
+    <!-- largeHeap: Fire TV Stick 2nd gen has ~120 MB free; posters + ExoPlayer need the headroom -->
+    <application android:banner="@drawable/tv_banner" android:largeHeap="true">
 
         <activity android:name="com.anistream.app.MainActivity">
             <intent-filter tools:node="remove">

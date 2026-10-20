@@ -7,7 +7,9 @@ import com.anistream.domain.model.AnimeSearchResult
 import com.anistream.domain.model.MediaItem
 import com.anistream.domain.model.MediaRow
 import com.anistream.domain.model.MediaType
+import com.anistream.domain.model.Recommendation
 import com.anistream.domain.model.WatchHistory
+import com.anistream.domain.repository.RecommendationsRepository
 import com.anistream.domain.repository.MoviesRepository
 import com.anistream.domain.repository.WatchHistoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -35,19 +37,32 @@ data class MoviesHomeUiState(
     val isLoading: Boolean = true,
     val rows: List<MediaRow> = emptyList(),
     val continueWatching: List<WatchHistory> = emptyList(),
-    val error: String? = null
+    val error: String? = null,
+    /** ranked "For you" movies/series (TMDB) from the Room cache; empty without history */
+    val picks: List<Recommendation> = emptyList()
+)
+
+/** A pick as a browsable item: ids are "tt…", so taps open the regular detail. */
+fun Recommendation.asMediaItem() = MediaItem(
+    id = id, type = mediaType ?: MediaType.MOVIE, title = title, posterUrl = posterUrl, year = year, rating = rating
 )
 
 @HiltViewModel
 class MoviesHomeViewModel @Inject constructor(
     private val movies: MoviesRepository,
-    private val history: WatchHistoryRepository
+    private val history: WatchHistoryRepository,
+    recommendations: RecommendationsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MoviesHomeUiState())
     val uiState: StateFlow<MoviesHomeUiState> = _uiState.asStateFlow()
 
-    init { load() }
+    init {
+        load()
+        viewModelScope.launch {
+            recommendations.observe("media").collect { picks -> _uiState.update { it.copy(picks = picks) } }
+        }
+    }
 
     fun load() {
         viewModelScope.launch {

@@ -1,5 +1,6 @@
 package com.anistream.feature.player
 
+import com.anistream.core.common.LowEnd
 import android.content.Context
 import android.net.Uri
 import androidx.annotation.OptIn
@@ -18,10 +19,12 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.anistream.core.common.Result
 import com.anistream.domain.model.AnimeDetail
 import com.anistream.domain.model.Episode
+import com.anistream.domain.model.SkipInterval
 import com.anistream.domain.model.StreamSource
 import com.anistream.domain.model.WatchHistory
 import com.anistream.domain.repository.AnidbRepository
 import com.anistream.domain.repository.DownloadRepository
+import com.anistream.domain.repository.SkipTimesRepository
 import com.anistream.domain.repository.WatchHistoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -59,7 +62,9 @@ data class PlayerUiState(
     val watchedBelow: Int = 0,
     /** current episode played to the end; the screen shows a countdown or end card */
     val ended: Boolean = false,
-    val downloadStarted: Boolean = false
+    val downloadStarted: Boolean = false,
+    /** AniSkip intro/recap/credits for the current episode; empty = unknown (the fixed +85 s button stays) */
+    val skips: List<SkipInterval> = emptyList()
 )
 
 /**
@@ -72,7 +77,8 @@ class PlayerViewModel @Inject constructor(
     @ApplicationContext context: Context,
     private val anidb: AnidbRepository,
     private val history: WatchHistoryRepository,
-    private val downloads: DownloadRepository
+    private val downloads: DownloadRepository,
+    private val skipTimes: SkipTimesRepository
 ) : ViewModel() {
 
     private val animeSlug: String = savedStateHandle.get<String>("slug") ?: ""
@@ -92,7 +98,9 @@ class PlayerViewModel @Inject constructor(
     private var pendingResume: Float? = null
     private var loadJob: Job? = null
 
-    val player: ExoPlayer = ExoPlayer.Builder(context).build().apply {
+    private val lowEnd = LowEnd.isOn(context)
+
+    val player: ExoPlayer = buildPlayer(context).apply {
         addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
@@ -161,10 +169,17 @@ class PlayerViewModel @Inject constructor(
                 loadJob = null
                 return@launch load(keepPosition)
             }
-            val stream = variants.firstOrNull { it.qualityLabel == state.selectedQuality } ?: variants.first()
+            val stream = variants.firstOrNull { it.qualityLabel == state.selectedQuality }
+                ?: (if (lowEnd) variants.firstOrNull { it.height <= LowEnd.maxHeight } else null)
+                ?: variants.first()
 
             if (keepAt == null) recordStart(number)
             play(stream, keepAt)
+            val malId = stream.malId
+            if (malId != null && state.skips.isEmpty()) viewModelScope.launch {
+                val skips = skipTimes.skipTimes(malId, number)
+                _uiState.update { if (it.episodeNumber == number) it.copy(skips = skips) else it }
+            }
             _uiState.update {
                 it.copy(
                     isLoading = false,
@@ -263,7 +278,7 @@ class PlayerViewModel @Inject constructor(
         episode ?: return
         saveProgress()
         pendingResume = null
-        _uiState.update { it.copy(episodeNumber = episode.number, ended = false, downloadStarted = false) }
+        _uiState.update { it.copy(episodeNumber = episode.number, ended = false, downloadStarted = false, skips = emptyList()) }
         load()
     }
 

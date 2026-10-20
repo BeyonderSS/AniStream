@@ -1,5 +1,6 @@
 package com.anistream.feature.tv
 
+import com.anistream.core.common.LowEnd
 import android.provider.Settings
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.snap
@@ -74,13 +75,18 @@ object TvType {
 /** Animator duration scale 0 = the user turned animations off: no scaling, no crossfades, amber light only. */
 val LocalReduceMotion = staticCompositionLocalOf { false }
 
+/** [LowEnd] mode, read once per activity start. */
+val LocalLowEnd = staticCompositionLocalOf { false }
+
 private val FocusGlow = Glow(elevationColor = Accent.main.copy(alpha = 0.3f), elevation = 18.dp)
 
 @Composable
 fun ReelmTvTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
+    val lowEnd = remember { LowEnd.isOn(context) }
+    // low-end mode reuses the reduced-motion path: no backdrop crossfade, no card scaling
     val reduce = remember {
-        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+        lowEnd || Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
     }
     MaterialTheme(
         colorScheme = darkColorScheme(
@@ -96,7 +102,7 @@ fun ReelmTvTheme(content: @Composable () -> Unit) {
             error = Accent.danger
         )
     ) {
-        CompositionLocalProvider(LocalReduceMotion provides reduce) {
+        CompositionLocalProvider(LocalReduceMotion provides reduce, LocalLowEnd provides lowEnd) {
             Box(Modifier.fillMaxSize().background(Bg.base)) { content() }
         }
     }
@@ -113,7 +119,8 @@ data class TvItem(
     val onClick: () -> Unit
 )
 
-data class TvRow(val title: String, val items: List<TvItem>, val wide: Boolean = false)
+/** [caption]: small note under the row (e.g. a data-source attribution). */
+data class TvRow(val title: String, val items: List<TvItem>, val wide: Boolean = false, val caption: String? = null)
 
 /**
  * The projector: full-screen art of the focused title, crossfading 400 ms, under a dusk gradient
@@ -212,6 +219,8 @@ fun TvCardRow(
                 )
             }
         }
+        val caption = row.caption
+        if (caption != null) Text(caption, style = TvType.body.copy(color = Ink.muted), modifier = Modifier.padding(start = Overscan))
     }
 }
 

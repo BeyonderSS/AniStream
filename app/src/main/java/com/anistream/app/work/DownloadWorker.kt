@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.Build
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.os.bundleOf
 import androidx.hilt.work.HiltWorker
@@ -59,7 +60,7 @@ class DownloadWorker @AssistedInject constructor(
                 .addAction(0, "Cancel", actionIntent(applicationContext, ACTION_CANCEL, input, nid))
                 .build()
             try {
-                setForeground(ForegroundInfo(nid, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC))
+                setForeground(if (Build.VERSION.SDK_INT >= 29) ForegroundInfo(nid, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC) else ForegroundInfo(nid, n))
             } catch (e: IllegalStateException) {
                 // Android 12+ refuses foreground starts from the background; the transfer still runs as plain work.
             }

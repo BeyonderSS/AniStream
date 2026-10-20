@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
@@ -11,9 +13,20 @@ android {
 
     defaultConfig {
         minSdk = libs.versions.minSdk.get().toInt()
+        // TMDB key for recommendations: local.properties locally, the TMDB_API_KEY env var in CI. Empty = TMDB skipped.
+        val localProps = Properties().apply {
+            rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+        }
+        val tmdbKey = localProps.getProperty("TMDB_API_KEY")?.takeIf { it.isNotBlank() } ?: System.getenv("TMDB_API_KEY") ?: ""
+        buildConfigField("String", "TMDB_API_KEY", "\"${tmdbKey.trim()}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -24,6 +37,7 @@ android {
 }
 
 dependencies {
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(project(":core:common"))
     implementation(project(":core:database"))
     implementation(project(":domain"))

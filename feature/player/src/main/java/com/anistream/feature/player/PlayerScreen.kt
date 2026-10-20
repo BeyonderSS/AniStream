@@ -5,6 +5,25 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.foundation.shape.RoundedCornerShape
 import android.app.Activity
 import android.content.Context
+import android.media.AudioManager
+import android.provider.Settings
+import android.view.WindowManager
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material.icons.automirrored.rounded.VolumeOff
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.BrightnessMedium
+import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.material.icons.rounded.FastRewind
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.LockOpen
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.Speed
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
@@ -112,6 +131,7 @@ import com.anistream.core.ui.theme.Ink
 import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Space
 import kotlinx.coroutines.delay
+import com.anistream.domain.model.SkipInterval
 
 internal val Scrim = Bg.shadow.copy(alpha = 0.5f)
 internal val Tabular = AppType.bodyStrong.copy(fontFeatureSettings = "tnum")
@@ -126,6 +146,8 @@ fun PlayerScreen(
     val snackbar = remember { SnackbarHostState() }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val (fullscreen, setFullscreen) = rememberFullscreen(viewModel::onStop)
+    val tweaks = rememberPlayerTweaks(ui.animeSlug)
+    val pip = rememberPip(viewModel.player)
 
     LaunchedEffect(ui.message) {
         val msg = ui.message ?: return@LaunchedEffect
@@ -144,10 +166,14 @@ fun PlayerScreen(
             onToggleFullscreen = { setFullscreen(!fullscreen) },
             onSettings = { showSettings = true },
             onRetry = viewModel::retry,
+            tweaks = tweaks,
+            episodic = true,
+            pip = pip,
+            skips = ui.skips,
             endOverlay = if (!ui.ended) null else {
                 {
                     val next = ui.episodeNumbers.firstOrNull { it > ui.episodeNumber }
-                    if (next != null) NextCountdown("Up next: episode $next", viewModel::nextEpisode, viewModel::dismissEnd)
+                    if (next != null) NextEpisodeCard(ui.posterUrl, "Episode $next", ui.animeTitle, viewModel::nextEpisode, viewModel::dismissEnd)
                     else FinishedCard(ui.animeTitle, onBack)
                 }
             },
@@ -155,8 +181,8 @@ fun PlayerScreen(
         )
     }
 
-    Box(Modifier.fillMaxSize().background(if (fullscreen) Color.Black else Bg.base)) {
-        if (fullscreen) {
+    Box(Modifier.fillMaxSize().background(if (fullscreen || pip) Color.Black else Bg.base)) {
+        if (fullscreen || pip) {
             video(Modifier.fillMaxSize())
         } else {
             Column(Modifier.fillMaxSize()) {
@@ -179,7 +205,7 @@ fun PlayerScreen(
 
     if (showSettings) {
         ModalBottomSheet(onDismissRequest = { showSettings = false }, containerColor = Bg.raised, shape = SheetShape) {
-            Column(Modifier.padding(horizontal = Space.lg).padding(bottom = Space.xl)) {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = Space.lg).padding(bottom = Space.xl)) {
                 Text("Quality", style = AppType.heading)
                 Spacer(Modifier.height(Space.sm))
                 ui.availableQualities.forEach { source ->
@@ -193,6 +219,7 @@ fun PlayerScreen(
                 Text("Audio", style = AppType.heading)
                 Spacer(Modifier.height(Space.md))
                 SubDubToggle(ui.language, viewModel::setLanguage)
+                PlayerTweaksSection(viewModel.player, tweaks, live = false, autoSkipToggle = true)
             }
         }
     }
@@ -240,6 +267,10 @@ internal fun rememberFullscreen(onStop: () -> Unit): Pair<Boolean, (Boolean) -> 
             if (activity != null && !activity.isChangingConfigurations) {
                 activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
+            // swipe brightness only applies while a player is on screen
+            activity?.window?.let { w ->
+                w.attributes = w.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
+            }
         }
     }
     DisposableEffect(fullscreen) {
@@ -264,8 +295,10 @@ internal fun rememberFullscreen(onStop: () -> Unit): Pair<Boolean, (Boolean) -> 
 }
 
 /**
- * Video surface + the Nocturne controls overlay, shared by the anime and media players.
+ * Video surface + the controls overlay, shared by the anime and media players.
  * [live]: no seek bar / ±10s, a LIVE badge instead. [endOverlay] non-null = playback ended, shown over the video.
+ * Gestures: tap toggles controls, double tap ±10 s, hold = 2x, horizontal drag seeks (applied on release),
+ * vertical drag = brightness (right half) / volume (left half), pinch = fill / fit.
  */
 @Composable
 internal fun VideoPlayer(
@@ -279,9 +312,16 @@ internal fun VideoPlayer(
     onSettings: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier,
+    tweaks: PlayerTweaks,
     live: Boolean = false,
+    /** episodes get the "Skip intro" button in their first 5 minutes */
+    episodic: Boolean = false,
+    /** picture-in-picture: video only */
+    pip: Boolean = false,
     /** non-null: the error state also offers "Try web player" */
     onWebPlayer: (() -> Unit)? = null,
+    /** AniSkip intervals; non-empty replaces the fixed +85 s intro button */
+    skips: List<SkipInterval> = emptyList(),
     endOverlay: (@Composable () -> Unit)? = null
 ) {
     var controlsVisible by remember { mutableStateOf(true) }
@@ -294,6 +334,18 @@ internal fun VideoPlayer(
     var interactions by remember { mutableIntStateOf(0) }
     var bubble by remember { mutableIntStateOf(0) } // -1 rewind, +1 forward, 0 hidden
     var bubbleTick by remember { mutableIntStateOf(0) }
+    var locked by remember { mutableStateOf(false) }
+    var unlockTick by remember { mutableIntStateOf(0) }
+    var showUnlock by remember { mutableStateOf(false) }
+    var boosting by remember { mutableStateOf(false) }
+    var hint by remember { mutableStateOf<Pair<ImageVector, String>?>(null) }
+    var introSkippedFor by remember { mutableStateOf<String?>(null) }
+    var skipToast by remember { mutableStateOf<String?>(null) }
+    val autoSkipped = remember(title) { mutableSetOf<SkipInterval>() }
+    var playerView by remember { mutableStateOf<PlayerView?>(null) }
+    val context = LocalContext.current
+    val activity = context.findActivity()
+    val scope = rememberCoroutineScope()
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -303,13 +355,13 @@ internal fun VideoPlayer(
         player.addListener(listener)
         onDispose { player.removeListener(listener) }
     }
-    // poll only while something on screen shows the position
-    LaunchedEffect(controlsVisible) {
-        while (controlsVisible) {
+    // fast while the seek bar shows, slow otherwise (the skip-intro button needs the position too)
+    LaunchedEffect(Unit) {
+        while (true) {
             position = player.currentPosition
             bufferedPos = player.bufferedPosition
             duration = player.duration.coerceAtLeast(0L) // TIME_UNSET is negative
-            delay(250)
+            delay(if (controlsVisible) 250 else 1000)
         }
     }
     LaunchedEffect(controlsVisible, isPlaying, scrubMs != null, interactions) {
@@ -324,6 +376,12 @@ internal fun VideoPlayer(
             bubble = 0
         }
     }
+    LaunchedEffect(unlockTick) {
+        if (showUnlock) {
+            delay(2500)
+            showUnlock = false
+        }
+    }
 
     fun seekBy(ms: Long) {
         val target = (player.currentPosition + ms).coerceIn(0L, player.duration.coerceAtLeast(0L))
@@ -334,36 +392,160 @@ internal fun VideoPlayer(
 
     val showSpinner = isLoading || buffering
     val blocked = error != null || endOverlay != null
+    val showIntro = skips.isEmpty() && episodic && !live && !blocked && !locked && !pip && introSkippedFor != title &&
+        duration > INTRO_WINDOW_MS && position < INTRO_WINDOW_MS
+    // AniSkip: a button exactly inside each known interval; auto-skip jumps intro/recap once per interval
+    val skipNow = if (episodic && !live && !blocked) activeSkip(skips, position) else null
+    LaunchedEffect(skipNow, tweaks.autoSkip) {
+        val s = skipNow ?: return@LaunchedEffect
+        if (tweaks.autoSkip && s.isIntroOrRecap && autoSkipped.add(s)) {
+            player.seekTo(s.endMs)
+            position = s.endMs
+            skipToast = if (s.type == "recap") "Skipped recap" else "Skipped intro"
+        }
+    }
+    LaunchedEffect(skipToast) {
+        if (skipToast != null) {
+            delay(2000)
+            skipToast = null
+        }
+    }
 
     Box(modifier.background(Color.Black)) {
-        AndroidView(
-            factory = { ctx -> LayoutInflater.from(ctx).inflate(R.layout.player_texture, null) as PlayerView },
-            update = { it.player = player },
-            onRelease = { it.player = null },
+        VideoSurface(
+            player = player,
+            tweaks = tweaks,
+            create = { ctx -> LayoutInflater.from(ctx).inflate(R.layout.player_texture, null) as PlayerView },
+            onView = { playerView = it },
             modifier = Modifier.fillMaxSize()
         )
 
-        Box(
-            Modifier
-                .fillMaxSize()
-                .pointerInput(live) {
-                    detectTapGestures(
-                        onTap = { controlsVisible = !controlsVisible },
-                        onDoubleTap = if (live) null else { offset ->
-                            val dir = if (offset.x < size.width / 2) -1 else 1
-                            seekBy(dir * 10_000L)
-                            bubble = dir
-                            bubbleTick++
-                        }
-                    )
+        if (locked) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) { detectTapGestures { showUnlock = true; unlockTick++ } }
+            )
+            AnimatedVisibility(showUnlock && !pip, enter = fadeIn(tween(200)), exit = fadeOut(tween(250)), modifier = Modifier.align(Alignment.Center)) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(64.dp).clip(Radius.round).background(Scrim).clickable {
+                        locked = false
+                        showUnlock = false
+                        controlsVisible = true
+                    }
+                ) {
+                    Icon(Icons.Rounded.LockOpen, contentDescription = "Unlock", tint = Ink.high)
                 }
-        )
+            }
+        } else if (!pip) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(live) {
+                        detectTapGestures(
+                            onTap = { controlsVisible = !controlsVisible },
+                            onDoubleTap = if (live) null else { offset ->
+                                val dir = if (offset.x < size.width / 2) -1 else 1
+                                seekBy(dir * 10_000L)
+                                bubble = dir
+                                bubbleTick++
+                            },
+                            onLongPress = {
+                                if (!live && !blocked && player.isPlaying) {
+                                    boosting = true
+                                    player.setPlaybackSpeed(2f)
+                                    hint = Icons.Rounded.Speed to "2x"
+                                }
+                            },
+                            onPress = {
+                                tryAwaitRelease()
+                                if (boosting) {
+                                    boosting = false
+                                    player.setPlaybackSpeed(tweaks.speed)
+                                    hint = null
+                                }
+                            }
+                        )
+                    }
+                    .pointerInput(live, blocked) {
+                        if (blocked) return@pointerInput
+                        val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            var mode = DragMode.NONE
+                            var total = Offset.Zero
+                            var zoom = 1f
+                            val startPos = player.currentPosition
+                            val dur = player.duration.coerceAtLeast(0L)
+                            var target = startPos
+                            val maxVol = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                            val startVol = audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxVol
+                            val window = activity?.window
+                            val startBright = window?.attributes?.screenBrightness?.takeIf { it >= 0f }
+                                ?: (Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, 128) / 255f)
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val pressed = event.changes.count { it.pressed }
+                                if (pressed == 0) break
+                                if (pressed >= 2) {
+                                    mode = DragMode.PINCH
+                                    zoom *= event.calculateZoom()
+                                    event.changes.forEach { it.consume() }
+                                } else if (mode != DragMode.PINCH && !boosting) {
+                                    val c = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    total += c.positionChange()
+                                    if (mode == DragMode.NONE && total.getDistance() > viewConfiguration.touchSlop) {
+                                        mode = when {
+                                            abs(total.x) > abs(total.y) -> if (live || dur <= 0L) DragMode.IGNORE else DragMode.SEEK
+                                            down.position.x > size.width / 2 -> DragMode.BRIGHTNESS
+                                            else -> DragMode.VOLUME
+                                        }
+                                    }
+                                    when (mode) {
+                                        DragMode.SEEK -> {
+                                            // ponytail: full-width swipe = 90 s; tune here if long films want more reach
+                                            target = (startPos + (total.x / size.width * 90_000f).toLong()).coerceIn(0L, dur)
+                                            val d = (target - startPos) / 1000
+                                            hint = (if (d < 0) Icons.Rounded.FastRewind else Icons.Rounded.FastForward) to
+                                                "${formatTime(target)}  ${if (d < 0) "−" else "+"}${abs(d)}s"
+                                            c.consume()
+                                        }
+                                        DragMode.BRIGHTNESS -> {
+                                            val v = (startBright - total.y / size.height).coerceIn(0.01f, 1f)
+                                            window?.attributes = window?.attributes?.apply { screenBrightness = v }
+                                            hint = Icons.Rounded.BrightnessMedium to "${(v * 100).roundToInt()}%"
+                                            c.consume()
+                                        }
+                                        DragMode.VOLUME -> {
+                                            val v = (startVol - total.y / size.height).coerceIn(0f, 1f)
+                                            audio.setStreamVolume(AudioManager.STREAM_MUSIC, (v * maxVol).roundToInt(), 0)
+                                            hint = (if (v == 0f) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp) to "${(v * 100).roundToInt()}%"
+                                            c.consume()
+                                        }
+                                        else -> Unit
+                                    }
+                                }
+                            }
+                            when (mode) {
+                                DragMode.SEEK -> { player.seekTo(target); position = target; interactions++ }
+                                DragMode.PINCH -> when {
+                                    zoom > 1.1f -> tweaks.updateResize(Resize.FILL)
+                                    zoom < 0.9f -> tweaks.updateResize(Resize.FIT)
+                                }
+                                else -> Unit
+                            }
+                            if (mode != DragMode.NONE && !boosting) hint = null
+                        }
+                    }
+            )
+        }
 
         SeekBubble("−10s", visible = bubble == -1, Modifier.align(Alignment.CenterStart).padding(start = Space.xxl))
         SeekBubble("+10s", visible = bubble == 1, Modifier.align(Alignment.CenterEnd).padding(end = Space.xxl))
 
         AnimatedVisibility(
-            visible = controlsVisible,
+            visible = controlsVisible && !locked && !pip,
             enter = fadeIn(tween(200)),
             exit = fadeOut(tween(250)),
             modifier = Modifier.fillMaxSize()
@@ -385,6 +567,12 @@ internal fun VideoPlayer(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
+                    IconButton(onClick = { locked = true; controlsVisible = false; showUnlock = true; unlockTick++ }) {
+                        Icon(Icons.Rounded.Lock, contentDescription = "Lock controls", tint = Ink.high)
+                    }
+                    if (!live) IconButton(onClick = { scope.launch { saveFrame(context, playerView) } }) {
+                        Icon(Icons.Rounded.PhotoCamera, contentDescription = "Screenshot", tint = Ink.high)
+                    }
                     IconButton(onClick = onSettings) {
                         Icon(Icons.Rounded.Settings, contentDescription = "Settings", tint = Ink.high)
                     }
@@ -453,6 +641,18 @@ internal fun VideoPlayer(
                             )
                         }
                         Spacer(Modifier.weight(1f))
+                        Text(
+                            tweaks.resize.label,
+                            style = AppType.label.copy(color = Ink.high),
+                            modifier = Modifier
+                                .clip(Radius.pill)
+                                .clickable {
+                                    val all = Resize.entries
+                                    tweaks.updateResize(all[(tweaks.resize.ordinal + 1) % all.size])
+                                    interactions++
+                                }
+                                .padding(horizontal = Space.md, vertical = Space.sm)
+                        )
                         IconButton(onClick = onToggleFullscreen) {
                             Icon(
                                 if (fullscreen) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen,
@@ -475,11 +675,40 @@ internal fun VideoPlayer(
             }
         }
 
+        if (showIntro || (skipNow != null && !locked && !pip)) {
+            Text(
+                skipNow?.let { skipLabel(it.type) } ?: "Skip intro",
+                style = AppType.label.copy(color = Ink.high),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = Space.lg, bottom = if (controlsVisible) 88.dp else Space.lg)
+                    .clip(Radius.pill)
+                    .background(Bg.overlay.copy(alpha = 0.92f))
+                    .clickable {
+                        val s = skipNow
+                        if (s != null) {
+                            player.seekTo(s.endMs)
+                            position = s.endMs
+                            interactions++
+                        } else {
+                            seekBy(INTRO_SKIP_MS)
+                            introSkippedFor = title
+                        }
+                    }
+                    .padding(horizontal = Space.lg, vertical = Space.md)
+            )
+        }
+
+        val h = hint
+        val toast = skipToast
+        if (h != null && !pip) HintPill(h.first, h.second, Modifier.align(Alignment.TopCenter).padding(top = Space.xxl))
+        else if (toast != null && !pip) HintPill(Icons.Rounded.FastForward, toast, Modifier.align(Alignment.TopCenter).padding(top = Space.xxl))
+
         if (showSpinner && error == null) {
             CircularProgressIndicator(color = Accent.main, strokeWidth = 3.dp, modifier = Modifier.align(Alignment.Center).size(48.dp))
         }
 
-        if (error != null) {
+        if (error != null && !pip) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.align(Alignment.Center).padding(Space.lg)
@@ -494,7 +723,7 @@ internal fun VideoPlayer(
             }
         }
 
-        if (endOverlay != null) {
+        if (endOverlay != null && !pip) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -508,22 +737,34 @@ internal fun VideoPlayer(
     }
 }
 
-/** [label] e.g. "Up next: episode 3"; runs [onNext] after 5s. */
+private enum class DragMode { NONE, IGNORE, SEEK, BRIGHTNESS, VOLUME, PINCH }
+
+/**
+ * End-of-episode card: the next episode's art under the countdown ring, "Episode N", Play now / Cancel.
+ * The ring is the countdown: it runs [onNext] when it fills.
+ */
 @Composable
-internal fun NextCountdown(label: String, onNext: () -> Unit, onCancel: () -> Unit) {
-    var seconds by remember { mutableIntStateOf(5) }
-    LaunchedEffect(Unit) {
-        while (seconds > 0) {
-            delay(1000)
-            seconds--
+internal fun NextEpisodeCard(imageUrl: String?, episodeLabel: String, title: String, onNext: () -> Unit, onCancel: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(Space.lg)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(contentAlignment = Alignment.Center) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current).data(imageUrl).crossfade(true).build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.width(112.dp).aspectRatio(16f / 9f).clip(Radius.md).background(Bg.overlay)
+                )
+                Box(Modifier.matchParentSize().clip(Radius.md).background(Scrim))
+                CountdownRing(onDone = onNext, size = 40.dp)
+            }
+            Spacer(Modifier.width(Space.md))
+            Column(Modifier.weight(1f, fill = false)) {
+                Text("Up next", style = AppType.label.copy(color = Ink.muted))
+                Text(episodeLabel, style = AppType.heading, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(title, style = AppType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
-        onNext()
-    }
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = AppType.label.copy(color = Ink.muted))
-        Spacer(Modifier.height(Space.xs))
-        Text("Next episode in $seconds", style = AppType.heading)
-        Spacer(Modifier.height(Space.lg))
+        Spacer(Modifier.height(Space.md))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
             SecondaryButton(text = "Cancel", onClick = onCancel)
             PrimaryButton(text = "Play now", onClick = onNext)

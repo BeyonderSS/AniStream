@@ -29,7 +29,7 @@ object DatabaseModule {
             context,
             AniStreamDatabase::class.java,
             AniStreamDatabase.DATABASE_NAME
-        ).addMigrations(AniStreamDatabase.MIGRATION_1_2).build()
+        ).addMigrations(AniStreamDatabase.MIGRATION_1_2, AniStreamDatabase.MIGRATION_2_3).build()
     }
 
     @Provides
@@ -49,4 +49,7 @@ object DatabaseModule {
 
     @Provides
     fun providePlaylistDao(db: AniStreamDatabase): PlaylistDao = db.playlistDao()
+
+    @Provides
+    fun provideRecommendationDao(db: AniStreamDatabase): com.anistream.core.database.dao.RecommendationDao = db.recommendationDao()
 }

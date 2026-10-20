@@ -25,5 +25,11 @@ object MediaModule {
     fun provideLiveTvRepository(impl: LiveTvRepositoryImpl): LiveTvRepository = impl
 
     @Provides
+    fun provideRecommendationsRepository(impl: com.anistream.core.media.RecommendationsRepositoryImpl): com.anistream.domain.repository.RecommendationsRepository = impl
+
+    @Provides
+    fun provideSkipTimesRepository(impl: com.anistream.core.media.AniSkip): com.anistream.domain.repository.SkipTimesRepository = impl
+
+    @Provides
     fun provideMovieBoxSource(client: com.anistream.core.media.moviebox.MovieBoxClient): MovieBoxSource = client
 }

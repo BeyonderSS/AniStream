@@ -11,12 +11,14 @@ import com.anistream.core.database.dao.DownloadDao
 import com.anistream.core.database.dao.FavoriteDao
 import com.anistream.core.database.dao.PlaylistDao
 import com.anistream.core.database.dao.RecentSearchDao
+import com.anistream.core.database.dao.RecommendationDao
 import com.anistream.core.database.dao.WatchHistoryDao
 import com.anistream.core.database.entity.AddonEntity
 import com.anistream.core.database.entity.DownloadEntity
 import com.anistream.core.database.entity.FavoriteEntity
 import com.anistream.core.database.entity.PlaylistEntity
 import com.anistream.core.database.entity.RecentSearchEntity
+import com.anistream.core.database.entity.RecommendationEntity
 import com.anistream.core.database.entity.WatchHistoryEntity
 
 @Database(
@@ -26,9 +28,10 @@ import com.anistream.core.database.entity.WatchHistoryEntity
         RecentSearchEntity::class,
         DownloadEntity::class,
         AddonEntity::class,
-        PlaylistEntity::class
+        PlaylistEntity::class,
+        RecommendationEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AniStreamDatabase : RoomDatabase() {
@@ -38,6 +41,7 @@ abstract class AniStreamDatabase : RoomDatabase() {
     abstract fun downloadDao(): DownloadDao
     abstract fun addonDao(): AddonDao
     abstract fun playlistDao(): PlaylistDao
+    abstract fun recommendationDao(): RecommendationDao
 
     companion object {
         const val DATABASE_NAME = "anistream.db"
@@ -52,6 +56,13 @@ abstract class AniStreamDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE downloads ADD COLUMN subtitle TEXT")
                 db.execSQL("CREATE TABLE IF NOT EXISTS `addons` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `manifestUrl` TEXT NOT NULL, `description` TEXT, `enabled` INTEGER NOT NULL, `builtIn` INTEGER NOT NULL, `resourcesCsv` TEXT NOT NULL, `typesCsv` TEXT NOT NULL, PRIMARY KEY(`id`))")
                 db.execSQL("CREATE TABLE IF NOT EXISTS `playlists` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `url` TEXT NOT NULL)")
+            }
+        }
+
+        /** v3: cached "For you" recommendations. */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `recommendations` (`kind` TEXT NOT NULL, `id` TEXT NOT NULL, `title` TEXT NOT NULL, `posterUrl` TEXT, `year` INTEGER, `rating` REAL, `mediaType` TEXT, `because` TEXT, `position` INTEGER NOT NULL, PRIMARY KEY(`kind`, `id`))")
             }
         }
     }

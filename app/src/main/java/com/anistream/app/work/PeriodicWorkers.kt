@@ -12,6 +12,7 @@ import androidx.work.WorkerParameters
 import com.anistream.app.navigation.Routes
 import com.anistream.domain.repository.AnidbRepository
 import com.anistream.domain.repository.FavoriteRepository
+import com.anistream.domain.repository.RecommendationsRepository
 import com.anistream.domain.repository.WatchHistoryRepository
 import com.anistream.feature.movies.isMediaKey
 import dagger.assisted.Assisted
@@ -29,6 +30,23 @@ fun schedulePeriodicWork(context: Context) {
         "reminders", ExistingPeriodicWorkPolicy.KEEP,
         PeriodicWorkRequestBuilder<ReminderWorker>(24, TimeUnit.HOURS).build()
     )
+    // the first run starts right away, so a fresh install gets picks without waiting a day
+    wm.enqueueUniquePeriodicWork(
+        "recommendations", ExistingPeriodicWorkPolicy.KEEP,
+        PeriodicWorkRequestBuilder<RecommendationsWorker>(24, TimeUnit.HOURS).setConstraints(network).build()
+    )
+}
+
+/** Daily "For you" refresh; Home reads the Room cache, so it never waits on this. */
+@HiltWorker
+class RecommendationsWorker @AssistedInject constructor(
+    @Assisted context: Context,
+    @Assisted params: WorkerParameters,
+    private val recommendations: RecommendationsRepository
+) : CoroutineWorker(context, params) {
+
+    override suspend fun doWork(): Result =
+        if (recommendations.refresh().isSuccess() || runAttemptCount >= 2) Result.success() else Result.retry()
 }
 
 /** Notifies when a favourite anime's episode count grew since the last check. */

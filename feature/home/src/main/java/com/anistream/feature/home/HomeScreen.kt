@@ -82,6 +82,7 @@ import com.anistream.core.ui.theme.Motion
 import com.anistream.core.ui.components.MetaChips
 import androidx.compose.ui.text.font.FontWeight
 import com.anistream.domain.model.AnimeSearchResult
+import com.anistream.domain.model.forYouRows
 import kotlinx.coroutines.delay
 
 private const val HERO_COUNT = 8
@@ -203,6 +204,32 @@ fun HomeScreen(
                                         )
                                     }
                                 }
+                            }
+                        }
+
+                        // "For you": only once there is history (the cache is empty otherwise)
+                        uiState.picks.forYouRows().forEach { (title, picks) ->
+                            item(key = "fy-$title") {
+                                Spacer(Modifier.height(Space.xl))
+                                SectionHeader(title = title)
+                                AnimeCarousel(
+                                    items = remember(picks) {
+                                        picks.map { AnimeSearchResult(slug = it.id, title = it.title, posterUrl = it.posterUrl, score = it.rating, year = it.year) }
+                                    },
+                                    onAnimeClick = { onAnimeClick(it.slug) }
+                                )
+                            }
+                        }
+
+                        val pool = (hero + rows.flatMap { it.second }).distinctBy { it.slug }
+                        if (pool.isNotEmpty()) {
+                            item(key = "surprise") {
+                                Spacer(Modifier.height(Space.xl))
+                                SecondaryButton(
+                                    text = "Surprise me",
+                                    onClick = { onAnimeClick(pool.random().slug) },
+                                    modifier = Modifier.padding(horizontal = Space.lg)
+                                )
                             }
                         }
 

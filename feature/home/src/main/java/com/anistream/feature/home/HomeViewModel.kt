@@ -2,7 +2,9 @@ package com.anistream.feature.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.anistream.domain.model.Recommendation
 import com.anistream.domain.model.WatchHistory
+import com.anistream.domain.repository.RecommendationsRepository
 import com.anistream.domain.repository.HomeContent
 import com.anistream.domain.usecase.GetContinueWatchingUseCase
 import com.anistream.domain.usecase.GetHomeContentUseCase
@@ -18,13 +20,16 @@ data class HomeUiState(
     val isLoading: Boolean = true,
     val continueWatching: List<WatchHistory> = emptyList(),
     val content: HomeContent = HomeContent(),
-    val error: String? = null
+    val error: String? = null,
+    /** ranked "For you" anime from the Room cache; empty without history */
+    val picks: List<Recommendation> = emptyList()
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val getContinueWatching: GetContinueWatchingUseCase,
-    private val getHomeContent: GetHomeContentUseCase
+    private val getHomeContent: GetHomeContentUseCase,
+    recommendations: RecommendationsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -32,6 +37,9 @@ class HomeViewModel @Inject constructor(
 
     init {
         loadContent()
+        viewModelScope.launch {
+            recommendations.observe("anime").collect { picks -> _uiState.update { it.copy(picks = picks) } }
+        }
     }
 
     fun loadContent() {

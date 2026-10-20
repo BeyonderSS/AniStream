@@ -9,6 +9,8 @@ import com.anistream.domain.model.MediaRow
 import com.anistream.domain.model.MediaStream
 import com.anistream.domain.model.PlaybackRequest
 import com.anistream.domain.model.Playlist
+import com.anistream.domain.model.Recommendation
+import com.anistream.domain.model.SkipInterval
 import kotlinx.coroutines.flow.Flow
 
 /** Movies & TV: Cinemeta for browse rows, MovieBox for search/detail/streams, enabled Stremio addons for extra streams. */
@@ -45,6 +47,18 @@ interface LiveTvRepository {
     suspend fun removePlaylist(id: Long): Result<Unit>
     /** Channels from every saved playlist, deduplicated by stream URL. Cached in memory unless [refresh]. */
     suspend fun channels(refresh: Boolean = false): Result<List<Channel>>
+}
+
+/** On-device "For you" picks (TMDB for movies/series, hianime for anime), cached in Room and refreshed daily. */
+interface RecommendationsRepository {
+    /** kind "anime" | "media"; empty without watch history or before the first refresh */
+    fun observe(kind: String): Flow<List<Recommendation>>
+    suspend fun refresh(): Result<Unit>
+}
+
+/** AniSkip intro/recap/credits times; empty when unknown or offline. */
+interface SkipTimesRepository {
+    suspend fun skipTimes(malId: Long, episode: Int): List<SkipInterval>
 }
 
 /**

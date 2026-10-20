@@ -32,6 +32,8 @@ import com.anistream.domain.model.MediaType
 import com.anistream.domain.model.WatchHistory
 import com.anistream.feature.home.HomeViewModel
 import com.anistream.feature.movies.MoviesHomeViewModel
+import com.anistream.feature.movies.asMediaItem
+import com.anistream.domain.model.forYouRows
 
 enum class HomeFilter { ALL, MEDIA, ANIME }
 
@@ -86,14 +88,24 @@ fun TvHomeScreen(filter: HomeFilter, homeVm: HomeViewModel, moviesVm: MoviesHome
         animeRow("Fan favourites", c.favorites),
         animeRow("Completed anime", c.completed)
     )
+    // "For you" rows exist only once there is history; TMDB rows carry the attribution TMDB's terms ask for
+    val mediaPicks = media.picks.forYouRows().mapIndexed { i, (t, l) ->
+        TvRow(t, l.map { mediaItem(t, it.asMediaItem()) }, caption = "Data from TMDB".takeIf { i == 0 })
+    }
+    val animePicks = anime.picks.forYouRows().map { (t, l) ->
+        val title = if (filter == HomeFilter.ALL && t == "Top picks for you") "Top anime picks for you" else t
+        animeRow(title, l.map { AnimeSearchResult(slug = it.id, title = it.title, posterUrl = it.posterUrl, score = it.rating, year = it.year) })
+    }
     val rows = buildList {
         add(TvRow("Continue watching", continueRow, wide = true))
         when (filter) {
-            HomeFilter.ALL -> { add(animeRow("Trending anime", c.trending)); addAll(mediaRows); addAll(animeRows) }
-            HomeFilter.MEDIA -> addAll(mediaRows)
-            HomeFilter.ANIME -> { add(animeRow("Trending anime", c.trending)); addAll(animeRows) }
+            HomeFilter.ALL -> { addAll(mediaPicks); addAll(animePicks); add(animeRow("Trending anime", c.trending)); addAll(mediaRows); addAll(animeRows) }
+            HomeFilter.MEDIA -> { addAll(mediaPicks); addAll(mediaRows) }
+            HomeFilter.ANIME -> { addAll(animePicks); add(animeRow("Trending anime", c.trending)); addAll(animeRows) }
         }
     }.filter { it.items.isNotEmpty() }.distinctBy { it.title }
+        // low-end: fewer rows keeps composition and image memory down
+        .let { if (LocalLowEnd.current) it.take(LOW_END_ROWS) else it }
 
     var hero by remember { mutableStateOf<TvItem?>(null) }
     var lastFocused by rememberSaveable { mutableStateOf<String?>(null) }
@@ -128,6 +140,11 @@ fun TvHomeScreen(filter: HomeFilter, homeVm: HomeViewModel, moviesVm: MoviesHome
                     contentPadding = PaddingValues(bottom = 40.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    // everything but Continue watching
+                    val pool = rows.filterNot { it.wide }.flatMap { it.items }
+                    if (pool.isNotEmpty()) item(key = "surprise") {
+                        TvPill("Surprise me", onClick = { pool.random().onClick() }, modifier = Modifier.padding(start = Overscan))
+                    }
                     items(rows, key = { it.title }) { row ->
                         TvCardRow(row, restoreKey, restore, onFocused = { hero = it; lastFocused = it.key })
                     }
@@ -136,3 +153,5 @@ fun TvHomeScreen(filter: HomeFilter, homeVm: HomeViewModel, moviesVm: MoviesHome
         }
     }
 }
+
+private const val LOW_END_ROWS = 8

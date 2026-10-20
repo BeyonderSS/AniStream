@@ -69,6 +69,8 @@ fun MediaPlayerScreen(
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val (fullscreen, setFullscreen) = rememberFullscreen(viewModel::onStop)
     val request = ui.request
+    val tweaks = rememberPlayerTweaks(request?.historyKey ?: request?.title ?: "media")
+    val pip = rememberPip(viewModel.player)
 
     LaunchedEffect(ui.webImdbId) {
         val tt = ui.webImdbId ?: return@LaunchedEffect
@@ -96,11 +98,14 @@ fun MediaPlayerScreen(
             // no request at all: Retry can't help, so it leaves
             onRetry = if (request == null) onBack else viewModel::retry,
             live = ui.isLive,
+            tweaks = tweaks,
+            episodic = (request?.episode ?: 0) > 0,
+            pip = pip,
             onWebPlayer = if (ui.canWebPlay) viewModel::openWebPlayer else null,
             endOverlay = if (!ui.ended || request == null) null else {
                 {
                     if (ui.hasNextEpisode) {
-                        NextCountdown("Up next: S${request.season} E${request.episode + 1}", viewModel::nextEpisode, viewModel::dismissEnd)
+                        NextEpisodeCard(request.posterUrl, "Episode ${request.episode + 1}", "${request.title}, season ${request.season}", viewModel::nextEpisode, viewModel::dismissEnd)
                     } else {
                         FinishedCard(request.title, onBack)
                     }
@@ -110,8 +115,8 @@ fun MediaPlayerScreen(
         )
     }
 
-    Box(Modifier.fillMaxSize().background(if (fullscreen) Color.Black else Bg.base)) {
-        if (fullscreen) {
+    Box(Modifier.fillMaxSize().background(if (fullscreen || pip) Color.Black else Bg.base)) {
+        if (fullscreen || pip) {
             video(Modifier.fillMaxSize())
         } else {
             Column(Modifier.fillMaxSize()) {
@@ -212,6 +217,7 @@ fun MediaPlayerScreen(
                         }
                     }
                 }
+                PlayerTweaksSection(viewModel.player, tweaks, live = ui.isLive)
             }
         }
     }

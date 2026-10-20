@@ -49,16 +49,19 @@ android {
     productFlavors {
         create("phone") {
             dimension = "device"
+            minSdk = 26 // phone keeps API 26+; only tv drops to 22 (Fire TV Stick 2nd gen, Fire OS 5)
             isDefault = true
         }
         create("tv") {
             dimension = "device"
             applicationIdSuffix = ".tv"
+            minSdk = 22
             versionNameSuffix = "-tv"
         }
     }
 
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -69,10 +72,12 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
 dependencies {
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(project(":core:network"))
     implementation(project(":core:parser"))
     implementation(project(":core:database"))

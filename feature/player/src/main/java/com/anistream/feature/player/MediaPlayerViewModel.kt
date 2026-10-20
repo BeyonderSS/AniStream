@@ -1,5 +1,6 @@
 package com.anistream.feature.player
 
+import com.anistream.core.common.LowEnd
 import android.content.Context
 import android.net.Uri
 import androidx.annotation.OptIn
@@ -105,14 +106,17 @@ class MediaPlayerViewModel @Inject constructor(
     private val downloads: DownloadRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(MediaPlayerUiState(request = NowPlaying.request))
+    private val lowEnd = LowEnd.isOn(context)
+    private fun ordered(r: PlaybackRequest) = if (lowEnd) r.copy(streams = lowEndOrder(r.streams)) else r
+
+    private val _uiState = MutableStateFlow(MediaPlayerUiState(request = NowPlaying.request?.let(::ordered)))
     val uiState: StateFlow<MediaPlayerUiState> = _uiState.asStateFlow()
 
     private var pendingResume: Float? = null
     /** stream index that already auto-switched away after an error, so a failure chain only walks forward */
     private var fellBackFrom = -1
 
-    val player: ExoPlayer = ExoPlayer.Builder(context).build().apply {
+    val player: ExoPlayer = buildPlayer(context).apply {
         addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
@@ -272,7 +276,7 @@ class MediaPlayerViewModel @Inject constructor(
                         _uiState.update { it.copy(isLoading = false, error = "No streams for episode $episode") }
                         return@launch
                     }
-                    val next = r.copy(streams = res.data, episode = episode, subtitle = "S${r.season} · E$episode")
+                    val next = ordered(r.copy(streams = res.data, episode = episode, subtitle = "S${r.season} · E$episode"))
                     NowPlaying.request = next
                     fellBackFrom = -1
                     _uiState.update { it.copy(request = next, downloadStarted = false) }

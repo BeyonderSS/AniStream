@@ -62,7 +62,9 @@ class AnidbRepositoryImpl @Inject constructor(
         // stream host 403s without the embed site as Referer, e.g. https://zokoanime.video/
         val referer = URI(embedUrl).resolve("/").toString()
         val master = httpClient.getHtml(embed.masterUrl, mapOf("Referer" to referer))
-        HianimeParser.parseMasterPlaylist(master, embed.masterUrl, referer, embed.subtitleUrl)
+        // embed url is ".../stream/mal/<malId>/<ep>/<lang>"; AniSkip keys on that MAL id
+        val malId = MAL_ID.find(embedUrl)?.groupValues?.get(1)?.toLongOrNull()
+        HianimeParser.parseMasterPlaylist(master, embed.masterUrl, referer, embed.subtitleUrl).map { list -> list.map { it.copy(malId = malId) } }
     }
 
     override suspend fun getHomeContent(): Result<HomeContent> = fetch {
@@ -92,6 +94,10 @@ class AnidbRepositoryImpl @Inject constructor(
         }
         days.firstOrNull { it !is Result.Success }?.let { return it.asError() }
         Result.success(days.flatMap { (it as Result.Success).data })
+    }
+
+    private companion object {
+        val MAL_ID = Regex("""/mal/(\d+)/""")
     }
 
     private fun Result<*>.asError(): Result<Nothing> =

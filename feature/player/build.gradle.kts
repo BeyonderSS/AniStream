@@ -25,6 +25,7 @@ android {
 }
 
 dependencies {
+    testImplementation(libs.junit)
     implementation(project(":domain"))
     implementation(project(":core:common"))
     implementation(project(":core:ui"))
@@ -39,6 +40,7 @@ dependencies {
     implementation(libs.compose.animation)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
+    implementation(libs.activity.compose) // ComponentActivity.addOnUserLeaveHintListener (PiP)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

@@ -1,5 +1,6 @@
 package com.anistream.feature.tv
 
+import com.anistream.core.common.LowEnd
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
@@ -43,7 +44,40 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import android.text.format.DateFormat
+import java.util.Date
+import com.anistream.feature.player.INTRO_SKIP_MS
+import com.anistream.feature.player.INTRO_WINDOW_MS
+import com.anistream.feature.player.CountdownRing
+import com.anistream.feature.player.activeSkip
+import com.anistream.feature.player.skipLabel
+import com.anistream.domain.model.SkipInterval
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import com.anistream.feature.player.PlaybackSpeeds
+import com.anistream.feature.player.Resize
+import com.anistream.feature.player.SleepOptions
+import com.anistream.feature.player.SubtitleDelays
+import com.anistream.feature.player.SubtitleScales
+import com.anistream.feature.player.VideoSurface
+import com.anistream.feature.player.audioOptions
+import com.anistream.feature.player.delayLabel
+import com.anistream.feature.player.hasSubtitles
+import com.anistream.feature.player.rememberPlayerTweaks
+import com.anistream.feature.player.rememberTracks
+import com.anistream.feature.player.selectAudio
+import com.anistream.feature.player.sleepLabel
+import com.anistream.feature.player.speedLabel
+import com.anistream.feature.player.subtitleScaleLabel
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -97,7 +131,17 @@ private fun TvPlayerChrome(
     ended: Boolean,
     onUpNext: () -> Unit,
     onCancelUpNext: () -> Unit,
-    onWebPlayer: (() -> Unit)? = null
+    /** per-title key for remembered speed / picture / subtitle size */
+    tweaksKey: String,
+    /** episodes get a "Skip intro" chip in their first 5 minutes */
+    episodic: Boolean,
+    onWebPlayer: (() -> Unit)? = null,
+    /** art for the up-next card (poster) */
+    upNextImage: String? = null,
+    /** AniSkip intervals; non-empty replaces the fixed +85 s chip */
+    skips: List<SkipInterval> = emptyList(),
+    /** offer the "Auto-skip intro and recap" setting (anime) */
+    skipSetting: Boolean = false
 ) {
     var visible by remember { mutableStateOf(true) }
     var panel by remember { mutableStateOf(Panel.NONE) }
@@ -108,6 +152,38 @@ private fun TvPlayerChrome(
     val rootFocus = remember { FocusRequester() }
     val panelFocus = remember { FocusRequester() }
     val reduce = LocalReduceMotion.current
+    val tweaks = rememberPlayerTweaks(tweaksKey)
+    val tracks = rememberTracks(player)
+    val introFocus = remember { FocusRequester() }
+    var introFocused by remember { mutableStateOf(false) }
+    var introSkippedFor by remember { mutableStateOf<String?>(null) }
+    var skipToast by remember { mutableStateOf<String?>(null) }
+    val autoSkipped = remember(title, subtitle) { mutableSetOf<SkipInterval>() }
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val context = LocalContext.current
+    var lowEnd by remember { mutableStateOf(LowEnd.isOn(context)) }
+
+    val audio = audioOptions(tracks)
+    val subs = hasSubtitles(tracks)
+    val allSettings = settings + listOf(
+        SettingGroup("Speed", if (isLive) emptyList() else PlaybackSpeeds, ::speedLabel, { it == tweaks.speed }) { tweaks.updateSpeed(player, it) },
+        SettingGroup("Picture", Resize.entries, { it.label }, { it == tweaks.resize }, tweaks::updateResize),
+        SettingGroup("Audio track", if (audio.size > 1) audio else emptyList(), { it.label }, { it.selected }) { selectAudio(player, it) },
+        SettingGroup("Subtitle size", if (subs) SubtitleScales else emptyList(), ::subtitleScaleLabel, { it == tweaks.subScale }, tweaks::updateSubScale),
+        SettingGroup("Subtitle delay", if (subs) SubtitleDelays else emptyList(), ::delayLabel, { it == tweaks.subDelayMs }) { tweaks.subDelayMs = it },
+        SettingGroup("Sleep timer", SleepOptions, ::sleepLabel, { it == tweaks.sleep }, tweaks::updateSleep),
+        SettingGroup("Auto-skip intro and recap", if (skipSetting) listOf(true, false) else emptyList(), { if (it) "On" else "Off" }, { it == tweaks.autoSkip }, tweaks::updateAutoSkip),
+        SettingGroup("Low-end mode (applies on restart)", listOf(true, false), { if (it) "On" else "Off" }, { it == lowEnd }) { lowEnd = it; LowEnd.set(context, it) }
+    )
+    val hasSettings = allSettings.any { it.options.isNotEmpty() }
+    val skipNow = if (episodic && !isLive && error == null && !ended) activeSkip(skips, position) else null
+    val showIntro = panel == Panel.NONE && (
+        skipNow != null ||
+            (skips.isEmpty() && episodic && !isLive && error == null && !ended && introSkippedFor != title &&
+                duration > INTRO_WINDOW_MS && position < INTRO_WINDOW_MS)
+        )
+    val skipText = skipNow?.let { skipLabel(it.type) } ?: "Skip intro"
+    val upNextShown = ended && upNext != null
 
     fun show() { visible = true; poke++ }
     fun closePanel() { panel = Panel.NONE; poke++; runCatching { rootFocus.requestFocus() } }
@@ -123,6 +199,7 @@ private fun TvPlayerChrome(
             position = player.currentPosition
             duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
             playing = player.isPlaying
+            now = System.currentTimeMillis()
             delay(500)
         }
     }
@@ -133,11 +210,21 @@ private fun TvPlayerChrome(
         if (panel != Panel.NONE) { withFrameNanos { }; runCatching { panelFocus.requestFocus() } }
     }
     LaunchedEffect(Unit) { withFrameNanos { }; runCatching { rootFocus.requestFocus() } }
+    LaunchedEffect(showIntro) { if (!showIntro && introFocused) runCatching { rootFocus.requestFocus() } }
     LaunchedEffect(message) { if (message != null) { delay(3500); onMessageShown() } }
-    LaunchedEffect(ended, upNext) { if (ended && upNext != null) { delay(5000); onUpNext() } }
+    // AniSkip auto-skip: intro/recap once per interval, with a short toast
+    LaunchedEffect(skipNow, tweaks.autoSkip) {
+        val s = skipNow ?: return@LaunchedEffect
+        if (tweaks.autoSkip && s.isIntroOrRecap && autoSkipped.add(s)) {
+            player.seekTo(s.endMs)
+            position = s.endMs
+            skipToast = if (s.type == "recap") "Skipped recap" else "Skipped intro"
+        }
+    }
+    LaunchedEffect(skipToast) { if (skipToast != null) { delay(2000); skipToast = null } }
 
-    BackHandler(enabled = ended && upNext != null) { onCancelUpNext() }
-    BackHandler(enabled = !(ended && upNext != null) && (panel != Panel.NONE || visible) && error == null) {
+    BackHandler(enabled = upNextShown) { onCancelUpNext() }
+    BackHandler(enabled = !upNextShown && (panel != Panel.NONE || visible) && error == null) {
         if (panel != Panel.NONE) closePanel() else visible = false
     }
 
@@ -146,8 +233,18 @@ private fun TvPlayerChrome(
             .fillMaxSize()
             .background(Color.Black)
             .onPreviewKeyEvent { e ->
-                if (panel != Panel.NONE || error != null) { poke++; return@onPreviewKeyEvent false }
+                // the up-next card's buttons take the D-pad
+                if (panel != Panel.NONE || error != null || upNextShown) { poke++; return@onPreviewKeyEvent false }
                 if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                // the skip-intro chip (reached with ↓) takes OK; ↑ backs out; anything else acts as usual
+                val fromIntro = introFocused
+                if (fromIntro) {
+                    when (e.key) {
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> return@onPreviewKeyEvent false
+                        Key.DirectionUp -> { runCatching { rootFocus.requestFocus() }; show(); return@onPreviewKeyEvent true }
+                        else -> runCatching { rootFocus.requestFocus() }
+                    }
+                }
                 // ponytail: linear ramp on key repeat (10 s → 60 s per step); tune here if it feels slow on long films
                 val step = 10_000L * (1 + e.nativeKeyEvent.repeatCount / 5).coerceAtMost(6)
                 fun seek(delta: Long) {
@@ -165,8 +262,11 @@ private fun TvPlayerChrome(
                     Key.MediaPause -> player.pause()
                     Key.DirectionLeft, Key.MediaRewind -> seek(-step)
                     Key.DirectionRight, Key.MediaFastForward -> seek(step)
-                    Key.DirectionUp -> if (settings.any { it.options.isNotEmpty() }) panel = Panel.SETTINGS
-                    Key.DirectionDown -> if (strip != null && strip.numbers.isNotEmpty()) panel = Panel.STRIP
+                    Key.DirectionUp -> if (hasSettings) panel = Panel.SETTINGS
+                    Key.DirectionDown -> when {
+                        showIntro && !fromIntro -> runCatching { introFocus.requestFocus() }
+                        strip != null && strip.numbers.isNotEmpty() -> panel = Panel.STRIP
+                    }
                     else -> { show(); return@onPreviewKeyEvent false }
                 }
                 show()
@@ -175,17 +275,17 @@ private fun TvPlayerChrome(
             .focusRequester(rootFocus)
             .focusable()
     ) {
-        AndroidView(
-            factory = { ctx ->
+        VideoSurface(
+            player = player,
+            tweaks = tweaks,
+            create = { ctx ->
                 PlayerView(ctx).apply {
                     useController = false
                     setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                     keepScreenOn = true
                     isFocusable = false
-                    this.player = player
                 }
             },
-            onRelease = { it.player = null },
             modifier = Modifier.fillMaxSize()
         )
 
@@ -212,7 +312,7 @@ private fun TvPlayerChrome(
                         .padding(horizontal = Overscan, vertical = 32.dp)
                 ) {
                     when (panel) {
-                        Panel.SETTINGS -> SettingsPanel(settings, panelFocus) { closePanel() }
+                        Panel.SETTINGS -> SettingsPanel(allSettings, panelFocus) { closePanel() }
                         Panel.STRIP -> if (strip != null) StripPanel(strip, panelFocus) { closePanel() }
                         Panel.NONE -> Unit
                     }
@@ -232,13 +332,47 @@ private fun TvPlayerChrome(
                     }
                     if (panel == Panel.NONE) {
                         Spacer(Modifier.height(10.dp))
-                        Text(
-                            listOfNotNull("↑ Settings".takeIf { settings.any { it.options.isNotEmpty() } }, "↓ Episodes".takeIf { strip != null }).joinToString("    "),
-                            style = TvType.body.copy(color = Ink.muted)
-                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
+                            Text(
+                                listOfNotNull(
+                                    "↑ Settings".takeIf { hasSettings },
+                                    if (showIntro) "↓ $skipText" else "↓ Episodes".takeIf { strip != null }
+                                ).joinToString("    "),
+                                style = TvType.body.copy(color = Ink.muted),
+                                modifier = Modifier.weight(1f)
+                            )
+                            val fmt = remember(context) { DateFormat.getTimeFormat(context) }
+                            val left = duration - position
+                            Text(
+                                listOfNotNull(
+                                    fmt.format(Date(now)),
+                                    if (!isLive && duration > 0) "Ends at ${fmt.format(Date(now + (left / tweaks.speed).toLong()))}" else null
+                                ).joinToString("     "),
+                                style = TvType.body.copy(color = Ink.body, fontFeatureSettings = "tnum")
+                            )
+                        }
                     }
                 }
             }
+        }
+
+        if (showIntro) {
+            TvPill(
+                skipText,
+                onClick = {
+                    val s = skipNow
+                    if (s != null) player.seekTo(s.endMs)
+                    else player.seekTo((player.currentPosition + INTRO_SKIP_MS).coerceAtMost(duration))
+                    position = player.currentPosition
+                    if (s == null) introSkippedFor = title
+                    show()
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = Overscan, bottom = if (visible) 150.dp else 40.dp)
+                    .focusRequester(introFocus)
+                    .onFocusChanged { introFocused = it.isFocused }
+            )
         }
 
         if (error != null) {
@@ -259,16 +393,13 @@ private fun TvPlayerChrome(
             }
         }
 
-        if (ended && upNext != null) {
-            Text(
-                "$upNext in 5 s. Back to cancel",
-                style = TvType.title,
-                modifier = Modifier.align(Alignment.TopEnd).padding(Overscan).background(Bg.raised, Radius.lg).padding(horizontal = 24.dp, vertical = 14.dp)
-            )
+        if (upNextShown) {
+            UpNextCard(upNextImage, upNext.orEmpty(), title, onUpNext, onCancelUpNext, Modifier.align(Alignment.BottomEnd).padding(Overscan))
         }
-        if (message != null) {
+        val note = message ?: skipToast
+        if (note != null) {
             Text(
-                message,
+                note,
                 style = TvType.body.copy(color = Ink.high),
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 32.dp).background(Bg.overlay, Radius.pill).padding(horizontal = 22.dp, vertical = 10.dp)
             )
@@ -276,9 +407,41 @@ private fun TvPlayerChrome(
     }
 }
 
+/** Next-episode preview: art under the countdown ring, "Episode N", Play now (focused) / Cancel. The ring runs the countdown. */
+@Composable
+private fun UpNextCard(imageUrl: String?, episodeLabel: String, title: String, onPlay: () -> Unit, onCancel: () -> Unit, modifier: Modifier) {
+    val playFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { withFrameNanos { }; runCatching { playFocus.requestFocus() } }
+    Row(
+        modifier.background(Bg.raised, Radius.xl).padding(20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            AsyncImage(
+                model = imageUrl, contentDescription = null, contentScale = ContentScale.Crop,
+                modifier = Modifier.width(240.dp).aspectRatio(16f / 9f).clip(Radius.lg).background(Bg.overlay)
+            )
+            Box(Modifier.matchParentSize().clip(Radius.lg).background(Bg.base.copy(alpha = 0.45f)))
+            CountdownRing(onDone = onPlay, size = 64.dp, textStyle = TvType.title)
+        }
+        Column {
+            Text("Up next", style = TvType.body.copy(color = Ink.muted))
+            Text(episodeLabel, style = TvType.headline, maxLines = 1)
+            Text(title, style = TvType.body, maxLines = 1, modifier = Modifier.widthIn(max = 360.dp))
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                TvPill("Play now", onPlay, modifier = Modifier.focusRequester(playFocus))
+                TvPill("Cancel", onCancel)
+            }
+        }
+    }
+}
+
 @Composable
 private fun SettingsPanel(groups: List<SettingGroup<*>>, firstFocus: FocusRequester, close: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    // scrolls: focus brings the active row into view
+    Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         groups.filter { it.options.isNotEmpty() }.forEachIndexed { gi, g -> SettingRow(g, if (gi == 0) firstFocus else null, close) }
     }
 }
@@ -325,7 +488,12 @@ fun TvAnimePlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel(
         upNext = next?.let { "Episode $it" }.takeIf { s.hasNext },
         ended = s.ended,
         onUpNext = vm::nextEpisode,
-        onCancelUpNext = vm::dismissEnd
+        onCancelUpNext = vm::dismissEnd,
+        tweaksKey = s.animeSlug,
+        episodic = true,
+        upNextImage = s.posterUrl,
+        skips = s.skips,
+        skipSetting = true
     )
 }
 
@@ -374,7 +542,10 @@ fun TvMediaPlayerScreen(
         ended = s.ended,
         onUpNext = vm::nextEpisode,
         onCancelUpNext = vm::dismissEnd,
-        onWebPlayer = if (s.canWebPlay) vm::openWebPlayer else null
+        tweaksKey = r?.historyKey ?: r?.title ?: "media",
+        episodic = (r?.episode ?: 0) > 0,
+        onWebPlayer = if (s.canWebPlay) vm::openWebPlayer else null,
+        upNextImage = r?.posterUrl
     )
 }
 

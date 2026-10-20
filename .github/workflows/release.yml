@@ -50,6 +50,7 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: |
           ./gradlew assemblePhoneRelease assembleTvRelease
           mv app/build/outputs/apk/phone/release/app-phone-release.apk "Reelm-v$VERSION_NAME.apk"

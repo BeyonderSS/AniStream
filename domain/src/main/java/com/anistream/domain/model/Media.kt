@@ -120,3 +120,27 @@ data class PlaybackRequest(
     /** total episodes in this season (for next-episode); 0 for movies/live */
     val seasonEpisodeCount: Int = 0
 )
+
+/**
+ * A ranked "For you" pick, cached on device. [kind] "anime" (id = hianime slug) or "media" (id = IMDb "tt…",
+ * opens with MoviesRepository.detail). [because] = title of the watched seed that recommended it most strongly.
+ */
+data class Recommendation(
+    val id: String,
+    val kind: String,
+    val title: String,
+    val posterUrl: String? = null,
+    val year: Int? = null,
+    val rating: Double? = null,
+    val mediaType: MediaType? = null,
+    val because: String? = null
+)
+
+/** Home rows from ranked picks: "Top picks for you" (first 10), then "Because you watched X" for the two strongest seeds. */
+fun List<Recommendation>.forYouRows(): List<Pair<String, List<Recommendation>>> {
+    if (isEmpty()) return emptyList()
+    val because = mapNotNull { it.because }.distinct().take(2).map { seed ->
+        "Because you watched $seed" to filter { it.because == seed }
+    }.filter { it.second.size >= 3 }
+    return listOf("Top picks for you" to take(10)) + because
+}
