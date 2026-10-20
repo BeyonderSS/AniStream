@@ -44,6 +44,20 @@ android {
         }
     }
 
+    // phone = the existing app; tv = Android TV / Fire TV build launching TvActivity (app/src/tv overlay)
+    flavorDimensions += "device"
+    productFlavors {
+        create("phone") {
+            dimension = "device"
+            isDefault = true
+        }
+        create("tv") {
+            dimension = "device"
+            applicationIdSuffix = ".tv"
+            versionNameSuffix = "-tv"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -77,11 +91,14 @@ dependencies {
     implementation(project(":feature:genre-browse"))
     implementation(project(":feature:movies"))
     implementation(project(":feature:livetv"))
+    "tvImplementation"(project(":feature:tv"))
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
     ksp(libs.hilt.compiler.androidx)
+    implementation(libs.hilt.work)
+    implementation(libs.work.runtime)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

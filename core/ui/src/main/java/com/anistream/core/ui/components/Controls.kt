@@ -46,14 +46,18 @@ import com.anistream.core.ui.theme.Bg
 import com.anistream.core.ui.theme.Ink
 import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Space
+import com.anistream.core.ui.theme.Motion
+import com.anistream.core.ui.theme.amberGlow
+import com.anistream.core.ui.theme.duskShadow
+import androidx.compose.ui.draw.clip
 
-/** Scales the element to 0.97 while [interactionSource] is pressed (DESIGN.md press feedback). */
+/** Scales the element to 0.97 while [interactionSource] is pressed (DESIGN-REELM.md press feedback). */
 @Composable
 fun Modifier.pressScale(interactionSource: InteractionSource): Modifier {
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.97f else 1f,
-        animationSpec = tween(200, easing = FastOutSlowInEasing),
+        animationSpec = Motion.quick(),
         label = "pressScale"
     )
     return graphicsLayer { scaleX = scale; scaleY = scale }
@@ -102,7 +106,7 @@ fun ArtworkImage(
     )
 }
 
-/** Gold rectangle CTA, black uppercase label, darker gold while pressed. No glow. */
+/** Amber pill CTA with dark text and the soft projector glow; deeper amber while pressed. */
 @Composable
 fun PrimaryButton(
     text: String,
@@ -111,10 +115,10 @@ fun PrimaryButton(
     icon: ImageVector? = null,
     enabled: Boolean = true
 ) {
-    SharpButton(text, onClick, modifier, icon, enabled, primary = true)
+    PillButton(text, onClick, modifier, icon, enabled, primary = true)
 }
 
-/** Transparent ghost: 1dp white@50% border, white uppercase label, 8% white fill while pressed. */
+/** Quiet secondary: slate pill, mist label, haze while pressed. */
 @Composable
 fun SecondaryButton(
     text: String,
@@ -123,11 +127,11 @@ fun SecondaryButton(
     icon: ImageVector? = null,
     enabled: Boolean = true
 ) {
-    SharpButton(text, onClick, modifier, icon, enabled, primary = false)
+    PillButton(text, onClick, modifier, icon, enabled, primary = false)
 }
 
 @Composable
-private fun SharpButton(
+private fun PillButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier,
@@ -140,16 +144,17 @@ private fun SharpButton(
     val bg = when {
         primary && pressed -> Accent.pressed
         primary -> Accent.main
-        pressed -> Ink.glass
-        else -> Color.Transparent
+        pressed -> Bg.overlay
+        else -> Bg.raised
     }
     val fg = if (primary) Accent.on else Ink.high
     Row(
         modifier = modifier
             .pressScale(source)
             .alpha(if (enabled) 1f else 0.38f)
+            .then(if (primary && enabled) Modifier.amberGlow() else Modifier)
             .background(bg, Radius.pill)
-            .then(if (primary) Modifier else Modifier.border(1.dp, Ink.ghost, Radius.pill))
+            .then(if (primary) Modifier else Modifier.border(1.dp, Ink.hairline, Radius.pill))
             .clickable(interactionSource = source, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
             .heightIn(min = 52.dp)
             .padding(horizontal = Space.xl),
@@ -160,11 +165,11 @@ private fun SharpButton(
             Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(Space.sm))
         }
-        Text(text.uppercase(), style = AppType.label, color = fg, maxLines = 1, softWrap = false)
+        Text(text, style = AppType.button, color = fg, maxLines = 1, softWrap = false)
     }
 }
 
-/** Uppercase tertiary text button in Ink.body. */
+/** Tertiary text button in Ink.body. */
 @Composable
 fun TextAction(
     text: String,
@@ -174,16 +179,17 @@ fun TextAction(
 ) {
     Box(
         modifier = modifier
+            .clip(Radius.pill)
             .clickable(role = Role.Button, onClick = onClick)
             .heightIn(min = 48.dp)
             .padding(horizontal = Space.sm),
         contentAlignment = Alignment.Center
     ) {
-        Text(text.uppercase(), style = AppType.label, color = color, maxLines = 1, softWrap = false)
+        Text(text, style = AppType.label, color = color, maxLines = 1, softWrap = false)
     }
 }
 
-/** Sharp chip with a hairline border; selected = gold fill + black label. */
+/** Pill chip on slate; selected = mist fill + dusk label (amber stays reserved for actions). */
 @Composable
 fun PillChip(
     label: String,
@@ -192,12 +198,12 @@ fun PillChip(
     modifier: Modifier = Modifier,
     leadingIcon: ImageVector? = null
 ) {
-    val fg by animateColorAsState(if (selected) Accent.on else Ink.body, tween(200), label = "chipFg")
-    val bg by animateColorAsState(if (selected) Accent.main else Color.Transparent, tween(200), label = "chipBg")
+    val fg by animateColorAsState(if (selected) Bg.base else Ink.body, Motion.quick(), label = "chipFg")
+    val bg by animateColorAsState(if (selected) Ink.high else Bg.raised, Motion.quick(), label = "chipBg")
     Row(
         modifier = modifier
             .background(bg, Radius.pill)
-            .border(1.dp, if (selected) Accent.main else Ink.hairline, Radius.pill)
+            .clip(Radius.pill)
             .then(if (onClick != null) Modifier.pressClickable(onClick = onClick) else Modifier)
             .heightIn(min = 36.dp)
             .padding(horizontal = Space.md),
@@ -207,11 +213,11 @@ fun PillChip(
             Icon(leadingIcon, contentDescription = null, tint = fg, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(Space.xs))
         }
-        Text(label.uppercase(), style = AppType.label, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, style = AppType.label, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
-/** Sharp segmented control (e.g. Sub | Dub); selected segment gold with black label. */
+/** Pill segmented control (e.g. Sub | Dub) on a slate track; selected segment is a haze pill. */
 @Composable
 fun SegmentedControl(
     options: List<String>,
@@ -221,34 +227,35 @@ fun SegmentedControl(
 ) {
     Row(
         modifier = modifier
-            .border(1.dp, Ink.hairline, Radius.pill)
-            .padding(2.dp)
+            .background(Bg.raised, Radius.pill)
+            .padding(4.dp)
     ) {
         options.forEachIndexed { i, option ->
             val selected = i == selectedIndex
-            val bg by animateColorAsState(if (selected) Accent.main else Color.Transparent, tween(250), label = "segBg")
+            val bg by animateColorAsState(if (selected) Bg.overlay else Color.Transparent, Motion.standard(), label = "segBg")
             Box(
                 modifier = Modifier
+                    .clip(Radius.pill)
                     .background(bg)
                     .pressClickable(role = Role.Tab) { onSelect(i) }
-                    .heightIn(min = 36.dp)
+                    .heightIn(min = 40.dp)
                     .padding(horizontal = Space.lg),
                 contentAlignment = Alignment.Center
             ) {
-                Text(option.uppercase(), style = AppType.label, color = if (selected) Accent.on else Ink.muted, maxLines = 1)
+                Text(option, style = AppType.label, color = if (selected) Ink.high else Ink.muted, maxLines = 1)
             }
         }
     }
 }
 
-/** Icon in a sharp hairline square; used by empty/error states. */
+/** Icon in a soft slate circle; used by empty/error states. */
 @Composable
 internal fun SoftCircleIcon(icon: ImageVector, tint: Color, background: Color) {
     Box(
         modifier = Modifier
             .size(80.dp)
-            .background(background, Radius.md)
-            .border(1.dp, Ink.hairline, Radius.md),
+            .duskShadow(16.dp, Radius.round)
+            .background(background, Radius.round),
         contentAlignment = Alignment.Center
     ) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(36.dp))

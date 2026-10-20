@@ -77,6 +77,8 @@ import com.anistream.core.ui.theme.Bg
 import com.anistream.core.ui.theme.Ink
 import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Space
+import com.anistream.core.ui.theme.Motion
+import com.anistream.core.ui.components.MetaChips
 import com.anistream.domain.model.MediaItem
 import com.anistream.domain.model.MediaType
 import com.anistream.domain.model.WatchHistory
@@ -159,7 +161,7 @@ fun MoviesHomeScreen(
                         if (uiState.continueWatching.isNotEmpty()) {
                             item(key = "cw") {
                                 Spacer(Modifier.height(Space.lg))
-                                SectionHeader(title = "Continue Watching")
+                                SectionHeader(title = "Continue watching")
                                 LazyRow(
                                     contentPadding = PaddingValues(horizontal = Space.lg),
                                     horizontalArrangement = Arrangement.spacedBy(Space.md)
@@ -186,7 +188,7 @@ fun MoviesHomeScreen(
         val solid by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 120 } }
         val bg by animateColorAsState(
             if (solid || mode != Mode.Content) Bg.bar else Color.Transparent,
-            tween(250, easing = FastOutSlowInEasing),
+            Motion.standard(),
             label = "moviesTopBar"
         )
         Row(
@@ -199,7 +201,7 @@ fun MoviesHomeScreen(
                 .padding(start = Space.lg, end = Space.xs),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("MOVIES & TV", style = AppType.heading.copy(letterSpacing = 2.sp), modifier = Modifier.weight(1f))
+            Text("Movies & TV", style = AppType.heading.copy(fontSize = 24.sp), modifier = Modifier.weight(1f))
             IconButton(onClick = onAddonsClick) {
                 Icon(Icons.Outlined.Extension, contentDescription = "Manage addons", tint = Ink.high)
             }
@@ -213,13 +215,18 @@ private fun HeroPager(items: List<MediaItem>, onOpen: (MediaItem) -> Unit) {
     LaunchedEffect(pagerState.settledPage, pagerState.isScrollInProgress, items.size) {
         if (items.size < 2 || pagerState.isScrollInProgress) return@LaunchedEffect
         delay(6_000)
-        pagerState.animateScrollToPage((pagerState.settledPage + 1) % items.size, animationSpec = tween(600, easing = FastOutSlowInEasing))
+        pagerState.animateScrollToPage((pagerState.settledPage + 1) % items.size, animationSpec = tween(600, easing = Motion.emphasized))
     }
-    Box {
-        HorizontalPager(state = pagerState, key = { items[it].id }) { page ->
+    Box(Modifier.fillMaxWidth().aspectRatio(3f / 4f)) {
+        // "The projector": backdrop crossfades to the current item; text slides with the pager.
+        Crossfade(
+            targetState = items[pagerState.currentPage.coerceIn(0, items.lastIndex)],
+            animationSpec = tween(Motion.PROJECTOR, easing = Motion.emphasized),
+            label = "heroBackdrop"
+        ) { item -> ArtworkImage(item.posterUrl, null, alignment = Alignment.TopCenter, modifier = Modifier.fillMaxSize()) }
+        HorizontalPager(state = pagerState, key = { items[it].id }, modifier = Modifier.fillMaxSize()) { page ->
             val item = items[page]
-            Box(Modifier.fillMaxWidth().aspectRatio(3f / 4f).clickable { onOpen(item) }) {
-                ArtworkImage(item.posterUrl, item.title, alignment = Alignment.TopCenter, modifier = Modifier.fillMaxSize())
+            Box(Modifier.fillMaxSize().clickable { onOpen(item) }) {
                 Box(Modifier.fillMaxWidth().height(140.dp).background(Bg.scrimTop))
                 Box(Modifier.fillMaxWidth().fillMaxHeight(0.6f).align(Alignment.BottomCenter).background(Bg.scrim))
                 Column(
@@ -228,14 +235,9 @@ private fun HeroPager(items: List<MediaItem>, onOpen: (MediaItem) -> Unit) {
                         .fillMaxWidth()
                         .padding(start = Space.lg, end = Space.lg, bottom = Space.xl + Space.sm)
                 ) {
-                    val meta = listOfNotNull(
-                        if (item.type == MediaType.SERIES) "Series" else "Movie",
-                        item.year?.toString(),
-                        item.genres.firstOrNull()
-                    ).joinToString(" · ")
-                    Text(meta.uppercase(), style = AppType.label.copy(color = Ink.body), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Spacer(Modifier.height(Space.xs))
-                    Text(item.title.uppercase(), style = AppType.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    MetaChips(listOf(if (item.type == MediaType.SERIES) "Series" else "Movie", item.year?.toString(), item.genres.firstOrNull()))
+                    Spacer(Modifier.height(Space.sm))
+                    Text(item.title, style = AppType.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.height(Space.lg))
                     Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
                         PrimaryButton(text = "Watch", onClick = { onOpen(item) }, icon = Icons.Rounded.PlayArrow)
@@ -251,23 +253,23 @@ private fun HeroPager(items: List<MediaItem>, onOpen: (MediaItem) -> Unit) {
             ) {
                 repeat(items.size) { i ->
                     val selected = pagerState.currentPage == i
-                    val w by animateDpAsState(if (selected) 24.dp else 12.dp, tween(250), label = "dash")
-                    Box(Modifier.height(2.dp).width(w).background(if (selected) Accent.main else Ink.faint))
+                    val w by animateDpAsState(if (selected) 20.dp else 6.dp, Motion.standard(), label = "dash")
+                    Box(Modifier.height(6.dp).width(w).background(if (selected) Ink.high else Ink.faint, Radius.pill))
                 }
             }
         }
     }
 }
 
-/** 16:9 resume card with a gold progress edge; caption is the title plus "S1 · E2" for episodes. */
+/** 16:9 resume card with an amber progress edge; caption is the title plus the episode label. */
 @Composable
 private fun ResumeCard(history: WatchHistory, onClick: () -> Unit) {
     Column(Modifier.width(240.dp).clip(Radius.md).pressClickable(onClick = onClick)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).border(1.dp, Ink.hairline, Radius.md)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(Radius.md)) {
             ArtworkImage(history.posterUrl, history.animeTitle, alignment = Alignment.TopCenter, modifier = Modifier.fillMaxSize())
             Box(Modifier.fillMaxWidth().fillMaxHeight(0.6f).align(Alignment.BottomCenter).background(Bg.scrim))
             Icon(Icons.Rounded.PlayArrow, contentDescription = "Resume", tint = Ink.high, modifier = Modifier.align(Alignment.Center))
-            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(Color(0x40FFFFFF))) {
+            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(Ink.ghost)) {
                 Box(Modifier.fillMaxWidth(history.watchProgress.coerceIn(0f, 1f)).fillMaxHeight().background(Accent.main))
             }
         }
@@ -291,7 +293,7 @@ fun MoviesCatalogScreen(
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = Ink.high)
             }
-            Text(viewModel.title.ifBlank { "Browse" }.uppercase(), style = AppType.heading, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(viewModel.title.ifBlank { "Browse" }, style = AppType.heading, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         val err = s.error
         when {

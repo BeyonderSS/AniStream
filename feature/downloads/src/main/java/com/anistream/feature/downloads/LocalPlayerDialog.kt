@@ -10,6 +10,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import com.anistream.core.ui.theme.Bg
+import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Ink
 import com.anistream.core.ui.theme.Space
 import androidx.compose.runtime.Composable
@@ -71,7 +73,7 @@ fun LocalPlayerDialog(filePath: String, onDismiss: () -> Unit) {
             )
             IconButton(
                 onClick = onDismiss,
-                modifier = Modifier.statusBarsPadding().padding(Space.sm).background(Color.Black.copy(alpha = 0.7f))
+                modifier = Modifier.statusBarsPadding().padding(Space.sm).background(Bg.badge, Radius.round)
             ) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Close player", tint = Ink.high)
             }

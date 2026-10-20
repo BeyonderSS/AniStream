@@ -47,5 +47,5 @@ val ShimmerHighlight = Bg.overlay
 val Overlay = Bg.badge
 val Divider = Ink.hairline
 
-/** No rainbow (DESIGN.md): every genre gets the same quiet accent. */
+/** No rainbow (DESIGN-REELM.md): every genre gets the same quiet accent. */
 val GenreColors: List<Color> = listOf(Accent.main)

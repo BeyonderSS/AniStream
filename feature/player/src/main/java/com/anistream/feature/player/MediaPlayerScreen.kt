@@ -1,5 +1,7 @@
 package com.anistream.feature.player
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -72,7 +74,7 @@ fun MediaPlayerScreen(
         viewModel.messageShown()
     }
 
-    val title = listOfNotNull(request?.title, request?.subtitle).joinToString(" · ")
+    val title = listOfNotNull(request?.title, request?.subtitle).joinToString(", ")
     val video: @Composable (Modifier) -> Unit = { m ->
         VideoPlayer(
             player = viewModel.player,
@@ -89,7 +91,7 @@ fun MediaPlayerScreen(
             endOverlay = if (!ui.ended || request == null) null else {
                 {
                     if (ui.hasNextEpisode) {
-                        NextCountdown("UP NEXT · S${request.season} · E${request.episode + 1}", viewModel::nextEpisode, viewModel::dismissEnd)
+                        NextCountdown("Up next: S${request.season} E${request.episode + 1}", viewModel::nextEpisode, viewModel::dismissEnd)
                     } else {
                         FinishedCard(request.title, onBack)
                     }
@@ -115,7 +117,7 @@ fun MediaPlayerScreen(
                         .navigationBarsPadding()
                         .padding(Space.lg)
                 ) {
-                    Text((request?.title ?: "").uppercase(), style = AppType.heading, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(request?.title ?: "", style = AppType.heading, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     val sub = request?.subtitle
                     if (sub != null) {
                         Spacer(Modifier.height(Space.xs))
@@ -128,13 +130,14 @@ fun MediaPlayerScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .weight(1f, fill = false)
-                                .height(40.dp)
-                                .border(1.dp, Ink.ghost, Radius.pill)
+                                .height(48.dp)
+                                .clip(Radius.pill)
+                                .background(Bg.raised)
                                 .clickable(enabled = stream != null) { showSettings = true }
                                 .padding(start = Space.md, end = Space.sm)
                         ) {
                             Text(
-                                (stream?.label() ?: "No source").uppercase(),
+                                stream?.label() ?: "No source",
                                 style = AppType.label.copy(color = Ink.high, fontFeatureSettings = "tnum"),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -151,7 +154,7 @@ fun MediaPlayerScreen(
                                 Icon(
                                     if (ui.downloadStarted) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
                                     contentDescription = if (ui.downloadStarted) "Downloading" else "Download",
-                                    tint = if (ui.downloadStarted) Accent.main else Ink.body
+                                    tint = if (ui.downloadStarted) Accent.live else Ink.body
                                 )
                             }
                         }
@@ -163,19 +166,19 @@ fun MediaPlayerScreen(
     }
 
     if (showSettings && request != null) {
-        ModalBottomSheet(onDismissRequest = { showSettings = false }, containerColor = Bg.overlay) {
+        ModalBottomSheet(onDismissRequest = { showSettings = false }, containerColor = Bg.raised, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
             Column(
                 Modifier
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = Space.lg)
                     .padding(bottom = Space.xl)
             ) {
-                Text("SOURCE", style = AppType.heading)
+                Text("Source", style = AppType.heading)
                 request.streams.withIndex().groupBy { it.value.sourceName }.forEach { (source, streams) ->
                     Spacer(Modifier.height(Space.md))
-                    Text(source.uppercase(), style = AppType.label.copy(color = Ink.muted), modifier = Modifier.padding(horizontal = Space.sm))
+                    Text(source, style = AppType.label.copy(color = Ink.muted), modifier = Modifier.padding(horizontal = Space.sm))
                     streams.forEach { (i, s) ->
-                        SheetOption(s.detailLabel().ifBlank { source }.uppercase(), selected = i == ui.streamIndex) {
+                        SheetOption(s.detailLabel().ifBlank { source }, selected = i == ui.streamIndex) {
                             viewModel.selectStream(i)
                             showSettings = false
                         }
@@ -184,11 +187,11 @@ fun MediaPlayerScreen(
                 val subs = ui.stream?.subtitles.orEmpty()
                 if (subs.isNotEmpty()) {
                     Spacer(Modifier.height(Space.xl))
-                    Text("SUBTITLES", style = AppType.heading)
+                    Text("Subtitles", style = AppType.heading)
                     Spacer(Modifier.height(Space.sm))
-                    SheetOption("OFF", selected = ui.subtitleIndex == -1) { viewModel.selectSubtitle(-1) }
+                    SheetOption("Off", selected = ui.subtitleIndex == -1) { viewModel.selectSubtitle(-1) }
                     subs.forEachIndexed { i, t ->
-                        SheetOption(t.label.ifBlank { t.languageCode }.uppercase(), selected = i == ui.subtitleIndex) {
+                        SheetOption(t.label.ifBlank { t.languageCode }, selected = i == ui.subtitleIndex) {
                             viewModel.selectSubtitle(i)
                         }
                     }

@@ -9,6 +9,8 @@ import androidx.compose.ui.graphics.Color
 import com.anistream.core.ui.theme.Accent
 import com.anistream.core.ui.theme.Bg
 import com.anistream.core.ui.theme.Ink
+import com.anistream.core.ui.theme.Radius
+import androidx.compose.ui.unit.dp
 
 private val DarkColorScheme = darkColorScheme(
     primary = Accent.main,
@@ -48,18 +50,25 @@ private val DarkColorScheme = darkColorScheme(
     inverseOnSurface = Ink.high,
 
     error = Accent.danger,
-    onError = Ink.high,
+    onError = Bg.base,
     errorContainer = Accent.danger,
-    onErrorContainer = Ink.high,
+    onErrorContainer = Bg.base,
 
     outline = Ink.ghost,
     outlineVariant = Ink.hairline,
     scrim = Bg.base
 )
 
-private val Sharp = RoundedCornerShape(0)
-private val SharpShapes = Shapes(extraSmall = Sharp, small = Sharp, medium = Sharp, large = Sharp, extraLarge = Sharp)
+// Radius hierarchy (DESIGN-REELM.md): small 8, poster 12, card 18, sheet/dialog 24.
+private val ReelmShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = Radius.sm,
+    medium = Radius.md,
+    large = Radius.lg,
+    extraLarge = Radius.xl
+)
 
+/** Reelm theme (function name kept so existing call sites compile). */
 @Composable
 fun AniStreamTheme(
     content: @Composable () -> Unit
@@ -68,7 +77,7 @@ fun AniStreamTheme(
     MaterialTheme(
         colorScheme = DarkColorScheme,
         typography = AniStreamTypography,
-        shapes = SharpShapes,
+        shapes = ReelmShapes,
         content = content
     )
 }

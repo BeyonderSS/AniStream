@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.anistream.core.ui.theme.Bg
 import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Space
+import com.anistream.core.ui.theme.Motion
 
 /** A shimmering block. Give it a size and (optionally) a clip shape. */
 @Composable
@@ -43,7 +44,7 @@ fun LoadingShimmer(
     val x by transition.animateFloat(
         initialValue = -600f,
         targetValue = 1400f,
-        animationSpec = infiniteRepeatable(tween(1300, easing = FastOutSlowInEasing), RepeatMode.Restart),
+        animationSpec = infiniteRepeatable(tween(1300, easing = Motion.emphasized), RepeatMode.Restart),
         label = "shimmerX"
     )
     val brush = Brush.linearGradient(

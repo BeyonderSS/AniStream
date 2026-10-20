@@ -77,7 +77,7 @@ fun GenreBrowseScreen(
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = Ink.high)
             }
             Text(
-                (uiState.title ?: "Genres").uppercase(),
+                uiState.title ?: "Genres",
                 style = AppType.heading,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -140,7 +140,7 @@ private fun TileGrid(content: LazyGridScope.() -> Unit) {
     )
 }
 
-/** Raised sharp tile with a hairline; gold 1dp border while pressed (one-accent rule, no hue tints). */
+/** Slate tile, 12dp corners; lifts to haze while pressed (one-accent rule, no hue tints). */
 @Composable
 private fun GenreTile(genre: Genre, onClick: () -> Unit) {
     val source = remember { MutableInteractionSource() }
@@ -149,13 +149,12 @@ private fun GenreTile(genre: Genre, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(72.dp)
-            .background(Bg.raised, Radius.md)
-            .border(1.dp, if (pressed) Accent.main else Ink.hairline, Radius.md)
+            .background(if (pressed) Bg.overlay else Bg.raised, Radius.md)
             .clickable(interactionSource = source, indication = null, onClick = onClick)
             .padding(horizontal = Space.lg),
         verticalArrangement = Arrangement.Center
     ) {
-        Text(genre.name.uppercase(), style = AppType.heading, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(genre.name, style = AppType.heading, maxLines = 1, overflow = TextOverflow.Ellipsis)
         val count = genre.count
         if (count > 0) Text("$count titles", style = AppType.numeric)
     }

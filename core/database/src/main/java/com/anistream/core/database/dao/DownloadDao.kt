@@ -21,10 +21,6 @@ interface DownloadDao {
     @Query("UPDATE downloads SET progress = :progress, state = :state WHERE episodeId = :episodeId")
     suspend fun updateProgress(episodeId: Long, progress: Float, state: String)
 
-    /** downloads run in-process; anything left running from a previous process is dead */
-    @Query("UPDATE downloads SET state = 'FAILED' WHERE state IN ('PENDING', 'DOWNLOADING')")
-    suspend fun failInterrupted()
-
     @Query("DELETE FROM downloads WHERE episodeId = :episodeId")
     suspend fun delete(episodeId: Long)
 }

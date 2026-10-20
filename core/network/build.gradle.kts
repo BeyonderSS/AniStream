@@ -30,6 +30,7 @@ dependencies {
     implementation(project(":domain"))
 
     implementation(libs.okhttp)
+    implementation(libs.work.runtime)
     implementation(libs.okhttp.logging)
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)

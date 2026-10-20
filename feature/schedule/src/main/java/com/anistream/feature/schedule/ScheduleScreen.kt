@@ -75,7 +75,7 @@ fun ScheduleScreen(
 
     Column(Modifier.fillMaxSize().background(Bg.base)) {
         Text(
-            "SCHEDULE",
+            "Schedule",
             style = AppType.title,
             modifier = Modifier.padding(start = Space.lg, end = Space.lg, top = Space.sm, bottom = Space.md)
         )
@@ -86,7 +86,7 @@ fun ScheduleScreen(
             itemsIndexed(days) { i, date ->
                 val name = dayName(date)
                 DayPill(
-                    label = if (i == 0) "TODAY" else name.take(3).uppercase(),
+                    label = if (i == 0) "Today" else name.take(3).lowercase().replaceFirstChar { it.uppercase() },
                     date = date.dayOfMonth,
                     selected = name == uiState.selectedDay,
                     onClick = { viewModel.onDaySelect(name) }
@@ -161,14 +161,13 @@ private fun DayPill(label: String, date: Int, selected: Boolean, onClick: () -> 
             .width(56.dp)
             .height(64.dp)
             .clip(Radius.lg)
-            .background(if (selected) Accent.main else Color.Transparent)
-            .border(1.dp, if (selected) Accent.main else Ink.hairline, Radius.lg)
+            .background(if (selected) Ink.high else Bg.raised)
             .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(label, style = AppType.label.copy(letterSpacing = 0.sp), color = if (selected) Accent.on else Ink.muted, maxLines = 1)
-        Text(date.toString(), style = AppType.heading.copy(fontFeatureSettings = "tnum"), color = if (selected) Accent.on else Ink.body)
+        Text(label, style = AppType.label, color = if (selected) Bg.base.copy(alpha = 0.72f) else Ink.muted, maxLines = 1)
+        Text(date.toString(), style = AppType.heading.copy(fontFeatureSettings = "tnum"), color = if (selected) Bg.base else Ink.body)
     }
 }
 
@@ -183,7 +182,7 @@ private fun TimelineRow(
 ) {
     val dotColor = when {
         upNext -> Accent.main
-        else -> Color.White.copy(alpha = 0.4f)
+        else -> Ink.faint
     }
     Row(
         modifier = Modifier
@@ -227,13 +226,13 @@ private fun TimelineRow(
                 .padding(vertical = Space.xs)
                 .clip(Radius.lg)
                 .background(Bg.raised)
-                .border(1.dp, if (upNext) Accent.main else Ink.hairline, Radius.lg)
+                .then(if (upNext) Modifier.border(1.5.dp, Accent.main, Radius.lg) else Modifier)
                 .clickable(onClick = onClick)
                 .padding(Space.lg)
         ) {
             if (upNext) {
                 Text(
-                    "UP NEXT",
+                    "Up next",
                     style = AppType.label,
                     color = Accent.on,
                     modifier = Modifier

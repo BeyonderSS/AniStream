@@ -78,6 +78,9 @@ import com.anistream.core.ui.theme.Bg
 import com.anistream.core.ui.theme.Ink
 import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Space
+import com.anistream.core.ui.theme.Motion
+import com.anistream.core.ui.components.MetaChips
+import androidx.compose.ui.text.font.FontWeight
 import com.anistream.domain.model.AnimeSearchResult
 import kotlinx.coroutines.delay
 
@@ -111,12 +114,12 @@ fun HomeScreen(
     val hero = c.trending.distinctBy { it.slug }.take(HERO_COUNT)
     // (title, items, see-all path or null). Trending lives in the hero; leftovers get a row.
     val rows: List<Triple<String, List<AnimeSearchResult>, String?>> = listOf(
-        Triple("Trending Now", c.trending.drop(HERO_COUNT), null),
-        Triple("Latest Episodes", c.recentEpisodes, "recently-updated"),
-        Triple("Top Airing", c.topAiring, "top-airing"),
-        Triple("Most Popular", c.popular, "most-popular"),
-        Triple("Most Favorite", c.favorites, "most-favorite"),
-        Triple("Latest Completed", c.completed, "latest-completed")
+        Triple("Trending now", c.trending.drop(HERO_COUNT), null),
+        Triple("Latest episodes", c.recentEpisodes, "recently-updated"),
+        Triple("Top airing", c.topAiring, "top-airing"),
+        Triple("Most popular", c.popular, "most-popular"),
+        Triple("Most favourited", c.favorites, "most-favorite"),
+        Triple("Recently completed", c.completed, "latest-completed")
     ).filter { it.second.isNotEmpty() }
 
     val hasContent = hero.isNotEmpty() || rows.isNotEmpty()
@@ -155,7 +158,7 @@ fun HomeScreen(
                 )
             }
         ) {
-            Crossfade(targetState = mode, animationSpec = tween(250), label = "homeMode") { m ->
+            Crossfade(targetState = mode, animationSpec = Motion.standard(), label = "homeMode") { m ->
                 when (m) {
                     HomeMode.Loading -> HomeSkeleton()
                     HomeMode.Error -> ErrorContent(message = error ?: "", onRetry = { viewModel.loadContent() })
@@ -185,7 +188,7 @@ fun HomeScreen(
                         if (uiState.continueWatching.isNotEmpty()) {
                             item(key = "cwHeader") {
                                 Spacer(Modifier.height(Space.lg))
-                                SectionHeader(title = "Continue Watching")
+                                SectionHeader(title = "Continue watching")
                             }
                             item(key = "cwRow") {
                                 LazyRow(
@@ -233,7 +236,7 @@ fun HomeScreen(
 
 @Composable
 private fun HomeTopBar(solid: Boolean, onSearchClick: () -> Unit, onGenresClick: () -> Unit, onScheduleClick: () -> Unit) {
-    val bg by animateColorAsState(if (solid) Bg.bar else Color.Transparent, tween(250, easing = FastOutSlowInEasing), label = "topBarBg")
+    val bg by animateColorAsState(if (solid) Bg.bar else Color.Transparent, Motion.standard(), label = "topBarBg")
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -245,8 +248,8 @@ private fun HomeTopBar(solid: Boolean, onSearchClick: () -> Unit, onGenresClick:
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "ANISTREAM",
-            style = AppType.heading.copy(letterSpacing = 2.sp),
+            text = "Reelm",
+            style = AppType.heading.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold),
             modifier = Modifier.weight(1f)
         )
         IconButton(onClick = onSearchClick) {
@@ -284,12 +287,25 @@ private fun HeroPager(
         delay(HERO_INTERVAL_MS)
         pagerState.animateScrollToPage(
             (pagerState.settledPage + 1) % items.size,
-            animationSpec = tween(600, easing = FastOutSlowInEasing)
+            animationSpec = tween(600, easing = Motion.emphasized)
         )
     }
 
-    Box {
-        HorizontalPager(state = pagerState, key = { items[it].slug }) { page ->
+    Box(Modifier.fillMaxWidth().aspectRatio(3f / 4f)) {
+        // "The projector": the backdrop crossfades to the current item while the text slides with the pager.
+        Crossfade(
+            targetState = items[pagerState.currentPage.coerceIn(0, items.lastIndex)],
+            animationSpec = tween(Motion.PROJECTOR, easing = Motion.emphasized),
+            label = "heroBackdrop"
+        ) { anime ->
+            ArtworkImage(
+                url = anime.posterUrl,
+                contentDescription = null,
+                alignment = Alignment.TopCenter,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        HorizontalPager(state = pagerState, key = { items[it].slug }, modifier = Modifier.fillMaxSize()) { page ->
             HeroPage(items[page], onWatch = { onWatch(items[page]) }, onDetails = { onDetails(items[page]) })
         }
         PageDots(
@@ -307,15 +323,9 @@ private fun HeroPage(anime: AnimeSearchResult, onWatch: () -> Unit, onDetails: (
     Box(
         Modifier
             .fillMaxWidth()
-            .aspectRatio(3f / 4f)
+            .fillMaxHeight()
             .clickable(onClick = onDetails)
     ) {
-        ArtworkImage(
-            url = anime.posterUrl,
-            contentDescription = anime.title,
-            alignment = Alignment.TopCenter,
-            modifier = Modifier.fillMaxSize()
-        )
         Box(
             Modifier
                 .fillMaxWidth()
@@ -335,16 +345,12 @@ private fun HeroPage(anime: AnimeSearchResult, onWatch: () -> Unit, onDetails: (
                 .fillMaxWidth()
                 .padding(start = Space.lg, end = Space.lg, bottom = Space.xl + Space.sm)
         ) {
-            val meta = listOfNotNull(
-                anime.type?.takeIf { it.isNotBlank() },
-                anime.year?.toString(),
-                anime.status?.takeIf { it.isNotBlank() }
-            ).joinToString(" · ")
-            if (meta.isNotEmpty()) {
-                Text(meta.uppercase(), style = AppType.label.copy(color = Ink.body), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(Space.xs))
+            val meta = listOf(anime.type, anime.year?.toString(), anime.status)
+            if (meta.any { !it.isNullOrBlank() }) {
+                MetaChips(meta)
+                Spacer(Modifier.height(Space.sm))
             }
-            Text(anime.title.uppercase(), style = AppType.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(anime.title, style = AppType.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(Space.lg))
             Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
                 PrimaryButton(text = "Watch", onClick = onWatch, icon = Icons.Rounded.PlayArrow)
@@ -360,12 +366,12 @@ private fun PageDots(pagerState: PagerState, count: Int, modifier: Modifier = Mo
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
         repeat(count) { i ->
             val selected = pagerState.currentPage == i
-            val width by animateDpAsState(if (selected) 24.dp else 12.dp, tween(250, easing = FastOutSlowInEasing), label = "dash")
+            val width by animateDpAsState(if (selected) 20.dp else 6.dp, Motion.standard(), label = "dash")
             Box(
                 Modifier
-                    .height(2.dp)
+                    .height(6.dp)
                     .width(width)
-                    .background(if (selected) Accent.main else Ink.faint)
+                    .background(if (selected) Ink.high else Ink.faint, Radius.pill)
             )
         }
     }

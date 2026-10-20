@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dusk window so launch never flashes black or white before Compose draws. -->
+    <style name="Theme.Reelm.Tv" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/reelm_dusk</item>
+        <item name="android:colorAccent">@color/reelm_projector</item>
+    </style>
+    <color name="reelm_dusk">#FF15171F</color>
+    <color name="reelm_projector">#FFF2B45A</color>
+</resources>

@@ -42,7 +42,7 @@ enum class BottomNavItem(
     Library("library", "Library", Icons.Outlined.VideoLibrary)
 }
 
-/** Black 95% bar, hairline top border; selected = gold icon + gold uppercase label + a 2dp gold bar above the icon. */
+/** Slate 95% bar; selected = haze pill behind a mist icon + mist label, unselected at 52% ink. */
 @Composable
 fun BottomNavBar(
     currentRoute: String?,
@@ -50,7 +50,6 @@ fun BottomNavBar(
     modifier: Modifier = Modifier
 ) {
     Column(modifier.background(Bg.bar)) {
-        HorizontalDivider(thickness = 1.dp, color = Ink.hairline)
         NavigationBar(
             containerColor = Color.Transparent,
             contentColor = Ink.body,
@@ -61,28 +60,14 @@ fun BottomNavBar(
                 NavigationBarItem(
                     selected = selected,
                     onClick = { onNavigate(item.route) },
-                    icon = {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(
-                                Modifier
-                                    .size(width = 24.dp, height = 2.dp)
-                                    .background(if (selected) Accent.main else Color.Transparent)
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Icon(
-                                imageVector = item.icon,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    },
-                    label = { Text(item.label.uppercase(), style = AppType.label.copy(color = Color.Unspecified, fontSize = 10.sp, letterSpacing = 0.4.sp), maxLines = 1, softWrap = false) },
+                    icon = { Icon(item.icon, contentDescription = null, modifier = Modifier.size(24.dp)) },
+                    label = { Text(item.label, style = AppType.label.copy(color = Color.Unspecified, fontSize = 12.sp), maxLines = 1, softWrap = false) },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Accent.main,
-                        selectedTextColor = Accent.main,
+                        selectedIconColor = Ink.high,
+                        selectedTextColor = Ink.high,
                         unselectedIconColor = Ink.muted,
                         unselectedTextColor = Ink.muted,
-                        indicatorColor = Color.Transparent
+                        indicatorColor = Bg.overlay
                     )
                 )
             }

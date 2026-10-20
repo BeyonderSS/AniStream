@@ -87,6 +87,7 @@ private val bottomBarRoutes = setOf(
 @Composable
 fun AniStreamNavGraph() {
     val navController = rememberNavController()
+    com.anistream.app.work.PendingDeepLink.route?.let { r -> androidx.compose.runtime.LaunchedEffect(r) { com.anistream.app.work.PendingDeepLink.route = null; navController.navigate(r) } }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 

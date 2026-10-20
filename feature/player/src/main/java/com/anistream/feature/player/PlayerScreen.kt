@@ -1,5 +1,8 @@
 package com.anistream.feature.player
 
+import com.anistream.core.ui.theme.amberGlow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.foundation.shape.RoundedCornerShape
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -39,7 +42,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -111,7 +113,7 @@ import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Space
 import kotlinx.coroutines.delay
 
-internal val Scrim = Color.Black.copy(alpha = 0.45f)
+internal val Scrim = Bg.shadow.copy(alpha = 0.5f)
 internal val Tabular = AppType.bodyStrong.copy(fontFeatureSettings = "tnum")
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -134,7 +136,7 @@ fun PlayerScreen(
     val video: @Composable (Modifier) -> Unit = { m ->
         VideoPlayer(
             player = viewModel.player,
-            title = "${ui.animeTitle} · Ep ${ui.episodeNumber}",
+            title = "${ui.animeTitle}, Ep ${ui.episodeNumber}",
             isLoading = ui.isLoading,
             error = ui.error,
             fullscreen = fullscreen,
@@ -145,7 +147,7 @@ fun PlayerScreen(
             endOverlay = if (!ui.ended) null else {
                 {
                     val next = ui.episodeNumbers.firstOrNull { it > ui.episodeNumber }
-                    if (next != null) NextCountdown("UP NEXT · EPISODE $next", viewModel::nextEpisode, viewModel::dismissEnd)
+                    if (next != null) NextCountdown("Up next: episode $next", viewModel::nextEpisode, viewModel::dismissEnd)
                     else FinishedCard(ui.animeTitle, onBack)
                 }
             },
@@ -176,19 +178,19 @@ fun PlayerScreen(
     }
 
     if (showSettings) {
-        ModalBottomSheet(onDismissRequest = { showSettings = false }, containerColor = Bg.overlay) {
+        ModalBottomSheet(onDismissRequest = { showSettings = false }, containerColor = Bg.raised, shape = SheetShape) {
             Column(Modifier.padding(horizontal = Space.lg).padding(bottom = Space.xl)) {
-                Text("QUALITY", style = AppType.heading)
+                Text("Quality", style = AppType.heading)
                 Spacer(Modifier.height(Space.sm))
                 ui.availableQualities.forEach { source ->
-                    SheetOption(source.qualityLabel.uppercase(), selected = source.qualityLabel == ui.selectedQuality) {
+                    SheetOption(source.qualityLabel, selected = source.qualityLabel == ui.selectedQuality) {
                         viewModel.selectQuality(source.qualityLabel)
                         showSettings = false
                     }
                 }
                 if (ui.availableQualities.isEmpty()) Text("No qualities yet", style = AppType.caption)
                 Spacer(Modifier.height(Space.xl))
-                Text("AUDIO", style = AppType.heading)
+                Text("Audio", style = AppType.heading)
                 Spacer(Modifier.height(Space.md))
                 SubDubToggle(ui.language, viewModel::setLanguage)
             }
@@ -196,7 +198,7 @@ fun PlayerScreen(
     }
 }
 
-/** A row in a player bottom sheet: label (gold when selected) + check. */
+/** A row in a player bottom sheet: label (mist when selected, haze row) + amber check. */
 @Composable
 internal fun SheetOption(label: String, selected: Boolean, caption: String? = null, onClick: () -> Unit) {
     Row(
@@ -205,11 +207,12 @@ internal fun SheetOption(label: String, selected: Boolean, caption: String? = nu
             .fillMaxWidth()
             .height(if (caption == null) 48.dp else 56.dp)
             .clip(Radius.md)
+            .background(if (selected) Bg.overlay else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = Space.sm)
+            .padding(horizontal = Space.md)
     ) {
         Column(Modifier.weight(1f)) {
-            Text(label, style = Tabular.copy(color = if (selected) Accent.text else Ink.body), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, style = Tabular.copy(color = if (selected) Ink.high else Ink.body), maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (caption != null) Text(caption, style = AppType.numeric, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (selected) Icon(Icons.Rounded.Check, contentDescription = "Selected", tint = Accent.main)
@@ -401,8 +404,9 @@ internal fun VideoPlayer(
                                 contentAlignment = Alignment.Center,
                                 modifier = Modifier
                                     .size(72.dp)
-                                    .clip(Hexagon)
-                                    .border(2.dp, Ink.high, Hexagon)
+                                    .amberGlow(Radius.round)
+                                    .clip(Radius.round)
+                                    .background(Accent.main)
                                     .clickable {
                                         when {
                                             player.isPlaying -> player.pause()
@@ -415,8 +419,8 @@ internal fun VideoPlayer(
                                 Icon(
                                     if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                                     contentDescription = if (isPlaying) "Pause" else "Play",
-                                    tint = Ink.high,
-                                    modifier = Modifier.size(32.dp)
+                                    tint = Accent.on,
+                                    modifier = Modifier.size(36.dp)
                                 )
                             }
                         }
@@ -436,9 +440,9 @@ internal fun VideoPlayer(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (live) {
                             Text(
-                                "LIVE",
-                                style = AppType.label.copy(color = Accent.on),
-                                modifier = Modifier.background(Accent.main).padding(horizontal = Space.sm, vertical = 2.dp)
+                                "Live",
+                                style = AppType.label.copy(color = Accent.onLive),
+                                modifier = Modifier.background(Accent.live, Radius.pill).padding(horizontal = Space.sm + 2.dp, vertical = 2.dp)
                             )
                         } else {
                             Text(
@@ -498,7 +502,7 @@ internal fun VideoPlayer(
     }
 }
 
-/** [label] e.g. "UP NEXT · EPISODE 3"; runs [onNext] after 5s. */
+/** [label] e.g. "Up next: episode 3"; runs [onNext] after 5s. */
 @Composable
 internal fun NextCountdown(label: String, onNext: () -> Unit, onCancel: () -> Unit) {
     var seconds by remember { mutableIntStateOf(5) }
@@ -512,7 +516,7 @@ internal fun NextCountdown(label: String, onNext: () -> Unit, onCancel: () -> Un
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, style = AppType.label.copy(color = Ink.muted))
         Spacer(Modifier.height(Space.xs))
-        Text("NEXT EPISODE IN $seconds", style = AppType.heading)
+        Text("Next episode in $seconds", style = AppType.heading)
         Spacer(Modifier.height(Space.lg))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
             SecondaryButton(text = "Cancel", onClick = onCancel)
@@ -524,26 +528,15 @@ internal fun NextCountdown(label: String, onNext: () -> Unit, onCancel: () -> Un
 @Composable
 internal fun FinishedCard(title: String, onBack: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(Space.lg)) {
-        Text("YOU FINISHED", style = AppType.label.copy(color = Ink.muted))
+        Text("You finished", style = AppType.label.copy(color = Ink.muted))
         Spacer(Modifier.height(Space.xs))
-        Text(title.uppercase(), style = AppType.heading, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(title, style = AppType.heading, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(Space.lg))
         PrimaryButton(text = "Back to details", onClick = onBack)
     }
 }
 
-/** Pointy-top hexagon: the Nocturne brand echo around the centre play/pause. */
-private val Hexagon = GenericShape { size, _ ->
-    val w = size.width
-    val h = size.height
-    moveTo(w / 2f, 0f)
-    lineTo(w, h * 0.25f)
-    lineTo(w, h * 0.75f)
-    lineTo(w / 2f, h)
-    lineTo(0f, h * 0.75f)
-    lineTo(0f, h * 0.25f)
-    close()
-}
+private val SheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
 
 @Composable
 private fun SeekBubble(text: String, visible: Boolean, modifier: Modifier) {
@@ -564,7 +557,7 @@ private fun SeekBubble(text: String, visible: Boolean, modifier: Modifier) {
     }
 }
 
-/** Slim seek bar: 2dp sharp track (4dp while dragging) at 25% white, buffered at 40% white, played in gold, round gold thumb. */
+/** Slim seek bar: 4dp rounded track (6dp while dragging) in mist, buffered brighter, played in amber, round amber thumb. */
 @Composable
 private fun SeekBar(
     position: Long,
@@ -607,12 +600,13 @@ private fun SeekBar(
                 }
             }
     ) {
-        val track: Dp = if (dragging) 4.dp else 2.dp
+        val track: Dp = if (dragging) 6.dp else 4.dp
         val h = track.toPx()
         val top = (size.height - h) / 2
-        drawRect(Color.White.copy(alpha = 0.25f), Offset(0f, top), Size(size.width, h))
-        drawRect(Color.White.copy(alpha = 0.4f), Offset(0f, top), Size(size.width * loaded, h))
-        drawRect(Accent.main, Offset(0f, top), Size(size.width * played, h))
+        val r = CornerRadius(h / 2, h / 2)
+        drawRoundRect(Ink.ghost, Offset(0f, top), Size(size.width, h), r)
+        drawRoundRect(Ink.muted, Offset(0f, top), Size(size.width * loaded, h), r)
+        drawRoundRect(Accent.main, Offset(0f, top), Size(size.width * played, h), r)
         drawCircle(Accent.main, radius = (if (dragging) 8.dp else 6.dp).toPx(), center = Offset(size.width * played, size.height / 2))
     }
 }
@@ -636,7 +630,7 @@ private fun PortraitDetails(
             .padding(vertical = Space.lg)
     ) {
         Column(Modifier.padding(horizontal = Space.lg)) {
-            Text(ui.animeTitle.uppercase(), style = AppType.heading, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(ui.animeTitle, style = AppType.heading, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(Space.xs))
             val total = ui.episodeNumbers.size
             Text(
@@ -655,13 +649,14 @@ private fun PortraitDetails(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .height(40.dp)
-                    .border(1.dp, Ink.ghost, Radius.pill)
+                    .height(48.dp)
+                    .clip(Radius.pill)
+                    .background(Bg.raised)
                     .clickable(enabled = qualityEnabled, onClick = onQuality)
                     .padding(start = Space.md, end = Space.sm)
             ) {
                 Text(
-                    (ui.streamSource?.qualityLabel ?: "Auto").uppercase(),
+                    ui.streamSource?.qualityLabel ?: "Auto",
                     style = AppType.label.copy(color = if (qualityEnabled) Ink.high else Ink.faint, fontFeatureSettings = "tnum")
                 )
                 Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Change quality", tint = Ink.body, modifier = Modifier.size(20.dp))
@@ -675,7 +670,7 @@ private fun PortraitDetails(
                 Icon(
                     if (ui.downloadStarted) Icons.Rounded.DownloadDone else Icons.Rounded.Download,
                     contentDescription = if (ui.downloadStarted) "Downloading" else "Download episode",
-                    tint = if (ui.downloadStarted) Accent.main else Ink.body
+                    tint = if (ui.downloadStarted) Accent.live else Ink.body
                 )
             }
         }
@@ -687,7 +682,7 @@ private fun PortraitDetails(
 
         if (ui.episodeNumbers.size > 1) {
             Spacer(Modifier.height(Space.xl))
-            Text("EPISODES", style = AppType.heading, modifier = Modifier.padding(horizontal = Space.lg))
+            Text("Episodes", style = AppType.heading, modifier = Modifier.padding(horizontal = Space.lg))
             Spacer(Modifier.height(Space.md))
             EpisodeStrip(ui.episodeNumbers, ui.episodeNumber, ui.watchedBelow, onEpisode)
         }
@@ -712,7 +707,6 @@ private fun UpNextCard(posterUrl: String?, next: Int, onClick: () -> Unit) {
             .fillMaxWidth()
             .clip(Radius.lg)
             .background(Bg.raised)
-            .border(1.dp, Ink.hairline, Radius.lg)
             .clickable(onClick = onClick)
             .padding(Space.md)
     ) {
@@ -728,12 +722,12 @@ private fun UpNextCard(posterUrl: String?, next: Int, onClick: () -> Unit) {
         )
         Spacer(Modifier.width(Space.md))
         Column(Modifier.weight(1f)) {
-            Text("UP NEXT", style = AppType.label.copy(color = Ink.muted))
+            Text("Up next", style = AppType.label.copy(color = Ink.muted))
             Text("Episode $next", style = AppType.bodyStrong)
         }
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.size(40.dp).border(1.dp, Ink.ghost, Radius.pill)
+            modifier = Modifier.size(40.dp).background(Bg.overlay, Radius.round)
         ) {
             Icon(Icons.Rounded.PlayArrow, contentDescription = "Play episode $next", tint = Ink.high)
         }
@@ -761,7 +755,6 @@ private fun EpisodeStrip(numbers: List<Int>, current: Int, watchedBelow: Int, on
                     .size(48.dp)
                     .clip(Radius.md)
                     .background(if (isCurrent) Accent.main else Bg.raised)
-                    .border(1.dp, if (isCurrent) Accent.main else Ink.hairline, Radius.md)
                     .clickable { onEpisode(n) }
             ) {
                 Text(

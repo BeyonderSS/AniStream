@@ -111,7 +111,7 @@ fun FavoritesScreen(
                 modifier = Modifier.fillMaxWidth().padding(start = Space.lg, end = Space.sm, top = Space.sm, bottom = Space.sm),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("FAVORITES", style = AppType.title, modifier = Modifier.weight(1f))
+                Text("Favourites", style = AppType.title, modifier = Modifier.weight(1f))
                 if (uiState.favorites.isNotEmpty()) SortMenu(uiState.sortOption, viewModel::onSortChange)
             }
 
@@ -149,13 +149,13 @@ private fun SortMenu(current: SortOption, onSelect: (SortOption) -> Unit) {
         TextButton(onClick = { open = true }) {
             Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null, tint = Ink.body, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(Space.sm))
-            Text(current.label.uppercase(), style = AppType.label, color = Ink.body)
+            Text(current.label, style = AppType.label, color = Ink.body)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = Bg.overlay) {
             SortOption.entries.forEach { option ->
                 val selected = option == current
                 DropdownMenuItem(
-                    text = { Text(option.label, style = AppType.body, color = if (selected) Accent.text else Ink.body) },
+                    text = { Text(option.label, style = AppType.body, color = if (selected) Ink.high else Ink.body) },
                     trailingIcon = { if (selected) Icon(Icons.Rounded.Check, contentDescription = "Selected", tint = Accent.main) },
                     onClick = { onSelect(option); open = false }
                 )
@@ -201,8 +201,8 @@ private fun PosterTile(fav: FavoriteAnime, onClick: () -> Unit, onLongClick: () 
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)
                 .clip(Radius.md)
+                .clip(Radius.md)
                 .background(Bg.raised)
-                .border(1.dp, Ink.hairline, Radius.md)
         )
         Spacer(Modifier.height(Space.sm))
         Text(fav.animeTitle, style = AppType.captionStrong, maxLines = 2, overflow = TextOverflow.Ellipsis)

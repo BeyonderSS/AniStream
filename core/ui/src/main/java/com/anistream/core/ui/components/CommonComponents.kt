@@ -48,8 +48,7 @@ fun SearchBar(
             .fillMaxWidth()
             .height(52.dp)
             .clip(Radius.pill)
-            .background(Bg.raised)
-            .border(1.dp, Ink.hairline, Radius.pill),
+            .background(Bg.raised),
         textStyle = AppType.body.copy(color = Ink.high),
         placeholder = { Text(placeholder, style = AppType.body.copy(color = Ink.faint)) },
         leadingIcon = {
@@ -111,14 +110,14 @@ fun ScoreBadge(
     }
 }
 
-/** Small caption pill (base at 70% + white text) for TV / Movie / OVA over artwork. */
+/** Small caption pill (dusk at 72% + mist text) for TV / Movie / OVA over artwork. */
 @Composable
 fun TypeBadge(
     type: String,
     modifier: Modifier = Modifier
 ) {
     Text(
-        text = type.uppercase(),
+        text = type,
         style = AppType.label.copy(color = Ink.high),
         maxLines = 1,
         modifier = modifier
@@ -127,6 +126,36 @@ fun TypeBadge(
     )
 }
 
-/** Scores are always shown with the star colour; no traffic-light colours (DESIGN.md). */
+/** Scores are always shown with the star colour; no traffic-light colours (DESIGN-REELM.md). */
 @Suppress("UNUSED_PARAMETER")
 fun scoreColor(score: Double): Color = Accent.star
+
+/** Small rounded meta chip ("TV", "2014", "Airing"); replaces middle-dot meta strings. */
+@Composable
+fun MetaChip(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Ink.body,
+    background: Color = Bg.badge
+) {
+    Text(
+        text = text,
+        style = AppType.label.copy(color = color),
+        maxLines = 1,
+        modifier = modifier
+            .background(background, Radius.pill)
+            .padding(horizontal = Space.sm + 2.dp, vertical = 3.dp)
+    )
+}
+
+/** A row of [MetaChip]s; blank entries are skipped. */
+@Composable
+fun MetaChips(
+    items: List<String?>,
+    modifier: Modifier = Modifier,
+    background: Color = Bg.badge
+) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalAlignment = Alignment.CenterVertically) {
+        items.filterNot { it.isNullOrBlank() }.forEach { MetaChip(it!!, background = background) }
+    }
+}

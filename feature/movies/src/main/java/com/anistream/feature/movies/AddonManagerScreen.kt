@@ -1,5 +1,6 @@
 package com.anistream.feature.movies
 
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -105,7 +106,7 @@ fun AddonManagerScreen(onBack: () -> Unit, viewModel: AddonManagerViewModel = hi
     Column(Modifier.fillMaxSize().background(Bg.base)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(56.dp)) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = Ink.high) }
-            Text("ADDONS", style = AppType.heading)
+            Text("Addons", style = AppType.heading)
         }
         Text(
             "Stremio addons add extra stream sources to Movies & TV.",
@@ -150,8 +151,8 @@ private fun AddonRow(a: Addon, onToggle: (Boolean) -> Unit, onRemove: () -> Unit
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
+            .clip(Radius.lg)
             .background(Bg.raised)
-            .border(1.dp, Ink.hairline, Radius.lg)
             .padding(start = Space.lg, top = Space.md, bottom = Space.md, end = Space.sm)
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
@@ -160,9 +161,9 @@ private fun AddonRow(a: Addon, onToggle: (Boolean) -> Unit, onRemove: () -> Unit
                 if (a.builtIn) {
                     Spacer(Modifier.width(Space.sm))
                     Text(
-                        "BUILT-IN",
+                        "Built-in",
                         style = AppType.label.copy(color = Ink.muted),
-                        modifier = Modifier.border(1.dp, Ink.hairline, Radius.pill).padding(horizontal = Space.sm, vertical = 2.dp)
+                        modifier = Modifier.background(Bg.overlay, Radius.pill).padding(horizontal = Space.sm, vertical = 2.dp)
                     )
                 }
             }
@@ -178,8 +179,8 @@ private fun AddonRow(a: Addon, onToggle: (Boolean) -> Unit, onRemove: () -> Unit
                 checkedTrackColor = Accent.main,
                 checkedBorderColor = Accent.main,
                 uncheckedThumbColor = Ink.muted,
-                uncheckedTrackColor = Color.Transparent,
-                uncheckedBorderColor = Ink.hairline
+                uncheckedTrackColor = Bg.overlay,
+                uncheckedBorderColor = Color.Transparent
             )
         )
         if (!a.builtIn) {
@@ -204,7 +205,7 @@ fun AddUrlDialog(
         onDismissRequest = onDismiss,
         shape = Radius.xl,
         containerColor = Bg.overlay,
-        title = { Text(title.uppercase(), style = AppType.heading) },
+        title = { Text(title, style = AppType.heading) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
                 OutlinedTextField(

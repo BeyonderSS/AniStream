@@ -1,18 +1,16 @@
-# AniStream design spec — "Nocturne" (Lamborghini-inspired)
+# Reelm design spec ("Dusk Projector")
 
-> **Design system source:** adapted from the Lamborghini DESIGN.md in VoltAgent/awesome-design-md (full reference in `design-reference-lamborghini.md`). This REPLACES the earlier violet look. Where the sections below mention violet/`Accent.main`, read gold.
+> **Authoritative direction:** [`DESIGN-REELM.md`](DESIGN-REELM.md). It replaces the earlier black/gold "Nocturne" look (the old Lamborghini reference stays in `design-reference-lamborghini.md` for history only). On any conflict below, DESIGN-REELM.md wins.
 
-## Nocturne rules (override everything below on conflict)
-- **Canvas is true black** `#000000` (`Bg.base`). Elevation by surface layering only: `#000000` → `#181818` (`Bg.raised`, cards) → `#202020` (`Bg.overlay`, sheets/dialogs/pressed). No gradients except image scrims (black).
-- **Gold `#FFC000` (`Accent.main`) is the ONLY chromatic colour** and is used *exclusively* for: the primary CTA of a screen, the selected state (nav item, segmented option, chip, current episode), progress/seek bars. Text/icons ON gold are **black** (`Accent.on`). Pressed gold = `#917300` (`Accent.pressed`). Inline highlighted text = `#FFCE3E`. Star scores use gold too (no separate amber). `Accent.live` and `Accent.danger` stay only for done/failed states.
-- **No glows, no coloured shadows, no drop shadows.** Depth = surface layering + 1dp `Ink.hairline` borders.
-- **Zero border radius everywhere** (`Radius.*` are all sharp): buttons, cards, posters, chips, sheets, dialogs, tiles, search field. Only exceptions: switch/toggle tracks, the seek-bar thumb, and progress dots may be round.
-- **Typography**: one family. Display/headings use the condensed grotesk (`AppType.title`/`heading` use `sans-serif-condensed`), **ALL CAPS** (apply `.uppercase()` at the call site), weight Normal or Medium, tight line height. Body stays mixed case in the regular family. Labels/badges/buttons/tab labels: **uppercase caption with +0.96sp tracking** (`AppType.label`). Still max 4 sizes.
-- **Buttons**: Primary = gold rectangle, black uppercase label, 52dp tall, no radius. Secondary = transparent ghost with 1dp white border at 50% opacity, white uppercase label (pressed: 8% white fill). Tertiary = uppercase text button in `Ink.body`.
-- **Neutrals**: Pure white headings, Smoke `#F5F5F5`, Steel `#969696` secondary, Ash `#7D7D7D` metadata. Use `Ink.*`.
-- **Iconography**: thin/outlined feel — prefer `Icons.Outlined.*` (or Rounded where no outlined variant), white; selected gold.
-- **Imagery** is the hero: full-bleed, cinematic 16:9 or taller, black scrims for legibility. Posters keep 2:3 with sharp corners and a hairline border.
-- **Hexagon motif (optional flourish)**: the player's centre play/pause button may sit inside a hexagon outline (draw with a GenericShape) — nice brand echo, do it only if it stays crisp.
+## Reelm rules (override everything below on conflict)
+- **Canvas is soft dusk, never black**: `Bg.base` `#15171F` → `Bg.raised` `#1D2029` (cards, rails, sheets) → `Bg.overlay` `#272B37` (pressed, selected segments, dialogs). Depth comes from surface layering plus soft dusk-tinted shadows (`Modifier.duskShadow`, `#0A0C12`), never grey.
+- **Projector amber `#F2B45A` (`Accent.main`) is the only accent**, for the primary action, focus and progress. Text on amber is `#1A1408` (`Accent.on`). Only the primary CTA gets the soft amber light (`Modifier.amberGlow`). Selected chips use a mist pill with dusk text; selected segments/nav use a haze pill.
+- **Signal** `#7FD1B9` (`Accent.live`) only for downloaded / live / new; `#F07C6C` (`Accent.danger`) only for failure.
+- **Ink** is mist `#E9EAF0` by opacity: `Ink.high/body/muted/faint` = 100 / 72 / 52 / 32 %.
+- **Type**: Bricolage Grotesque (display, `AppType.title`/`heading`) and Figtree (text), bundled in `core/ui/src/main/res/font` (OFL, licences in `core/ui/licenses`). Phone scale 30 / 22 / 16 / 13. Sentence or title case only: **no ALL CAPS, no tracked eyebrows, no middle-dot meta strings** (use `MetaChips` or spacing).
+- **Radius hierarchy**: `Radius.sm` 8 (small inputs), `Radius.md` 12 (posters, tiles), `Radius.lg` 18 (cards), `Radius.xl` 24 (sheets, dialogs), `Radius.pill` (buttons, chips).
+- **Motion**: `Motion.quick()` 180 ms / `Motion.standard()` 260 ms with emphasized easing; the home hero backdrop crossfades (`Motion.PROJECTOR`, 400 ms) between items.
+- **Player**: a clean circular amber play/pause button (the hexagon is gone).
 
 ---
 
@@ -23,11 +21,11 @@ Anime streaming app. Users come to (1) resume what they're watching, (2) find so
 Tokens live in `core/ui/src/main/java/com/anistream/core/ui/theme/Design.kt` (`Space`, `Radius`, `Ink`, `Accent`, `Bg`, `AppType`). Use them; don't invent new hex values, sizes or dp.
 
 ## Rules
-- **Colour 60/30/10.** `Bg.base` background (60), raised surfaces + white ink (30), `Accent.main` violet only for primary CTA, selected state, progress and active nav (10). No rainbow chips. `Accent.star` only for score stars, `Accent.live` only for "airing/completed", `Accent.danger` only for failed/delete.
+- **Colour 60/30/10.** `Bg.base` background (60), raised surfaces + white ink (30), `Accent.main` amber only for primary CTA, selected state, progress and active nav (10). No rainbow chips. `Accent.star` only for score stars, `Accent.live` only for "airing/completed", `Accent.danger` only for failed/delete.
 - **Text hierarchy by opacity** (`Ink.high/body/muted/faint`), not by colour.
-- **Type: four sizes only**: `AppType.title` 28, `heading` 20, `body` 15, `caption` 12. Two weights (Normal, SemiBold). Times, episode numbers, file sizes use `AppType.numeric` (tabular digits).
+- **Type: four sizes only**: `AppType.title` 30, `heading` 22, `body` 16, `caption` 13. Two weights (Normal, SemiBold). Times, episode numbers, file sizes use `AppType.numeric` (tabular digits).
 - **8pt grid.** Screen gutter `Space.lg` 16dp. Related items 8 to 12dp apart; next group 24dp; sections 32dp. Card padding 16dp.
-- **Shapes.** Posters/tiles `Radius.md` 12dp, cards `Radius.lg` 16dp, hero/dialogs `Radius.xl`, buttons/chips `Radius.pill`. Cards get a 1dp `Ink.hairline` border instead of heavy shadows. Primary CTA gets a soft violet glow (`Accent.glow`, blurred shadow, `spotColor`/`ambientColor` tinted violet), never a grey shadow.
+- **Shapes.** Posters/tiles `Radius.md` 12dp, cards `Radius.lg` 18dp, hero/dialogs `Radius.xl`, buttons/chips `Radius.pill`. Cards get a 1dp `Ink.hairline` border instead of heavy shadows. Primary CTA gets a soft amber glow (`Modifier.amberGlow`), never a grey shadow.
 - **Posters are 2:3**, landscape/continue cards 16:9. Every image has a `Bg.raised` placeholder and a crossfade (Coil `crossfade(true)`). Titles under posters: max 2 lines, `AppType.captionStrong`.
 - **Thumb zone.** Primary action of a screen sits in the bottom third or in a sticky bottom bar. Tap targets ≥ 48dp.
 - **Every screen has loading (shimmer skeletons shaped like the content, not a spinner), empty (illustrative icon + one line + CTA) and error (message + Retry) states.**

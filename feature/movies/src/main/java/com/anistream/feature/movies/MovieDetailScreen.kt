@@ -83,6 +83,7 @@ import com.anistream.core.ui.theme.Bg
 import com.anistream.core.ui.theme.Ink
 import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Space
+import com.anistream.core.ui.theme.Motion
 import com.anistream.domain.model.MediaDetail
 import com.anistream.domain.model.MediaType
 import kotlinx.coroutines.launch
@@ -213,12 +214,12 @@ fun MovieDetailScreen(
         ) {
             IconButton(
                 onClick = onBack,
-                modifier = Modifier.padding(Space.sm).background(if (scrolled) Color.Transparent else Bg.badge)
+                modifier = Modifier.padding(Space.sm).background(if (scrolled) Color.Transparent else Bg.badge, Radius.round)
             ) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = Ink.high)
             }
             if (scrolled) {
-                Text(detail?.title.orEmpty().uppercase(), style = AppType.heading, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(end = Space.lg))
+                Text(detail?.title.orEmpty(), style = AppType.heading, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(end = Space.lg))
             }
         }
 
@@ -228,8 +229,8 @@ fun MovieDetailScreen(
             val firstSeason = detail.seasons.firstOrNull()?.number ?: 1
             val (label, target) = when {
                 !detail.playable -> "Not available to stream" to null
-                isSeries && resume != null -> "Continue S${resume.season} · E${resume.episode}" to resume
-                isSeries -> "Play S$firstSeason · E1" to Resume(firstSeason, 1)
+                isSeries && resume != null -> "Continue S${resume.season} E${resume.episode}" to resume
+                isSeries -> "Play S$firstSeason E1" to Resume(firstSeason, 1)
                 resume != null -> "Continue" to Resume(0, 0)
                 else -> "Play" to Resume(0, 0)
             }
@@ -271,7 +272,7 @@ private fun Hero(d: MediaDetail) {
             PosterImage(d.posterUrl, d.title, Modifier.width(120.dp))
             Spacer(Modifier.width(Space.lg))
             Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
-                Text(d.title.uppercase(), style = AppType.title, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Text(d.title, style = AppType.title, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 val rating = d.rating
                 if (rating != null && rating > 0) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -296,10 +297,10 @@ private fun Hero(d: MediaDetail) {
     ) {
         meta.forEach {
             Text(
-                it.uppercase(),
+                it,
                 style = AppType.label.copy(color = Ink.body),
                 maxLines = 1,
-                modifier = Modifier.border(1.dp, Ink.hairline, Radius.sm).padding(horizontal = Space.sm, vertical = Space.xs)
+                modifier = Modifier.background(Bg.raised, Radius.pill).padding(horizontal = Space.md, vertical = Space.xs)
             )
         }
     }
@@ -313,7 +314,7 @@ private fun Synopsis(text: String) {
         Modifier
             .padding(horizontal = Space.lg)
             .padding(top = Space.xl)
-            .animateContentSize(tween(250, easing = FastOutSlowInEasing))
+            .animateContentSize(Motion.standard())
     ) {
         Text(
             text,
@@ -324,7 +325,7 @@ private fun Synopsis(text: String) {
         )
         if (overflows || expanded) {
             Text(
-                if (expanded) "LESS" else "MORE",
+                if (expanded) "Show less" else "Read more",
                 style = AppType.label.copy(color = Ink.body),
                 modifier = Modifier.clickable { expanded = !expanded }.padding(vertical = Space.sm)
             )
@@ -334,7 +335,7 @@ private fun Synopsis(text: String) {
 
 @Composable
 private fun Heading(text: String) {
-    Text(text.uppercase(), style = AppType.heading, modifier = Modifier.padding(horizontal = Space.lg).padding(bottom = Space.md))
+    Text(text, style = AppType.heading, modifier = Modifier.padding(horizontal = Space.lg).padding(bottom = Space.md))
 }
 
 @Composable
@@ -344,8 +345,8 @@ private fun EpisodeTile(number: Int, next: Boolean, enabled: Boolean, onClick: (
         modifier = modifier
             .height(48.dp)
             .clip(Radius.md)
-            .background(Bg.raised)
-            .border(1.dp, if (next) Accent.main else Ink.hairline, Radius.md)
+            .background(if (next) Accent.soft else Bg.raised)
+            .then(if (next) Modifier.border(1.5.dp, Accent.main, Radius.md) else Modifier)
             .clickable(enabled = enabled, onClick = onClick)
     ) {
         Text("$number", style = AppType.bodyStrong.copy(fontFeatureSettings = "tnum", color = if (next) Accent.text else Ink.body))
@@ -393,8 +394,8 @@ private fun BoxScope.ActionBar(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(52.dp)
-                .background(Bg.base)
-                .border(1.dp, if (isFavorite) Accent.main else Ink.ghost, Radius.pill)
+                .clip(Radius.round)
+                .background(if (isFavorite) Bg.overlay else Bg.raised)
                 .clickable {
                     onFavorite()
                     scope.launch {
@@ -406,7 +407,7 @@ private fun BoxScope.ActionBar(
             Icon(
                 if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                 contentDescription = if (isFavorite) "Remove from favourites" else "Add to favourites",
-                tint = if (isFavorite) Accent.main else Ink.body,
+                tint = if (isFavorite) Ink.high else Ink.body,
                 modifier = Modifier.scale(heartScale.value)
             )
         }

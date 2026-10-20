@@ -1,6 +1,6 @@
-# AniStream
+# Reelm
 
-A native Android anime streaming app. It is built on the same scraping approach as [ani-cli](https://github.com/pystardust/ani-cli), wrapped in a dark, gold-accented UI.
+A native Android anime streaming app. It is built on the same scraping approach as [ani-cli](https://github.com/pystardust/ani-cli), wrapped in a soft dusk UI with a warm amber accent.
 
 <p>
   <img src="docs/screenshots/home.png" width="200" alt="Home">
@@ -54,7 +54,7 @@ core/ui                 design system tokens + shared components
 feature/*               home, search, anime-detail, player, favorites, downloads, schedule, genre-browse
 ```
 
-The design system ("Nocturne") is adapted from the Lamborghini spec in [awesome-design-md](https://github.com/VoltAgent/awesome-design-md). It uses a true-black canvas, a single gold accent, sharp corners and condensed uppercase display type. See [`DESIGN.md`](DESIGN.md).
+The design system ("Dusk Projector") uses a soft blue-slate dusk canvas instead of black, a single projector-amber accent, a radius hierarchy and Bricolage Grotesque + Figtree type in sentence case. See [`DESIGN-REELM.md`](DESIGN-REELM.md) and [`DESIGN.md`](DESIGN.md). Package names stay `com.anistream.*` so existing installs keep updating.
 
 ## Build
 
@@ -67,4 +67,4 @@ Requires JDK 17+ and the Android SDK (compileSdk 35).
 
 ## Disclaimer
 
-AniStream hosts nothing; it only fetches what third-party sites already serve publicly. Use it at your own risk and within your local laws. See [DISCLAIMER.md](DISCLAIMER.md). Licensed under GPL-3.0, like ani-cli.
+Reelm hosts nothing; it only fetches what third-party sites already serve publicly. Use it at your own risk and within your local laws. See [DISCLAIMER.md](DISCLAIMER.md). Licensed under GPL-3.0, like ani-cli.

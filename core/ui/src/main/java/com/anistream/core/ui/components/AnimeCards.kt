@@ -42,10 +42,11 @@ import com.anistream.core.ui.theme.Bg
 import com.anistream.core.ui.theme.Ink
 import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Space
+import com.anistream.core.ui.theme.Motion
 import com.anistream.domain.model.AnimeSearchResult
 import com.anistream.domain.model.WatchHistory
 
-/** 2:3 poster with hairline border, Radius.md, placeholder + crossfade. */
+/** 2:3 poster, 12dp corners, faint mist edge, placeholder + crossfade. */
 @Composable
 fun PosterImage(
     url: String?,
@@ -98,7 +99,7 @@ fun AnimeCard(
     }
 }
 
-/** Full-width list card: small poster + title + "TV · ★ 8.1 · Airing" meta line. */
+/** Full-width list card: small poster + title + spaced meta (type, score, status). */
 @Composable
 fun AnimeCardHorizontal(
     anime: AnimeSearchResult,
@@ -110,7 +111,6 @@ fun AnimeCardHorizontal(
             .fillMaxWidth()
             .clip(Radius.lg)
             .background(Bg.raised)
-            .border(1.dp, Ink.hairline, Radius.lg)
             .pressClickable(onClick = onClick)
             .padding(Space.md),
         verticalAlignment = Alignment.CenterVertically
@@ -145,7 +145,7 @@ fun AnimeCardHorizontal(
     }
 }
 
-/** 16:9 resume card: artwork crop, play overlay, violet progress along the bottom edge, "Ep N" caption. */
+/** 16:9 resume card: artwork crop, play overlay, amber progress along the bottom edge, "Ep N" caption. */
 @Composable
 fun ContinueWatchingCard(
     history: WatchHistory,
@@ -155,7 +155,7 @@ fun ContinueWatchingCard(
 ) {
     val progress by animateFloatAsState(
         targetValue = history.watchProgress.coerceIn(0f, 1f),
-        animationSpec = tween(300, easing = FastOutSlowInEasing),
+        animationSpec = Motion.standard(),
         label = "progress"
     )
 
@@ -191,7 +191,6 @@ fun ContinueWatchingCard(
                     .size(48.dp)
                     .clip(Radius.pill)
                     .background(Bg.badge)
-                    .border(1.dp, Ink.hairline, Radius.pill)
                     .pressClickable(onClick = onPlayClick),
                 contentAlignment = Alignment.Center
             ) {
@@ -210,7 +209,7 @@ fun ContinueWatchingCard(
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
                     .height(3.dp)
-                    .background(Color(0x40FFFFFF))
+                    .background(Ink.ghost)
             ) {
                 Box(
                     Modifier
@@ -245,7 +244,7 @@ fun SectionHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = title.uppercase(),
+            text = title,
             style = AppType.heading,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -260,7 +259,7 @@ fun SectionHeader(
                     .padding(start = Space.md, end = Space.xs),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("SEE ALL", style = AppType.label.copy(color = Ink.body), maxLines = 1, softWrap = false)
+                Text("See all", style = AppType.label.copy(color = Ink.body), maxLines = 1, softWrap = false)
                 Icon(
                     Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                     contentDescription = null,

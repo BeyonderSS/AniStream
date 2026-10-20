@@ -51,9 +51,10 @@ jobs:
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
-          ./gradlew assembleRelease
-          mv app/build/outputs/apk/release/app-release.apk "AniStream-v$VERSION_NAME.apk"
-          sha256sum "AniStream-v$VERSION_NAME.apk" | tee checksum.txt
+          ./gradlew assemblePhoneRelease assembleTvRelease
+          mv app/build/outputs/apk/phone/release/app-phone-release.apk "Reelm-v$VERSION_NAME.apk"
+          mv app/build/outputs/apk/tv/release/app-tv-release.apk "Reelm-TV-v$VERSION_NAME.apk"
+          sha256sum Reelm-*.apk | tee checksum.txt
 
       - name: Publish release
         env:
@@ -62,12 +63,16 @@ jobs:
           {
             echo "Automated build of \`${GITHUB_SHA::7}\`: $(git log -1 --pretty=%s)"
             echo
-            echo "**Install:** download \`AniStream-v$VERSION_NAME.apk\` and open it on your phone (Android 8.0+). It installs over any earlier CI release."
+            echo "**Phone:** \`Reelm-v$VERSION_NAME.apk\` (Android 8.0+). Installs over earlier releases."
             echo
-            echo "SHA-256: \`$(cut -d' ' -f1 checksum.txt)\`"
+            echo "**Android TV / Fire TV:** \`Reelm-TV-v$VERSION_NAME.apk\`. On Fire TV: install the *Downloader* app, enable *Install unknown apps* for it, and open this release's APK link."
+            echo
+            echo '```'
+            cat checksum.txt
+            echo '```'
           } > notes.md
-          gh release create "v$VERSION_NAME" "AniStream-v$VERSION_NAME.apk" \
-            --title "AniStream v$VERSION_NAME" \
+          gh release create "v$VERSION_NAME" Reelm-*.apk \
+            --title "Reelm v$VERSION_NAME" \
             --notes-file notes.md \
             --target "$GITHUB_SHA" \
             --latest

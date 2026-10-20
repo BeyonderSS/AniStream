@@ -1,5 +1,6 @@
 package com.anistream.feature.downloads
 
+import com.anistream.core.ui.components.MetaChips
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -80,16 +81,16 @@ fun DownloadsScreen(
     val downloads = uiState.downloads
     Column(Modifier.fillMaxSize().background(Bg.base)) {
         Text(
-            "DOWNLOADS",
+            "Downloads",
             style = AppType.title,
             modifier = Modifier.padding(start = Space.lg, end = Space.lg, top = Space.sm)
         )
         if (downloads.isNotEmpty()) {
             val n = downloads.size
-            Text(
-                "$n download${if (n == 1) "" else "s"} · ${formatSize(downloads.sumOf { it.fileSizeBytes })}",
-                style = AppType.numeric,
-                modifier = Modifier.padding(start = Space.lg, top = Space.xs)
+            MetaChips(
+                listOf("$n download${if (n == 1) "" else "s"}", formatSize(downloads.sumOf { it.fileSizeBytes })),
+                background = Bg.raised,
+                modifier = Modifier.padding(start = Space.lg, top = Space.sm)
             )
         }
         Spacer(Modifier.height(Space.md))
@@ -210,14 +211,14 @@ private fun DownloadRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(Radius.lg)
             .background(Bg.raised)
-            .border(1.dp, Ink.hairline, Radius.lg)
             .clickable(enabled = playable, onClick = onPlay)
             .padding(start = Space.md, end = Space.xs, top = Space.md, bottom = Space.md),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            Modifier.size(40.dp).background(Bg.overlay, Radius.md).border(1.dp, if (playable) Ink.ghost else Ink.hairline, Radius.md),
+            Modifier.size(40.dp).background(if (playable) Accent.live.copy(alpha = 0.16f) else Bg.overlay, Radius.round),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -229,7 +230,7 @@ private fun DownloadRow(
                 },
                 contentDescription = null,
                 tint = when (state) {
-                    DownloadState.COMPLETED -> Ink.high
+                    DownloadState.COMPLETED -> Accent.live
                     DownloadState.FAILED -> Accent.danger
                     else -> Ink.muted
                 },
@@ -244,22 +245,22 @@ private fun DownloadRow(
                 style = AppType.bodyStrong
             )
             val size = download.fileSizeBytes
-            Text(
-                if (size > 0) "${download.quality} · ${formatSize(size)}" else download.quality,
-                style = AppType.numeric
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                Text(download.quality, style = AppType.numeric)
+                if (size > 0) Text(formatSize(size), style = AppType.numeric)
+            }
             if (active) {
                 Row(Modifier.padding(top = Space.sm), verticalAlignment = Alignment.CenterVertically) {
                     LinearProgressIndicator(
                         progress = { download.progress },
                         modifier = Modifier.weight(1f).height(4.dp).clip(Radius.pill),
                         color = Accent.main,
-                        trackColor = Color.White.copy(alpha = 0.25f),
-                        strokeCap = StrokeCap.Butt,
+                        trackColor = Ink.ghost,
+                        strokeCap = StrokeCap.Round,
                         drawStopIndicator = {}
                     )
                     Text(
-                        if (state == DownloadState.PENDING) "QUEUED" else "${(download.progress * 100).toInt()}%",
+                        if (state == DownloadState.PENDING) "Queued" else "${(download.progress * 100).toInt()}%",
                         style = AppType.numeric,
                         color = Ink.body,
                         modifier = Modifier.padding(start = Space.sm).width(44.dp)
@@ -276,7 +277,7 @@ private fun DownloadRow(
                 modifier = Modifier.padding(end = Space.md).size(20.dp)
             )
             DownloadState.FAILED -> TextButton(onClick = onDelete) {
-                Text("FAILED · REMOVE", style = AppType.label, color = Accent.danger)
+                Text("Failed, remove", style = AppType.label, color = Accent.danger)
             }
             DownloadState.PAUSED -> IconButton(onClick = onDelete) {
                 Icon(Icons.Rounded.Delete, contentDescription = "Delete download", tint = Ink.muted)

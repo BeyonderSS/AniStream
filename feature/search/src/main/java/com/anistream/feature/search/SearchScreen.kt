@@ -93,7 +93,7 @@ fun SearchScreen(
 
     Column(Modifier.fillMaxSize().background(Bg.base)) {
         Text(
-            "SEARCH",
+            "Search",
             style = AppType.title,
             modifier = Modifier.padding(start = Space.lg, end = Space.lg, top = Space.sm, bottom = Space.md)
         )
@@ -140,9 +140,9 @@ fun SearchScreen(
                     if (uiState.recentSearches.isNotEmpty()) {
                         fullSpan {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("RECENT SEARCHES", style = AppType.heading, modifier = Modifier.weight(1f))
+                                Text("Recent searches", style = AppType.heading, modifier = Modifier.weight(1f))
                                 TextButton(onClick = viewModel::onClearRecents) {
-                                    Text("CLEAR ALL", style = AppType.label, color = Ink.body)
+                                    Text("Clear all", style = AppType.label, color = Ink.body)
                                 }
                             }
                         }
@@ -164,7 +164,7 @@ fun SearchScreen(
                     }
                     if (popularLoading || popular.isNotEmpty()) {
                         fullSpan {
-                            Text("POPULAR RIGHT NOW", style = AppType.heading, modifier = Modifier.padding(bottom = Space.xs))
+                            Text("Popular right now", style = AppType.heading, modifier = Modifier.padding(bottom = Space.xs))
                         }
                     }
                     if (popularLoading) skeletonItems()
@@ -214,7 +214,7 @@ private fun SearchField(
     TextField(
         value = query,
         onValueChange = onQueryChange,
-        modifier = modifier.fillMaxWidth().height(52.dp).border(1.dp, Ink.hairline, Radius.pill),
+        modifier = modifier.fillMaxWidth().height(52.dp).clip(Radius.pill),
         placeholder = { Text("Titles, genres, studios", style = AppType.body, color = Ink.faint) },
         leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = Ink.muted) },
         trailingIcon = {
@@ -245,13 +245,12 @@ private fun PillChip(label: String, selected: Boolean, onClick: () -> Unit, onRe
             .minimumInteractiveComponentSize()
             .height(36.dp)
             .clip(Radius.pill)
-            .background(if (selected) Accent.main else Color.Transparent)
-            .border(1.dp, if (selected) Accent.main else Ink.hairline, Radius.pill)
+            .background(if (selected) Ink.high else Bg.raised)
             .clickable(onClick = onClick)
             .padding(start = Space.md, end = if (onRemove != null) Space.xs else Space.md),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label.uppercase(), style = AppType.label, color = if (selected) Accent.on else Ink.body, maxLines = 1)
+        Text(label, style = AppType.label, color = if (selected) Bg.base else Ink.body, maxLines = 1)
         if (onRemove != null) {
             Icon(
                 Icons.Rounded.Close,

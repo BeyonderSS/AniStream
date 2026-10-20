@@ -89,6 +89,7 @@ import com.anistream.core.ui.theme.Bg
 import com.anistream.core.ui.theme.Ink
 import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Space
+import com.anistream.core.ui.theme.Motion
 import com.anistream.domain.model.AnimeDetail
 import com.anistream.domain.model.Episode
 import com.anistream.domain.model.WatchHistory
@@ -162,13 +163,13 @@ fun AnimeDetailScreen(
         ) {
             IconButton(
                 onClick = onBack,
-                modifier = Modifier.padding(Space.sm).background(if (scrolled) Color.Transparent else Bg.badge)
+                modifier = Modifier.padding(Space.sm).background(if (scrolled) Color.Transparent else Bg.badge, Radius.round)
             ) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = Ink.high)
             }
             if (scrolled) {
                 Text(
-                    uiState.anime?.title.orEmpty().uppercase(),
+                    uiState.anime?.title.orEmpty(),
                     style = AppType.heading,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -265,14 +266,14 @@ private fun DetailContent(
                                     .width(144.dp)
                                     .height(64.dp)
                                     .clip(Radius.lg)
-                                    .background(if (current) Accent.main else Bg.raised)
-                                    .border(1.dp, if (current) Accent.main else Ink.hairline, Radius.lg)
+                                    .background(if (current) Ink.high else Bg.raised)
+                                    .border(1.dp, if (current) Ink.high else Ink.hairline, Radius.lg)
                                     .clickable(enabled = !current) { onAnimeClick(season.slug) }
                                     .padding(horizontal = Space.md)
                             ) {
                                 Text(
                                     season.title,
-                                    style = AppType.captionStrong.copy(color = if (current) Accent.on else Ink.body),
+                                    style = AppType.captionStrong.copy(color = if (current) Bg.base else Ink.body),
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -396,11 +397,10 @@ private fun Hero(anime: AnimeDetail) {
                     .aspectRatio(2f / 3f)
                     .clip(Radius.md)
                     .background(Bg.raised)
-                    .border(1.dp, Ink.hairline, Radius.md)
             )
             Spacer(Modifier.width(Space.lg))
             Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
-                Text(anime.title.uppercase(), style = AppType.title, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Text(anime.title, style = AppType.title, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 val score = anime.score
                 if (score != null && score > 0) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -408,7 +408,7 @@ private fun Hero(anime: AnimeDetail) {
                         Spacer(Modifier.width(Space.xs))
                         Text("%.2f".format(score), style = AppType.numeric.copy(color = Ink.high))
                         val by = anime.scoredBy
-                        if (by != null && by > 0) Text("  ·  ${compact(by)} ratings", style = AppType.numeric)
+                        if (by != null && by > 0) Text("${compact(by)} ratings", style = AppType.numeric, modifier = Modifier.padding(start = Space.sm))
                     }
                 }
             }
@@ -441,12 +441,12 @@ private fun Hero(anime: AnimeDetail) {
 @Composable
 private fun MetaChip(text: String, color: Color) {
     Text(
-        text.uppercase(),
+        text,
         style = AppType.label.copy(color = color),
         maxLines = 1,
         modifier = Modifier
-            .border(1.dp, Ink.hairline, Radius.sm)
-            .padding(horizontal = Space.sm, vertical = Space.xs)
+            .background(Bg.raised, Radius.pill)
+            .padding(horizontal = Space.md, vertical = Space.xs)
     )
 }
 
@@ -458,7 +458,7 @@ private fun Synopsis(text: String) {
         Modifier
             .padding(horizontal = Space.lg)
             .padding(top = Space.xl)
-            .animateContentSize(tween(250, easing = FastOutSlowInEasing))
+            .animateContentSize(Motion.standard())
     ) {
         Text(
             text,
@@ -469,7 +469,7 @@ private fun Synopsis(text: String) {
         )
         if (overflows || expanded) {
             Text(
-                if (expanded) "LESS" else "MORE",
+                if (expanded) "Show less" else "Read more",
                 style = AppType.label.copy(color = Ink.body),
                 modifier = Modifier
                     .clickable { expanded = !expanded }
@@ -482,13 +482,13 @@ private fun Synopsis(text: String) {
 @Composable
 private fun Heading(text: String) {
     Text(
-        text.uppercase(),
+        text,
         style = AppType.heading,
         modifier = Modifier.padding(horizontal = Space.lg).padding(bottom = Space.md)
     )
 }
 
-/** Sharp hairline chip; selected = gold fill + black label. */
+/** Pill chip on slate; selected = mist fill + dusk label. */
 @Composable
 private fun Chip(text: String, selected: Boolean = false, numeric: Boolean = false, onClick: () -> Unit) {
     val base = if (numeric) AppType.numeric else AppType.label
@@ -497,12 +497,11 @@ private fun Chip(text: String, selected: Boolean = false, numeric: Boolean = fal
         modifier = Modifier
             .height(36.dp)
             .clip(Radius.pill)
-            .background(if (selected) Accent.main else Color.Transparent)
-            .border(1.dp, if (selected) Accent.main else Ink.hairline, Radius.pill)
+            .background(if (selected) Ink.high else Bg.raised)
             .clickable(onClick = onClick)
             .padding(horizontal = Space.md)
     ) {
-        Text(if (numeric) text else text.uppercase(), style = base.copy(color = if (selected) Accent.on else Ink.body))
+        Text(text, style = base.copy(color = if (selected) Bg.base else Ink.body))
     }
 }
 
@@ -513,8 +512,8 @@ private fun EpisodeTile(number: Int, watched: Boolean, next: Boolean, onClick: (
         modifier = modifier
             .height(48.dp)
             .clip(Radius.md)
-            .background(Bg.raised)
-            .border(1.dp, if (next) Accent.main else Ink.hairline, Radius.md)
+            .background(if (next) Accent.soft else Bg.raised)
+            .then(if (next) Modifier.border(1.5.dp, Accent.main, Radius.md) else Modifier)
             .clickable(onClick = onClick)
     ) {
         Text(
@@ -567,8 +566,8 @@ private fun BoxScope.ActionBar(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(52.dp)
-                .background(Bg.base)
-                .border(1.dp, if (isFavorite) Accent.main else Ink.ghost, Radius.pill)
+                .clip(Radius.round)
+                .background(if (isFavorite) Bg.overlay else Bg.raised)
                 .clickable {
                     onFavorite()
                     scope.launch {
@@ -580,7 +579,7 @@ private fun BoxScope.ActionBar(
             Icon(
                 if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                 contentDescription = if (isFavorite) "Remove from favourites" else "Add to favourites",
-                tint = if (isFavorite) Accent.main else Ink.body,
+                tint = if (isFavorite) Ink.high else Ink.body,
                 modifier = Modifier.scale(heartScale.value)
             )
         }

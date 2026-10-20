@@ -8,7 +8,7 @@ import com.anistream.core.ui.theme.AppType
 // Colour is left unspecified so Material components (buttons, nav, chips) can tint text via LocalContentColor.
 private fun TextStyle.noColor() = copy(color = Color.Unspecified)
 
-/** Every Material3 style lands on one of the four AppType sizes (28 / 20 / 15 / 12). */
+/** Every Material3 style lands on one of the four AppType sizes (30 / 22 / 16 / 13). */
 val AniStreamTypography = Typography(
     displayLarge = AppType.title.noColor(),
     displayMedium = AppType.title.noColor(),
@@ -22,7 +22,7 @@ val AniStreamTypography = Typography(
     bodyLarge = AppType.body.noColor(),
     bodyMedium = AppType.body.noColor(),
     bodySmall = AppType.caption.noColor(),
-    labelLarge = AppType.label.noColor(),
+    labelLarge = AppType.button.noColor(),
     labelMedium = AppType.label.noColor(),
     labelSmall = AppType.caption.noColor()
 )

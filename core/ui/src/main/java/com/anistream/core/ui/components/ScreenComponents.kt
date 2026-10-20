@@ -53,7 +53,7 @@ fun ErrorContent(
     ) {
         SoftCircleIcon(Icons.Rounded.CloudOff, tint = Ink.muted, background = Bg.raised)
         Spacer(Modifier.height(Space.xl))
-        Text("Something went wrong".uppercase(), style = AppType.heading, textAlign = TextAlign.Center)
+        Text("Something went wrong", style = AppType.heading, textAlign = TextAlign.Center)
         Spacer(Modifier.height(Space.sm))
         Text(
             text = message,
@@ -67,7 +67,7 @@ fun ErrorContent(
     }
 }
 
-/** Empty state: icon in a soft violet circle, one line (+ optional subtitle), optional CTA. */
+/** Empty state: icon in a soft slate circle, one line (+ optional subtitle), optional CTA. */
 @Composable
 fun EmptyState(
     message: String,
@@ -86,7 +86,7 @@ fun EmptyState(
     ) {
         SoftCircleIcon(icon, tint = Ink.body, background = Bg.raised)
         Spacer(Modifier.height(Space.xl))
-        Text(message.uppercase(), style = AppType.heading, textAlign = TextAlign.Center)
+        Text(message, style = AppType.heading, textAlign = TextAlign.Center)
         if (subtitle != null) {
             Spacer(Modifier.height(Space.sm))
             Text(subtitle, style = AppType.body.copy(color = Ink.muted), textAlign = TextAlign.Center)
@@ -121,9 +121,8 @@ fun EpisodeListItem(
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .clip(Radius.sm)
-                .background(if (isCurrent) Accent.main else Bg.raised)
-                .border(1.dp, if (isCurrent) Accent.main else Ink.hairline, Radius.sm),
+                .clip(Radius.round)
+                .background(if (isCurrent) Accent.main else Bg.raised),
             contentAlignment = Alignment.Center
         ) {
             if (isWatched) {
@@ -150,10 +149,10 @@ fun EpisodeListItem(
                 if (episode.filler) {
                     Spacer(Modifier.width(Space.sm))
                     Text(
-                        text = "FILLER",
+                        text = "Filler",
                         style = AppType.label.copy(color = Ink.muted),
                         modifier = Modifier
-                            .border(1.dp, Ink.hairline, Radius.pill)
+                            .background(Bg.overlay, Radius.pill)
                             .padding(horizontal = Space.sm, vertical = 2.dp)
                     )
                 }
@@ -166,7 +165,7 @@ fun EpisodeListItem(
                         .fillMaxWidth()
                         .height(3.dp)
                         .clip(Radius.pill)
-                        .background(Ink.hairline)
+                        .background(Ink.ghost)
                 ) {
                     Box(
                         Modifier

@@ -1,5 +1,6 @@
 package com.anistream.feature.livetv
 
+import androidx.compose.ui.draw.clip
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -102,7 +103,7 @@ fun LiveTvScreen(
             if (managing) {
                 IconButton(onClick = { managing = false }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = Ink.high) }
             }
-            Text(if (managing) "PLAYLISTS" else "LIVE TV", style = AppType.title, modifier = Modifier.weight(1f))
+            Text(if (managing) "Playlists" else "Live TV", style = AppType.title, modifier = Modifier.weight(1f))
             if (!managing && !list.isNullOrEmpty()) {
                 IconButton(onClick = { managing = true }) {
                     Icon(Icons.Outlined.PlaylistPlay, contentDescription = "Manage playlists", tint = Ink.high)
@@ -193,13 +194,13 @@ private fun ChannelRow(c: Channel, onClick: () -> Unit) {
             url = c.logoUrl,
             contentDescription = null,
             contentScale = ContentScale.Fit,
-            modifier = Modifier.size(48.dp).border(1.dp, Ink.hairline, Radius.sm).padding(Space.xs)
+            modifier = Modifier.size(48.dp).clip(Radius.sm).background(Bg.raised).padding(Space.xs)
         )
         Spacer(Modifier.width(Space.md))
         Column(Modifier.weight(1f)) {
             Text(c.name, style = AppType.bodyStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val g = c.group
-            if (!g.isNullOrBlank()) Text(g.uppercase(), style = AppType.label.copy(color = Ink.faint), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (!g.isNullOrBlank()) Text(g, style = AppType.caption.copy(color = Ink.muted), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -209,7 +210,7 @@ private fun SearchField(query: String, onChange: (String) -> Unit) {
     TextField(
         value = query,
         onValueChange = onChange,
-        modifier = Modifier.padding(horizontal = Space.lg).fillMaxWidth().height(52.dp).border(1.dp, Ink.hairline, Radius.pill),
+        modifier = Modifier.padding(horizontal = Space.lg).fillMaxWidth().height(52.dp),
         placeholder = { Text("Search channels", style = AppType.body, color = Ink.faint) },
         leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = Ink.muted) },
         trailingIcon = {
@@ -248,16 +249,16 @@ private fun NoPlaylists(busy: Boolean, error: String?, onAdd: () -> Unit, onSugg
             modifier = Modifier
                 .padding(Space.lg)
                 .fillMaxWidth()
+                .clip(Radius.lg)
                 .background(Bg.raised)
-                .border(1.dp, Ink.hairline, Radius.lg)
                 .pressClickable(enabled = !busy, onClick = onSuggestion)
                 .padding(Space.lg)
         ) {
             Column(Modifier.weight(1f)) {
-                Text("IPTV-ORG", style = AppType.heading)
+                Text("iptv-org", style = AppType.heading)
                 Text(error ?: "Free public channels", style = AppType.caption.copy(color = if (error != null) Accent.danger else Ink.muted))
             }
-            Text(if (busy) "ADDING…" else "ADD", style = AppType.label.copy(color = Accent.text))
+            Text(if (busy) "Adding…" else "Add", style = AppType.label.copy(color = Accent.text))
         }
     }
 }
@@ -275,8 +276,8 @@ private fun PlaylistManager(list: List<Playlist>, onRemove: (Long) -> Unit, onAd
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clip(Radius.lg)
                         .background(Bg.raised)
-                        .border(1.dp, Ink.hairline, Radius.lg)
                         .padding(start = Space.lg, top = Space.md, bottom = Space.md, end = Space.xs)
                 ) {
                     Column(Modifier.weight(1f)) {
@@ -315,7 +316,7 @@ private fun AddPlaylistDialog(busy: Boolean, error: String?, onDismiss: () -> Un
         shape = Radius.xl,
         containerColor = Bg.overlay,
         icon = { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, contentDescription = null, tint = Ink.body) },
-        title = { Text("ADD PLAYLIST", style = AppType.heading) },
+        title = { Text("Add playlist", style = AppType.heading) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
                 OutlinedTextField(
