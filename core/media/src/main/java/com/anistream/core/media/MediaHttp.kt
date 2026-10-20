@@ -41,6 +41,18 @@ class MediaHttp @Inject constructor() {
 
     suspend fun getJson(url: String): JsonObject = json.parseToJsonElement(get(url)).jsonObject
 
+    /** First KB of [url] (redirects followed): final URL, status and content type, without reading the body. */
+    suspend fun probe(url: String, headers: Map<String, String> = emptyMap()): Probe = withContext(Dispatchers.IO) {
+        val builder = Request.Builder().url(url).header("User-Agent", USER_AGENT).header("Range", "bytes=0-1023")
+        headers.forEach { (k, v) -> builder.header(k, v) }
+        client.newCall(builder.build()).await().use { response ->
+            if (!response.isSuccessful) throw IOException("HTTP ${response.code} for $url")
+            Probe(response.request.url.toString(), response.code, response.header("Content-Type").orEmpty().lowercase())
+        }
+    }
+
+    data class Probe(val url: String, val code: Int, val contentType: String)
+
     private suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
         cont.invokeOnCancellation { cancel() }
         enqueue(object : Callback {

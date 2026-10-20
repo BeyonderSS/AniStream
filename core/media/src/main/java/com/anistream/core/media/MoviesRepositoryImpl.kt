@@ -3,6 +3,8 @@ package com.anistream.core.media
 import com.anistream.core.common.Result
 import com.anistream.core.common.safeApiCall
 import com.anistream.core.database.dao.AddonDao
+import com.anistream.core.media.dramachi.DramachiSource
+import com.anistream.core.media.fourkhdhub.FourKHdHubSource
 import com.anistream.core.media.moviebox.MovieBoxSource
 import com.anistream.domain.model.MediaDetail
 import com.anistream.domain.model.MediaItem
@@ -27,8 +29,13 @@ import javax.inject.Singleton
 class MoviesRepositoryImpl @Inject constructor(
     private val http: MediaHttp,
     private val movieBox: MovieBoxSource,
-    private val addonDao: AddonDao
+    private val addonDao: AddonDao,
+    fourKHdHub: FourKHdHubSource,
+    dramachi: DramachiSource
 ) : MoviesRepository {
+
+    /** Title-searched sites, tried after MovieBox and before addons, in this order. */
+    private val titleSources = listOf(fourKHdHub, dramachi)
 
     // ponytail: in-memory caches, lost on process death; that only costs a re-fetch.
     private val typeOf = ConcurrentHashMap<String, MediaType>()        // tt → type, from anything we emitted
@@ -99,7 +106,8 @@ class MoviesRepositoryImpl @Inject constructor(
                 rating = mb.rating ?: cine.rating
             )
         }
-        cine.copy(playable = streamAddons().isNotEmpty())
+        // No MovieBox match: 4KHDHub/Dramachi/addons may still carry it; streams() comes back empty if none do.
+        cine.copy(playable = true)
     }
 
     /** Cinemeta meta; series is tried first when the type is unknown (a movie lookup of a series id returns a wrong title). */
@@ -128,9 +136,8 @@ class MoviesRepositoryImpl @Inject constructor(
     }
 
     /** IMDb id for a MovieBox subject (needed by Stremio addons), via Cinemeta search by title + year. */
-    private suspend fun imdbIdFor(sid: String): String? {
+    private suspend fun imdbIdFor(sid: String, mb: MediaDetail): String? {
         mbToTt[sid]?.let { return it.ifEmpty { null } }
-        val mb = movieBox.detail(sid)
         // Cinemeta search hits only carry a series' first year; a MovieBox per-season subject can be years later.
         val years = mb.year?.takeIf { mb.type == MediaType.MOVIE }?.let { it..it }
         val q = enc(Stremio.normalizeTitle(mb.title))
@@ -143,20 +150,27 @@ class MoviesRepositoryImpl @Inject constructor(
     override suspend fun streams(id: String, season: Int, episode: Int): Result<List<MediaStream>> = safeApiCall {
         val sid: String?
         val tt: String?
-        val type: MediaType
+        val detail: MediaDetail?
+        val years: IntRange?
         if (id.startsWith("mb:")) {
             sid = id.removePrefix("mb:")
-            tt = runCatching { imdbIdFor(sid) }.getOrNull()
-            type = if (season > 0) MediaType.SERIES else MediaType.MOVIE
+            detail = runCatching { movieBox.detail(sid) }.getOrNull()
+            tt = detail?.let { runCatching { imdbIdFor(sid, it) }.getOrNull() }
+            years = detail?.year?.let { it..it }
         } else {
             tt = id
             val meta = runCatching { cinemetaMeta(id) }.getOrNull()
             sid = meta?.let { matchMovieBox(id, it) }
-            type = meta?.detail?.type ?: if (season > 0) MediaType.SERIES else MediaType.MOVIE
+            detail = meta?.detail
+            years = meta?.years
         }
+        val type = detail?.type ?: if (season > 0) MediaType.SERIES else MediaType.MOVIE
 
         val sources = mutableListOf<suspend () -> List<MediaStream>>()
         if (sid != null) sources += { movieBox.streams(sid, season, episode) }
+        if (detail != null) titleSources.forEach { src ->
+            sources += { src.streams(detail.title, years?.first, type, season, episode) }
+        }
         if (tt != null) {
             val videoId = if (type == MediaType.SERIES) "$tt:$season:$episode" else tt
             streamAddons().forEach { addon ->
@@ -168,7 +182,7 @@ class MoviesRepositoryImpl @Inject constructor(
         }
         if (sources.isEmpty()) error("No streaming source carries this title")
 
-        // Each source on its own timeout; order kept: MovieBox first, then addons (each already best-first).
+        // Each source on its own timeout; order kept: MovieBox, 4KHDHub, Dramachi, then addons (each already best-first).
         val results = coroutineScope {
             sources.map { fetch -> async { runCatching { withTimeout(SOURCE_TIMEOUT_MS) { fetch() } } } }.awaitAll()
         }
@@ -181,6 +195,6 @@ class MoviesRepositoryImpl @Inject constructor(
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
 
     private companion object {
-        const val SOURCE_TIMEOUT_MS = 12_000L
+        const val SOURCE_TIMEOUT_MS = 15_000L
     }
 }

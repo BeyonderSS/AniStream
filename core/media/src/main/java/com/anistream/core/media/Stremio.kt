@@ -151,6 +151,11 @@ internal object Stremio {
         .replace(Regex("\\s+(s\\d{1,2}|season \\d{1,2})$"), "")
         .trim()
 
+    /** Title as a site search query: "[Hindi]"/"(…)" tags and a trailing "S5" dropped, punctuation kept. */
+    fun searchQuery(title: String): String = title.replace(BRACKETS, " ")
+        .replace(Regex("(?i)\\s+(s\\d{1,2}|season \\d{1,2})\\s*$"), "")
+        .replace(Regex("\\s+"), " ").trim()
+
     /** Best MovieBox candidate for a Cinemeta title: same type, same normalised title, year within ±1; untagged titles first. */
     fun pickMatch(title: String, type: MediaType, years: IntRange?, candidates: List<MediaItem>): MediaItem? {
         val norm = normalizeTitle(title)
