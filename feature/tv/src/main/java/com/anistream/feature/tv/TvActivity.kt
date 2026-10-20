@@ -137,7 +137,8 @@ private fun TvApp() {
         drawerContent = {
             // Floating glass island: translucent gradient + hairline highlight (real blur isn't available on API 22).
             if (showRail) androidx.compose.foundation.layout.Box(
-                Modifier.fillMaxHeight().padding(start = 16.dp, top = 27.dp, bottom = 27.dp),
+                // 32dp start keeps the rounded edge inside TV overscan
+                Modifier.fillMaxHeight().padding(start = 32.dp, top = 27.dp, bottom = 27.dp),
                 contentAlignment = androidx.compose.ui.Alignment.CenterStart
             ) { Column(
                 Modifier
@@ -149,23 +150,19 @@ private fun TvApp() {
             ) {
                 rail.forEach { r ->
                     val selected = current == r.route
-                    // focused = amber ring + lighter surface; selected (current screen) = amber icon + 3dp amber bar on the left
+                    // focused = amber ring + lighter surface; selected (current screen) = soft amber fill + amber icon
                     NavigationDrawerItem(
                         selected = selected,
                         onClick = { nav.navigateTop(r.route) },
-                        modifier = if (selected) Modifier.drawWithContent {
-                            drawContent()
-                            drawRect(Accent.main, size = Size(3.dp.toPx(), size.height))
-                        } else Modifier,
                         colors = NavigationDrawerItemDefaults.colors(
                             containerColor = Color.Transparent,
                             contentColor = Ink.body,
                             inactiveContentColor = Ink.body,
                             focusedContainerColor = Bg.overlay,
                             focusedContentColor = Ink.high,
-                            selectedContainerColor = Color.Transparent,
+                            selectedContainerColor = Color(0x33F2B45A),
                             selectedContentColor = Ink.high,
-                            focusedSelectedContainerColor = Bg.overlay,
+                            focusedSelectedContainerColor = Color(0x4DF2B45A),
                             focusedSelectedContentColor = Ink.high
                         ),
                         border = NavigationDrawerItemDefaults.border(
