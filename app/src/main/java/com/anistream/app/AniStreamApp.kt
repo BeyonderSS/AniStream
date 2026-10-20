@@ -37,6 +37,8 @@ class AniStreamApp : Application(), Configuration.Provider, ImageLoaderFactory {
         return builder
             .memoryCache { MemoryCache.Builder(this).maxSizePercent(0.15).build() }
             .allowRgb565(true)
+            .crossfade(false)
+            .allowHardware(true)
             // ponytail: one width cap for posters and the backdrop alike (the dimmed backdrop just goes soft); per-call sizes if that looks bad
             .components { add(CapWidth(300)) }
             .build()

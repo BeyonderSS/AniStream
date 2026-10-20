@@ -15,12 +15,26 @@ import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.tv.material3.Border
+import androidx.tv.material3.Glow
+import androidx.tv.material3.LocalContentColor
+import androidx.tv.material3.NavigationDrawerItemDefaults
+import com.anistream.core.ui.theme.Accent
+import com.anistream.core.ui.theme.Bg
+import com.anistream.core.ui.theme.Ink
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -121,21 +135,57 @@ private fun TvApp() {
     // screens so the NavHost keeps its place in the composition.
     NavigationDrawer(
         drawerContent = {
-            if (showRail) Column(
-                Modifier.fillMaxHeight().padding(horizontal = 12.dp, vertical = 27.dp),
+            // Floating glass island: translucent gradient + hairline highlight (real blur isn't available on API 22).
+            if (showRail) androidx.compose.foundation.layout.Box(
+                Modifier.fillMaxHeight().padding(start = 16.dp, top = 27.dp, bottom = 27.dp),
+                contentAlignment = androidx.compose.ui.Alignment.CenterStart
+            ) { Column(
+                Modifier
+                    .clip(IslandShape)
+                    .background(IslandFill)
+                    .border(1.dp, IslandEdge, IslandShape)
+                    .padding(horizontal = 8.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp, androidx.compose.ui.Alignment.CenterVertically)
             ) {
                 rail.forEach { r ->
+                    val selected = current == r.route
+                    // focused = amber ring + lighter surface; selected (current screen) = amber icon + 3dp amber bar on the left
                     NavigationDrawerItem(
-                        selected = current == r.route,
+                        selected = selected,
                         onClick = { nav.navigateTop(r.route) },
-                        leadingContent = { Icon(r.icon, contentDescription = r.label) }
+                        modifier = if (selected) Modifier.drawWithContent {
+                            drawContent()
+                            drawRect(Accent.main, size = Size(3.dp.toPx(), size.height))
+                        } else Modifier,
+                        colors = NavigationDrawerItemDefaults.colors(
+                            containerColor = Color.Transparent,
+                            contentColor = Ink.body,
+                            inactiveContentColor = Ink.body,
+                            focusedContainerColor = Bg.overlay,
+                            focusedContentColor = Ink.high,
+                            selectedContainerColor = Color.Transparent,
+                            selectedContentColor = Ink.high,
+                            focusedSelectedContainerColor = Bg.overlay,
+                            focusedSelectedContentColor = Ink.high
+                        ),
+                        border = NavigationDrawerItemDefaults.border(
+                            focusedBorder = Border(BorderStroke(3.dp, Accent.main)),
+                            focusedSelectedBorder = Border(BorderStroke(3.dp, Accent.main))
+                        ),
+                        glow = NavigationDrawerItemDefaults.glow(focusedGlow = Glow.None, focusedSelectedGlow = Glow.None),
+                        leadingContent = { Icon(r.icon, contentDescription = r.label, tint = if (selected) Accent.main else LocalContentColor.current) }
                     ) { Text(r.label) }
                 }
-            }
+            } }
         }
     ) { host() }
 }
+
+private val IslandShape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
+private val IslandFill = androidx.compose.ui.graphics.Brush.verticalGradient(
+    listOf(Color(0xD9272B37), Color(0xC71D2029))
+)
+private val IslandEdge = Color(0x29FFFFFF)
 
 private fun NavHostController.navigateTop(route: String) = navigate(route) {
     popUpTo(graph.findStartDestination().id) { saveState = true }

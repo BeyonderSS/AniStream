@@ -10,8 +10,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.draw.clipToBounds
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +50,7 @@ import com.anistream.domain.model.forYouRows
 
 enum class HomeFilter { ALL, MEDIA, ANIME }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TvHomeScreen(filter: HomeFilter, homeVm: HomeViewModel, moviesVm: MoviesHomeViewModel, nav: NavController) {
     val anime by homeVm.uiState.collectAsStateWithLifecycle()
@@ -48,6 +62,107 @@ fun TvHomeScreen(filter: HomeFilter, homeVm: HomeViewModel, moviesVm: MoviesHome
         moviesVm.refreshContinueWatching()
     }
 
+    val lowEnd = LocalLowEnd.current
+    // ponytail: rows rebuild only when the data changes, not on every D-pad move
+    val rows = remember(anime, media, filter, lowEnd) { buildRows(filter, anime, media, lowEnd, nav) }
+
+    // Focus is written here but read only by the backdrop/hero composables below, so a D-pad move
+    // recomposes those two and the two cards whose focus changed, never the whole screen.
+    val focused = remember { mutableStateOf<TvItem?>(null) }
+    val hero = remember { mutableStateOf<TvItem?>(null) }
+    LaunchedEffect(lowEnd) {
+        // low-end: change hero/backdrop only once focus has rested 300 ms; further moves cancel the load
+        snapshotFlow { focused.value }.collectLatest { if (lowEnd && hero.value != null) delay(300); hero.value = it }
+    }
+    var lastFocused by rememberSaveable { mutableStateOf<String?>(null) }
+    val restore = remember { FocusRequester() }
+    // read without observing: only matters when the screen is (re)built, and writing it on each move must not recompose this
+    val last = Snapshot.withoutReadObservation { lastFocused }
+    val restoreKey = last?.takeIf { k -> rows.any { r -> r.items.any { it.key == k } } } ?: rows.firstOrNull()?.items?.firstOrNull()?.key
+    val hasRows = rows.isNotEmpty()
+    LaunchedEffect(hasRows) {
+        if (hasRows) {
+            withFrameNanos { }
+            runCatching { restore.requestFocus() }
+        }
+    }
+
+    // The focused row snaps to the top of the rows area (never a half-cut row under the hero):
+    // the column's own bring-into-view is turned off and we scroll by row index instead.
+    val listState = rememberLazyListState()
+    val focusedRow = remember { mutableIntStateOf(-1) }
+    // everything but Continue watching
+    val pool = remember(rows) { rows.filterNot { it.wide }.flatMap { it.items } }
+    val lead = if (pool.isNotEmpty()) 1 else 0
+    LaunchedEffect(lead) {
+        snapshotFlow { focusedRow.intValue }.collectLatest { i ->
+            if (i >= 0) listState.animateScrollToItem(if (i == 0) 0 else i + lead)
+        }
+    }
+    val rowSpec = LocalBringIntoViewSpec.current
+
+    Box(Modifier.fillMaxSize()) {
+        HomeBackdrop(hero)
+        Column(Modifier.fillMaxSize()) {
+            HomeHero(hero, filter)
+            when {
+                rows.isEmpty() && (anime.isLoading || media.isLoading) -> TvMessage("Loading…")
+                rows.isEmpty() -> TvMessage(anime.error ?: media.error ?: "Nothing here yet") {
+                    TvPill("Retry", onClick = { homeVm.loadContent(); moviesVm.load() })
+                }
+                else -> CompositionLocalProvider(LocalBringIntoViewSpec provides NoVerticalBringIntoView) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.clipToBounds(),
+                        contentPadding = PaddingValues(bottom = 40.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        if (pool.isNotEmpty()) item(key = "surprise") {
+                            TvPill("Surprise me", onClick = { pool.random().onClick() }, modifier = Modifier.padding(start = Overscan))
+                        }
+                        itemsIndexed(rows, key = { _, it -> it.title }) { i, row ->
+                            // rows keep the default horizontal scrolling
+                            CompositionLocalProvider(LocalBringIntoViewSpec provides rowSpec) {
+                                TvCardRow(row, restoreKey, restore, onFocused = {
+                                    focused.value = it; lastFocused = it.key; focusedRow.intValue = i
+                                })
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeBackdrop(hero: State<TvItem?>) = ProjectorBackdrop(hero.value?.imageUrl)
+
+@Composable
+private fun HomeHero(hero: State<TvItem?>, filter: HomeFilter) {
+    Column(Modifier.fillMaxWidth().padding(start = Overscan, end = Overscan, top = 36.dp).height(176.dp)) {
+        val h = hero.value
+        Text(
+            h?.title ?: when (filter) { HomeFilter.ALL -> "Reelm"; HomeFilter.MEDIA -> "Movies & TV"; HomeFilter.ANIME -> "Anime" },
+            style = TvType.display, maxLines = 2, overflow = TextOverflow.Ellipsis
+        )
+        Spacer(Modifier.height(12.dp))
+        if (h != null) MetaChips(h.meta.distinct(), maxLines = 1)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+private val NoVerticalBringIntoView = object : BringIntoViewSpec {
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float) = 0f
+}
+
+private fun buildRows(
+    filter: HomeFilter,
+    anime: com.anistream.feature.home.HomeUiState,
+    media: com.anistream.feature.movies.MoviesHomeUiState,
+    lowEnd: Boolean,
+    nav: NavController
+): List<TvRow> {
     fun animeItem(row: String, a: AnimeSearchResult) = TvItem(
         key = "$row|${a.slug}", title = a.title, imageUrl = a.posterUrl,
         meta = listOfNotNull(a.type, a.year?.toString(), scoreLabel(a.score)),
@@ -96,7 +211,7 @@ fun TvHomeScreen(filter: HomeFilter, homeVm: HomeViewModel, moviesVm: MoviesHome
         val title = if (filter == HomeFilter.ALL && t == "Top picks for you") "Top anime picks for you" else t
         animeRow(title, l.map { AnimeSearchResult(slug = it.id, title = it.title, posterUrl = it.posterUrl, score = it.rating, year = it.year) })
     }
-    val rows = buildList {
+    return buildList {
         add(TvRow("Continue watching", continueRow, wide = true))
         when (filter) {
             HomeFilter.ALL -> { addAll(mediaPicks); addAll(animePicks); add(animeRow("Trending anime", c.trending)); addAll(mediaRows); addAll(animeRows) }
@@ -105,53 +220,7 @@ fun TvHomeScreen(filter: HomeFilter, homeVm: HomeViewModel, moviesVm: MoviesHome
         }
     }.filter { it.items.isNotEmpty() }.distinctBy { it.title }
         // low-end: fewer rows keeps composition and image memory down
-        .let { if (LocalLowEnd.current) it.take(LOW_END_ROWS) else it }
-
-    var hero by remember { mutableStateOf<TvItem?>(null) }
-    var lastFocused by rememberSaveable { mutableStateOf<String?>(null) }
-    val restore = remember { FocusRequester() }
-    val restoreKey = lastFocused?.takeIf { k -> rows.any { r -> r.items.any { it.key == k } } } ?: rows.firstOrNull()?.items?.firstOrNull()?.key
-    val hasRows = rows.isNotEmpty()
-    LaunchedEffect(hasRows) {
-        if (hasRows) {
-            withFrameNanos { }
-            runCatching { restore.requestFocus() }
-        }
-    }
-
-    Box(Modifier.fillMaxSize()) {
-        ProjectorBackdrop(hero?.imageUrl)
-        Column(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxWidth().padding(start = Overscan, end = Overscan, top = 36.dp).height(176.dp)) {
-                val h = hero
-                Text(
-                    h?.title ?: when (filter) { HomeFilter.ALL -> "Reelm"; HomeFilter.MEDIA -> "Movies & TV"; HomeFilter.ANIME -> "Anime" },
-                    style = TvType.display, maxLines = 2, overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(12.dp))
-                if (h != null) MetaChips(h.meta.distinct())
-            }
-            when {
-                rows.isEmpty() && (anime.isLoading || media.isLoading) -> TvMessage("Loading…")
-                rows.isEmpty() -> TvMessage(anime.error ?: media.error ?: "Nothing here yet") {
-                    TvPill("Retry", onClick = { homeVm.loadContent(); moviesVm.load() })
-                }
-                else -> LazyColumn(
-                    contentPadding = PaddingValues(bottom = 40.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    // everything but Continue watching
-                    val pool = rows.filterNot { it.wide }.flatMap { it.items }
-                    if (pool.isNotEmpty()) item(key = "surprise") {
-                        TvPill("Surprise me", onClick = { pool.random().onClick() }, modifier = Modifier.padding(start = Overscan))
-                    }
-                    items(rows, key = { it.title }) { row ->
-                        TvCardRow(row, restoreKey, restore, onFocused = { hero = it; lastFocused = it.key })
-                    }
-                }
-            }
-        }
-    }
+        .let { if (lowEnd) it.take(LOW_END_ROWS) else it }
 }
 
 private const val LOW_END_ROWS = 8

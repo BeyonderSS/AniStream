@@ -9,6 +9,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +26,11 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -43,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.tv.material3.Border
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -80,6 +88,14 @@ val LocalLowEnd = staticCompositionLocalOf { false }
 
 private val FocusGlow = Glow(elevationColor = Accent.main.copy(alpha = 0.3f), elevation = 18.dp)
 
+/** Focus in every mode: a 3dp amber ring plus a slight brightness lift. Selected (current tab, watched) is soft amber instead. */
+private val FocusRing = BorderStroke(3.dp, Accent.main)
+private val FocusLift = Color.White.copy(alpha = 0.12f)
+
+/** Low-end: no glow (a blurred shadow per focus change is too much for the Fire TV Stick 2 GPU). */
+@Composable
+private fun focusGlow() = if (LocalLowEnd.current) Glow.None else FocusGlow
+
 @Composable
 fun ReelmTvTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
@@ -108,6 +124,7 @@ fun ReelmTvTheme(content: @Composable () -> Unit) {
     }
 }
 
+@Immutable
 /** One focusable thing on screen. [key] is unique per screen (row title + id) so focus can be restored to it. */
 data class TvItem(
     val key: String,
@@ -119,6 +136,7 @@ data class TvItem(
     val onClick: () -> Unit
 )
 
+@Immutable
 /** [caption]: small note under the row (e.g. a data-source attribution). */
 data class TvRow(val title: String, val items: List<TvItem>, val wide: Boolean = false, val caption: String? = null)
 
@@ -128,25 +146,37 @@ data class TvRow(val title: String, val items: List<TvItem>, val wide: Boolean =
  */
 @Composable
 fun ProjectorBackdrop(url: String?, modifier: Modifier = Modifier) {
-    val spec = if (LocalReduceMotion.current) snap<Float>() else tween(Motion.PROJECTOR, easing = Motion.emphasized)
+    val lowEnd = LocalLowEnd.current
+    // low-end: a quick 150 ms alpha fade (cheap; the old snap felt like a flicker)
+    val spec = when {
+        lowEnd -> tween(150)
+        LocalReduceMotion.current -> snap<Float>()
+        else -> tween(Motion.PROJECTOR, easing = Motion.emphasized)
+    }
     Box(modifier.fillMaxSize()) {
         Crossfade(targetState = url, animationSpec = spec, label = "projector") { u ->
             if (u != null) {
                 AsyncImage(model = u, contentDescription = null, contentScale = ContentScale.Crop, alpha = 0.6f, modifier = Modifier.fillMaxSize())
             }
         }
-        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to Bg.base, 0.55f to Bg.base.copy(alpha = 0.55f), 1f to Color.Transparent)))
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color.Transparent, 0.45f to Bg.base.copy(alpha = 0.4f), 1f to Bg.base)))
+        if (lowEnd) {
+            // one full-screen layer instead of two stacked gradients
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Bg.base.copy(alpha = 0.45f), 0.45f to Bg.base.copy(alpha = 0.7f), 1f to Bg.base)))
+        } else {
+            Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to Bg.base, 0.55f to Bg.base.copy(alpha = 0.55f), 1f to Color.Transparent)))
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color.Transparent, 0.45f to Bg.base.copy(alpha = 0.4f), 1f to Bg.base)))
+        }
     }
 }
 
-/** Small rounded meta chips instead of middle-dot strings. */
+/** Small rounded meta chips instead of middle-dot strings; wraps (up to [maxLines]) instead of overflowing. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun MetaChips(meta: List<String>, modifier: Modifier = Modifier) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+fun MetaChips(meta: List<String>, modifier: Modifier = Modifier, maxLines: Int = 2) {
+    FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp), maxLines = maxLines) {
         meta.filter { it.isNotBlank() }.forEach {
             Text(
-                it,
+                it, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 style = TvType.body.copy(color = Ink.high),
                 modifier = Modifier.background(Bg.overlay.copy(alpha = 0.85f), Radius.pill).padding(horizontal = 14.dp, vertical = 4.dp)
             )
@@ -154,21 +184,22 @@ fun MetaChips(meta: List<String>, modifier: Modifier = Modifier) {
     }
 }
 
-/** Poster (2:3) or continue-watching (16:9) card: scales 1.08 with a soft amber glow on focus, no outline. */
+/** Poster (2:3) or continue-watching (16:9) card: amber ring + brightness lift on focus; scale 1.08 and glow unless reduced/low-end. */
 @Composable
 fun TvCard(item: TvItem, wide: Boolean, onFocused: () -> Unit, modifier: Modifier = Modifier) {
     val reduce = LocalReduceMotion.current
+    var focused by remember { mutableStateOf(false) }
     Card(
         onClick = item.onClick,
         modifier = modifier
             .width(if (wide) 248.dp else 132.dp)
             .aspectRatio(if (wide) 16f / 9f else 2f / 3f)
-            .onFocusChanged { if (it.isFocused) onFocused() },
+            .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocused() },
         shape = CardDefaults.shape(Radius.md),
         colors = CardDefaults.colors(containerColor = Bg.raised),
         scale = CardDefaults.scale(focusedScale = if (reduce) 1f else 1.08f),
-        glow = CardDefaults.glow(focusedGlow = FocusGlow),
-        border = CardDefaults.border(focusedBorder = androidx.tv.material3.Border.None)
+        glow = CardDefaults.glow(focusedGlow = focusGlow()),
+        border = CardDefaults.border(focusedBorder = Border(FocusRing, shape = Radius.md))
     ) {
         Box(Modifier.fillMaxSize()) {
             if (item.imageUrl != null) {
@@ -181,6 +212,7 @@ fun TvCard(item: TvItem, wide: Boolean, onFocused: () -> Unit, modifier: Modifie
                     item.subtitle?.let { Text(it, style = TvType.body.copy(color = Ink.muted), maxLines = 1) }
                 }
             }
+            if (focused) Box(Modifier.fillMaxSize().background(FocusLift))
             item.progress?.let { p ->
                 Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp).background(Ink.faint)) {
                     Box(Modifier.fillMaxWidth(p.coerceIn(0f, 1f)).height(4.dp).background(Accent.main))
@@ -252,7 +284,7 @@ fun TvPill(
             disabledContentColor = Ink.faint
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = if (reduce) 1f else 1.08f),
-        glow = ClickableSurfaceDefaults.glow(focusedGlow = FocusGlow)
+        glow = ClickableSurfaceDefaults.glow(focusedGlow = focusGlow())
     ) {
         Row(
             Modifier.padding(horizontal = if (large) 28.dp else 20.dp, vertical = if (large) 12.dp else 8.dp),

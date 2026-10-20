@@ -3,6 +3,8 @@ package com.anistream.feature.tv
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,7 +45,11 @@ import com.anistream.feature.movies.MovieDetailViewModel
 import com.anistream.feature.movies.Resume
 import kotlinx.coroutines.delay
 
-/** Backdrop + left column (title, chips, synopsis ≤ 3 lines, actions) + focusable rows below. */
+/**
+ * Backdrop + left column (title, chips, synopsis ≤ 4 lines, actions) + focusable rows below, all in one
+ * LazyColumn so D-pad focus scrolls it. Chips and actions wrap (FlowRow) instead of overflowing.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DetailLayout(
     backdrop: String?,
@@ -58,20 +64,20 @@ private fun DetailLayout(
         ProjectorBackdrop(backdrop)
         LazyColumn(contentPadding = PaddingValues(top = 48.dp, bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
             item {
-                Column(Modifier.padding(horizontal = Overscan).fillMaxWidth(0.6f)) {
-                    Text(title, style = TvType.display, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Column(Modifier.padding(horizontal = Overscan).fillMaxWidth(0.7f)) {
+                    Text(title, style = TvType.headline, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.height(14.dp))
                     MetaChips(meta)
                     if (!synopsis.isNullOrBlank()) {
                         Spacer(Modifier.height(16.dp))
-                        Text(synopsis, style = TvType.body, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                        Text(synopsis, style = TvType.body, maxLines = 4, overflow = TextOverflow.Ellipsis)
                     }
                     if (note != null) {
                         Spacer(Modifier.height(10.dp))
                         Text(note, style = TvType.body.copy(color = Accent.main))
                     }
                     Spacer(Modifier.height(24.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) { actions() }
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { actions() }
                 }
             }
             rows()
