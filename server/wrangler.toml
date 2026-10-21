@@ -1,0 +1,27 @@
+name = "reelm-api"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+
+# Create the database with `npx wrangler d1 create reelm`, then paste its id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "reelm"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[durable_objects.bindings]]
+name = "USER_HUB"
+class_name = "UserHub"
+
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "Room"
+
+# SQLite-backed classes are required on the free plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["UserHub", "Room"]
+
+[vars]
+# JSON string served at /.well-known/assetlinks.json (Android App Links). Empty array if unset.
+ASSET_LINKS = ""
