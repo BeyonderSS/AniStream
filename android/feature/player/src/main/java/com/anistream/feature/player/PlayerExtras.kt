@@ -27,10 +27,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.ui.draw.clipToBounds
+import androidx.media3.common.VideoSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -267,14 +272,30 @@ fun VideoSurface(
         }
     }
 
-    Box(modifier) {
+    // Fill used to zoom from the centre, cropping top and bottom equally, which cut off subtitles burned into the
+    // video (most anime "sub" streams). It now scales to full width and crops only the top.
+    var videoAspect by remember { mutableStateOf(0f) }
+    DisposableEffect(player) {
+        fun read(v: VideoSize) { if (v.height > 0) videoAspect = v.width * v.pixelWidthHeightRatio / v.height }
+        val l = object : Player.Listener { override fun onVideoSizeChanged(videoSize: VideoSize) = read(videoSize) }
+        read(player.videoSize); player.addListener(l)
+        onDispose { player.removeListener(l) }
+    }
+    BoxWithConstraints(modifier.clipToBounds()) {
         val aspect = tweaks.resize.aspect
-        val mode = tweaks.resize.mode
+        // only when the video is narrower than the screen (16:9 on a 20:9 phone); wider films keep the centre zoom
+        val fillFromBottom = tweaks.resize == Resize.FILL && videoAspect > 0f && maxHeight.value > 0f &&
+            videoAspect < maxWidth.value / maxHeight.value
+        val mode = if (fillFromBottom) AspectRatioFrameLayout.RESIZE_MODE_FIT else tweaks.resize.mode
         AndroidView(
             factory = { ctx -> create(ctx).also { it.subtitleView?.visibility = View.GONE; onView(it) } },
             update = { it.player = player; it.resizeMode = mode },
             onRelease = { it.player = null },
-            modifier = if (aspect == null) Modifier.fillMaxSize() else Modifier.align(Alignment.Center).aspectRatio(aspect)
+            modifier = when {
+                fillFromBottom -> Modifier.align(Alignment.BottomCenter).fillMaxWidth().wrapContentHeight(Alignment.Bottom, unbounded = true).aspectRatio(videoAspect)
+                aspect == null -> Modifier.fillMaxSize()
+                else -> Modifier.align(Alignment.Center).aspectRatio(aspect)
+            }
         )
         Subtitles(player, tweaks, Modifier.fillMaxSize())
     }
