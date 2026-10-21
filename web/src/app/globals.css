@@ -237,3 +237,6 @@ html[data-splash="off"] #splash { display: none; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 video::cue { background: rgb(21 23 31 / 0.72); color: #e9eaf0; font-family: var(--font-figtree), sans-serif; font-size: 1.05em; line-height: 1.35; }
+
+/* Reelm owns the error card (Retry/Back, source failover); hide the skin's own dialog */
+.reelm-skin .media-dialog-backdrop, .reelm-skin .media-dialog-popup { display: none !important; }
