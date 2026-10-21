@@ -85,9 +85,58 @@ export function extractMovieBox({ client, crypto, endpoints }) {
   return { config, logic, endpoints: paths };
 }
 
+// --- dramachi ---------------------------------------------------------------------------------------------------
+const DRAMACHI_FNS = ["search", "fetch_episodes", "fetch_file_stream", "episode_streams", "parse_episode_number", "extract_leading_season_number"];
+const rustSha = (src, name) => sha(rustFn(src, name).replace(/\s+/g, " "));
+
+export function extractDramachi(client) {
+  const code_ = code(client);
+  const interfaces = [...new Set([...code_.matchAll(/interface=(\w+)/g)].map((m) => m[1]))].sort();
+  for (const need of ["search", "title_v2", "eplist", "getFile"]) if (!interfaces.includes(need)) throw new Error(`extractor: dramachi interface ${need} not found`);
+  return {
+    config: {
+      base: one(code_, /const DEFAULT_BASE_URL: &str = "([^"]+)"/, "dramachi base url"),
+      imageCdn: one(code_, /const IMAGE_CDN_BASE: &str = "([^"]+)"/, "dramachi image cdn"),
+      interfaces,
+      cdnPath: one(code_, /format!\(\s*"(https:\/\/\{\}\/cdn\/\{\})"/, "dramachi cdn url format"),
+    },
+    logic: Object.fromEntries(DRAMACHI_FNS.map((n) => [n, rustSha(client, n)])),
+  };
+}
+
+// --- 4khdhub ----------------------------------------------------------------------------------------------------
+const FK_HUBCLOUD_FNS = ["resolve", "resolve_hubdrive", "resolve_greenmotors", "decode_greenmotors_payload", "extract_greenmotors_payload", "extract_hubcloud_drive_url", "unwrap_watch_online_url", "extract_script_pixeldrain_urls", "pixeldrain_api_url", "rot13", "score"];
+const FK_PARSER_FNS = ["parse_search", "parse_details", "parse_releases", "parse_season_episode", "normalize_filename"];
+
+export function extractFourKHdHub({ client, hubcloud, parser, net }) {
+  const mirrors = [...new Set([...code(hubcloud).matchAll(/host\.contains\("([a-z0-9-]+\.)"\)/g)].map((m) => m[1]))].sort();
+  const pixel = [...new Set([...code(hubcloud).matchAll(/search_prefix\("https:\/\/([a-z.]+)\//g)].map((m) => m[1]))].sort();
+  const selectors = [...new Set([...(code(parser) + code(hubcloud)).matchAll(/Selector::parse\("([^"]+)"\)/g)].map((m) => m[1]))].sort();
+  return {
+    config: {
+      base: one(code(client), /const DEFAULT_BASE_URL: &str = "([^"]+)"/, "4khdhub base url"),
+      userAgent: one(net, /pub const DEFAULT_BROWSER_USER_AGENT: &str = "([^"]+)"/, "browser user agent"),
+      searchParam: one(code(client), /append_pair\("(\w+)", query\)/, "4khdhub search param"),
+      mirrors: must(mirrors, "4khdhub mirror hosts"),
+      pixeldrain: must(pixel, "pixeldrain hosts"),
+    },
+    // DOM selectors are the contract with the site, so a changed selector counts as logic drift
+    logic: {
+      selectors: sha(must(selectors, "4khdhub selectors").join("\n")),
+      ...Object.fromEntries(FK_HUBCLOUD_FNS.map((n) => [n, rustSha(hubcloud, n)])),
+      ...Object.fromEntries(FK_PARSER_FNS.map((n) => [n, rustSha(parser, n)])),
+    },
+  };
+}
+
 // --- from disk --------------------------------------------------------------------------------------------------
 const rd = (p) => readFileSync(p, "utf8");
 export const fromDisk = {
+  dramachi: (mbDir) => extractDramachi(rd(join(mbDir, "src/providers/dramachi/client.rs"))),
+  fourkhdhub(mbDir) {
+    const dir = join(mbDir, "src/providers/fourkhdhub");
+    return extractFourKHdHub({ client: rd(join(dir, "client.rs")), hubcloud: rd(join(dir, "hubcloud.rs")), parser: rd(join(dir, "parser.rs")), net: rd(join(mbDir, "src/net.rs")) });
+  },
   hianime: (aniDir) => extractAniCli(rd(join(aniDir, "ani-cli"))),
   moviebox(mbDir) {
     const dir = join(mbDir, "src/providers/moviebox");
@@ -99,5 +148,5 @@ export const fromDisk = {
 };
 
 if (process.argv[1]?.endsWith("extract.mjs") && process.argv[2]) {
-  console.log(JSON.stringify({ hianime: fromDisk.hianime(process.argv[2]), moviebox: fromDisk.moviebox(process.argv[3]) }, null, 2));
+  console.log(JSON.stringify({ hianime: fromDisk.hianime(process.argv[2]), moviebox: fromDisk.moviebox(process.argv[3]), dramachi: fromDisk.dramachi(process.argv[3]), fourkhdhub: fromDisk.fourkhdhub(process.argv[3]) }, null, 2));
 }

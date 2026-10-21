@@ -81,6 +81,11 @@ android {
         compose = true
         buildConfig = true
     }
+
+    packaging {
+        // Compose ships this prebuilt and AGP can't strip it without an NDK; it is packaged as-is either way
+        jniLibs.keepDebugSymbols += "**/libandroidx.graphics.path.so"
+    }
 }
 
 dependencies {

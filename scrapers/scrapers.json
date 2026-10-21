@@ -159,5 +159,69 @@
       }
     }
   },
-  "updatedAt": "2026-10-21T11:32:08.835Z"
+  "updatedAt": "2026-10-21T12:13:58.468Z",
+  "dramachi": {
+    "config": {
+      "base": "https://api.nodeobjects.com/",
+      "imageCdn": "https://static.nodeobjects.com/thumbnail/",
+      "interfaces": [
+        "eplist",
+        "getFile",
+        "search",
+        "title_v2"
+      ],
+      "cdnPath": "https://{}/cdn/{}"
+    },
+    "upstream": {
+      "commit": "431ab051cfdf34953b11b602b46618380d2a653d",
+      "logic": {
+        "search": "707648bd1b4d05ab",
+        "fetch_episodes": "268e1dc099843568",
+        "fetch_file_stream": "faef147d8d4a1299",
+        "episode_streams": "983b6f912f9d4dac",
+        "parse_episode_number": "36ac3ef1c1b1a73d",
+        "extract_leading_season_number": "7d6ef50c4c8eb84c"
+      }
+    }
+  },
+  "fourkhdhub": {
+    "config": {
+      "base": "https://4khdhub.one/",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "searchParam": "s",
+      "mirrors": [
+        "greenmotors.",
+        "greenmountmotors.",
+        "hubcloud.",
+        "hubdrive.",
+        "pixeldrain."
+      ],
+      "pixeldrain": [
+        "pixeldrain.com",
+        "pixeldrain.dev"
+      ]
+    },
+    "upstream": {
+      "commit": "431ab051cfdf34953b11b602b46618380d2a653d",
+      "logic": {
+        "selectors": "da82a961b3615b8b",
+        "resolve": "41c543b535961d9e",
+        "resolve_hubdrive": "a4ce0cf6fd4e314d",
+        "resolve_greenmotors": "2e0e0a3b358e5e08",
+        "decode_greenmotors_payload": "f349cebf5672f4aa",
+        "extract_greenmotors_payload": "3903d653b74732b9",
+        "extract_hubcloud_drive_url": "b773fd9113f4dcd8",
+        "unwrap_watch_online_url": "2a0a8e227a512d70",
+        "extract_script_pixeldrain_urls": "d2dfc70821713a95",
+        "pixeldrain_api_url": "df60a9c0997f6374",
+        "rot13": "e23f7ddccf276f61",
+        "score": "23f0f96ccad6470b",
+        "parse_search": "11c936a648c917e8",
+        "parse_details": "494042c6860a00c2",
+        "parse_releases": "b5b2ce0727e7655c",
+        "parse_season_episode": "4cb53291797ca96b",
+        "normalize_filename": "c16fa2cad0030cd6"
+      }
+    }
+  }
 }

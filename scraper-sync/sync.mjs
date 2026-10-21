@@ -6,7 +6,7 @@ import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { fromDisk } from "./extract.mjs";
-import { run } from "./smoke.mjs";
+import { health, run } from "./smoke.mjs";
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "../scrapers/scrapers.json");
 const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : undefined; };
@@ -14,7 +14,7 @@ const flag = (n) => process.argv.includes(n);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const commit = (dir) => { try { return execFileSync("git", ["-C", dir, "rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return "unknown"; } };
 
-const dirs = { hianime: arg("--ani"), moviebox: arg("--mb") };
+const dirs = { hianime: arg("--ani"), moviebox: arg("--mb"), dramachi: arg("--mb"), fourkhdhub: arg("--mb") };
 const cur = existsSync(OUT) ? JSON.parse(readFileSync(OUT, "utf8")) : { schema: 1 };
 const next = structuredClone(cur);
 const report = []; // lines for the issue; empty = nothing needs a human
@@ -46,6 +46,17 @@ for (const s of Object.keys(dirs)) {
   const drift = Object.keys(up.logic).filter((k) => up.logic[k] !== base[k]);
   if (drift.length) report.push(`- **${s}**: upstream logic changed in \`${drift.join("`, `")}\` (${(old?.upstream?.commit ?? "?").slice(0, 7)}..${sha.slice(0, 7)}). Review the diff, port it to the Reelm scrapers, then run \`node scraper-sync/sync.mjs --accept\`.`);
   if (next[s] && !same(next[s].upstream?.logic, base)) { next[s].upstream = { ...next[s].upstream, logic: base }; dirty = true; }
+}
+
+// the Reelm Helper extension can only reach hosts listed in its manifest, and a store-installed extension cannot be hot-patched
+const perms = JSON.parse(readFileSync(join(dirname(OUT), "../extension/manifest.json"), "utf8")).host_permissions.join(" ");
+const missing = (next.fourkhdhub?.config.mirrors ?? []).map((m) => m.replace(/\.$/, "")).filter((m) => !perms.includes(m));
+if (missing.length) report.push(`- **fourkhdhub**: extension/manifest.json has no host permission for mirror(s) \`${missing.join("`, `")}\`. Add them and ship a new Reelm Helper.`);
+
+// sources with no upstream to track still get a liveness check
+for (const h of flag("--no-smoke") ? [] : await health()) {
+  console.log(`${h.name}: ${h.status} (${h.detail})`);
+  if (h.status === "fail") report.push(`- **${h.name}**: live check FAILED (${h.detail}).`);
 }
 
 if (dirty) {

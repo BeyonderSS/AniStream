@@ -92,7 +92,68 @@ export async function moviebox(c) {
   return `${hit.title} (${hit.subjectId})`;
 }
 
-export const checks = { hianime, moviebox };
+// --- dramachi ---------------------------------------------------------------------------------------------------
+export async function dramachi(c) {
+  const api = async (q) => {
+    const r = await fetch(`${c.base}?${new URLSearchParams(q)}`, { signal: AbortSignal.timeout(T) });
+    const t = await r.text();
+    if (/<title>Just a moment/i.test(t)) throw new Skip("dramachi: Cloudflare challenge");
+    if (!r.ok) throw new Error(`dramachi ${q.interface} HTTP ${r.status}`);
+    try { return JSON.parse(t); } catch { throw new Error(`dramachi ${q.interface}: response is not JSON`); }
+  };
+  // anything that is not "movie(s)" is a series (the app maps it the same way)
+  const hit = must(((await api({ interface: "search", q: "queen of tears", filter: "all", page: "1" })).data ?? []).find((o) => o.id && !["movie", "movies"].includes(String(o.content).toLowerCase())), "search: no series result");
+  const seasons = must((await api({ interface: "title_v2", id: String(hit.id) })).seasons, "title_v2: no seasons");
+  const rip = must(Object.values(seasons)[0]?.versions?.[0]?.rip, "title_v2: no rip in first season");
+  const ep = must(((await api({ interface: "eplist", season: rip, id: String(hit.id) })).episode_list ?? []).find((e) => e.fid && e.disk), "eplist: no playable episode");
+  const f = await api({ interface: "getFile", fid: ep.fid, findex: ep.disk });
+  const url = c.cdnPath.replace("{}", String(must(f.hostInfo?.host, "getFile: no host")).replace(/\/$/, "")).replace("{}", String(must(f.fileInfo?.[0]?.url, "getFile: no file url")).replace(/^\//, ""));
+  const r = await fetch(url, { headers: { Range: "bytes=0-0" }, signal: AbortSignal.timeout(T) });
+  if (![200, 206].includes(r.status)) throw new Error(`cdn file HTTP ${r.status}`);
+  r.body?.cancel();
+  return `${hit.title} -> ${new URL(url).host}`;
+}
+
+// --- 4khdhub ----------------------------------------------------------------------------------------------------
+export async function fourkhdhub(c) {
+  const get = async (url) => {
+    let r;
+    try { r = await fetch(url, { headers: { "User-Agent": c.userAgent }, signal: AbortSignal.timeout(T) }); } catch (e) { throw new Skip(`4khdhub: unreachable (${e.cause?.code ?? e.message})`); }
+    const t = await r.text();
+    if (r.status === 403 || r.status === 503 || /<title>Just a moment/i.test(t)) throw new Skip(`4khdhub: blocked (HTTP ${r.status})`);
+    if (!r.ok) throw new Error(`4khdhub HTTP ${r.status}`);
+    return t;
+  };
+  const base = c.base.replace(/\/$/, "");
+  const cards = [...(await get(`${base}/?${c.searchParam}=${encodeURIComponent("inception")}`)).matchAll(/<a href="(\/[^"]+)" class="movie-card"[^>]*>([\s\S]*?)<\/a>/g)]
+    .filter((m) => /class="movie-card-title">[^<]+</.test(m[2]));
+  const first = must(cards[0], "search: no movie-card parsed");
+  const page = await get(base + first[1]);
+  const items = page.split('class="download-item ').slice(1);
+  must(items.length, "detail: no download-item blocks");
+  const links = items.flatMap((i) => [...i.matchAll(/href="(https:\/\/[^"]+)"/g)].map((m) => m[1])).filter((u) => c.mirrors.some((m) => u.includes(m)));
+  must(links.length, "detail: no mirror links in download items");
+  return `${first[1]} (${items.length} releases, ${links.length} mirror links)`;
+}
+
+// --- sources with no upstream code to track: plain liveness -------------------------------------------------------
+async function probe(name, url, ok, init = {}) {
+  try {
+    const r = await fetch(url, { ...init, signal: AbortSignal.timeout(T) });
+    const t = await r.text();
+    if (!r.ok) return { name, status: "fail", detail: `HTTP ${r.status}` };
+    return ok(t) ? { name, status: "pass", detail: "ok" } : { name, status: "fail", detail: "unexpected response" };
+  } catch (e) { return { name, status: "fail", detail: e.cause?.code ?? e.message }; }
+}
+
+export const health = () => Promise.all([
+  probe("cinemeta", "https://v3-cinemeta.strem.io/catalog/movie/top/search=inception.json", (t) => JSON.parse(t).metas?.length > 0),
+  probe("aniskip", "https://api.aniskip.com/v2/skip-times/21/1?types[]=op&types[]=ed&episodeLength=0", (t) => Array.isArray(JSON.parse(t).results)),
+  probe("iptv-org", "https://iptv-org.github.io/iptv/index.m3u", (t) => t.startsWith("#EXTM3U")),
+  probe("vsembed", "https://vsembed.ru/embed/movie?imdb=tt0111161", (t) => t.length > 200),
+]);
+
+export const checks = { hianime, moviebox, dramachi, fourkhdhub };
 
 /** Runs one check and never throws: { status, detail }. */
 export async function run(source, config) {
