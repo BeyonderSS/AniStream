@@ -215,21 +215,6 @@ function Player() {
         <VideoSkin className="reelm-skin size-full" style={{ "--media-accent-color": "#F2B45A", "--media-accent-text-color": "#15171F", "--media-border-radius": "0", "--media-border-color": "transparent", "--media-object-fit": "contain" } as React.CSSProperties}>
           {src && <Media key={si + pkey + nonce} src={src.src} crossOrigin={src.hls ? "anonymous" : undefined} {...(common as object)} />}
           {!src && !err && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="flex flex-col items-center gap-4"><ReelMark className="size-14 animate-spin [animation-duration:1.6s]" /><p className="text-sm text-foreground/72">{p ? "Finding a stream" : "Joining the room"}</p></div></div>}
-          {fe && (
-            <div className="absolute inset-0 z-20 grid place-items-center bg-dusk/80 p-6 backdrop-blur-md">
-              <div role="alert" className="page-in flex max-w-sm flex-col items-center gap-3 rounded-[24px] bg-haze p-7 text-center shadow-[0_24px_60px_rgb(10_12_18/0.6)]">
-                <ReelMark className="size-10 opacity-70" />
-                <h2 className="font-display text-xl font-semibold">{fe.t}</h2>
-                <p className="text-sm text-foreground/72">{fe.b}</p>
-                <div className="mt-2 flex gap-2">
-                  {err === "helper" && <a href={HELPER_URL()} target="_blank" rel="noreferrer" className={pill.primary}>Install Reelm Helper</a>}
-                  <button className={err === "helper" ? pill.secondary : pill.primary} onClick={() => { setErr(""); setSi(0); setNonce(nonce + 1); }}><RotateCcw />Retry</button>
-                  <Link href={back} className={pill.secondary}>Back</Link>
-                </div>
-                {next && <button className="mt-1 text-sm text-primary hover:underline" onClick={() => go(next)}>Play the next episode instead</button>}
-              </div>
-            </div>
-          )}
 
           {skip && !err && (
             <button onClick={() => { video.current!.currentTime = skip.e; }} className={cn(pill.secondary, "absolute right-4 bottom-28 z-10 bg-dusk/80 ring-1 ring-white/15 backdrop-blur md:right-8")}>
@@ -299,6 +284,21 @@ function Player() {
       )}
         </VideoSkin>
       </VideoPlayer>
+          {fe && (
+            <div className="absolute inset-0 z-50 grid place-items-center bg-dusk/80 p-6 backdrop-blur-md">
+              <div role="alert" className="page-in flex max-w-sm flex-col items-center gap-3 rounded-[24px] bg-haze p-7 text-center shadow-[0_24px_60px_rgb(10_12_18/0.6)]">
+                <ReelMark className="size-10 opacity-70" />
+                <h2 className="font-display text-xl font-semibold">{fe.t}</h2>
+                <p className="text-sm text-foreground/72">{fe.b}</p>
+                <div className="mt-2 flex gap-2">
+                  {err === "helper" && <a href={HELPER_URL()} target="_blank" rel="noreferrer" className={pill.primary}>Install Reelm Helper</a>}
+                  <button className={err === "helper" ? pill.secondary : pill.primary} onClick={() => { setErr(""); setSi(0); setNonce(nonce + 1); }}><RotateCcw />Retry</button>
+                  <Link href={back} className={pill.secondary}>Back</Link>
+                </div>
+                {next && <button className="mt-1 text-sm text-primary hover:underline" onClick={() => go(next)}>Play the next episode instead</button>}
+              </div>
+            </div>
+          )}
     </main>
   );
 }
