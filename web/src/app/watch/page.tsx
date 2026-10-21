@@ -86,7 +86,7 @@ function Player() {
       if (!document.documentElement.dataset.reelmHelper) throw new Error("helper");
       const list = await get<any[]>(`movies/stream?id=${encodeURIComponent(p.id)}&type=${p.type}&title=${encodeURIComponent(p.title)}&year=${p.year ?? ""}&s=${p.season ?? 0}&e=${p.episode ?? 0}`);
       if (!list.length) throw new Error("No streams found for this title.");
-      return [list.map((x) => ({ src: x.url, hls: /\.m3u8(\?|$)/.test(x.url), label: x.label, codec: x.codec })), list[0].subtitles.map((x: Sub) => ({ ...x, url: `/api/sub?u=${encodeURIComponent(x.url)}` }))] as const;
+      return [list.map((x) => ({ src: x.url, hls: /\.m3u8(\?|$)/.test(x.url), label: x.label, codec: x.codec })), (list.find((x) => x.subtitles?.length)?.subtitles ?? []).map((x: Sub) => ({ ...x, url: `/api/sub?u=${encodeURIComponent(x.url)}` }))] as const;
     })().then((r) => {
       if (!live || !r) return;
       const [a, b] = r;
