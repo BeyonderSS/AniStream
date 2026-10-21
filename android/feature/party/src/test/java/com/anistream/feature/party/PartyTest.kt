@@ -57,6 +57,35 @@ class PartyTest {
         assertEquals(109, parseRelease(Json.parseToJsonElement("""{"tag_name":"v1.0.9","prerelease":false,$assets}""").jsonObject, tv = false)?.versionCode)
     }
 
+    @Test fun channelComesFromTheVersionName() {
+        assertNull(channelOf("1.0.22"))
+        assertNull(channelOf("1.0.22-tv")) // the TV flavor suffix is not a branch
+        assertEquals("port-automation", channelOf("1.0.22-port-automation"))
+        assertEquals("port-automation", channelOf("1.0.22-port-automation-tv"))
+        assertNull(channelOf("1.0.0"))
+    }
+
+    @Test fun featureBuildsFollowOnlyTheirOwnPreReleasesAndStable() {
+        fun release(tag: String, pre: Boolean) = Json.parseToJsonElement(
+            """{"tag_name":"$tag","prerelease":$pre,"assets":[{"name":"Reelm-v1.apk","browser_download_url":"https://x/$tag.apk","size":1}]}"""
+        ).jsonObject
+        val list = kotlinx.serialization.json.JsonArray(
+            listOf(
+                release("v1.0.30-other-branch", true), // another branch: never
+                release("v1.0.25-my-branch", true),
+                release("v1.0.24", false),
+                release("v1.0.20-my-branch", true)
+            )
+        )
+        // newest of: stable + my-branch pre-releases (the other branch's v1.0.30 is skipped)
+        assertEquals(125, pickNewest(list, tv = false, channel = "my-branch")?.versionCode)
+        // a stable build only ever sees stable releases
+        assertEquals(124, pickNewest(list, tv = false, channel = null)?.versionCode)
+        // a newer stable release wins over an older pre-release of the branch
+        val newerStable = kotlinx.serialization.json.JsonArray(listOf(release("v1.0.26", false), release("v1.0.25-my-branch", true)))
+        assertEquals(126, pickNewest(newerStable, tv = false, channel = "my-branch")?.versionCode)
+    }
+
     @Test fun playingRoomAdvancesByElapsedServerTime() {
         assertEquals(12_500L, targetPosition(10_000, at = 1_000, serverNow = 3_500, playing = true))
         assertEquals(10_000L, targetPosition(10_000, at = 1_000, serverNow = 3_500, playing = false))

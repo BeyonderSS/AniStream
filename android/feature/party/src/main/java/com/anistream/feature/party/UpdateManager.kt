@@ -41,6 +41,7 @@ data class UpdateUi(
 )
 
 private const val LATEST = "https://api.github.com/repos/BeyonderSS/Reelm/releases/latest"
+private const val RELEASES = "https://api.github.com/repos/BeyonderSS/Reelm/releases?per_page=30"
 private const val EVERY_MS = 6 * 60 * 60 * 1000L
 
 /** Checks GitHub for a newer release, downloads its APK and hands it to the system installer. */
@@ -57,6 +58,8 @@ class UpdateManager @Inject constructor(
     private val tv = context.packageName.endsWith(".tv")
     private val debuggable = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
     val versionName: String = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+    /** null for a stable build; the branch slug for a CI feature build, which also follows that branch's pre-releases. */
+    private val channel = channelOf(versionName)
     private val versionCode = PackageInfoCompat.getLongVersionCode(context.packageManager.getPackageInfo(context.packageName, 0)).toInt()
 
     /** App start: at most once every 6 h, and silent unless there is something to install. */
@@ -78,7 +81,8 @@ class UpdateManager @Inject constructor(
     private suspend fun check(manual: Boolean) {
         _ui.update { it.copy(checking = true, status = null) }
         val release = try {
-            parseRelease(http.getJson(LATEST), tv)
+            // /releases/latest never returns a pre-release, so a stable build can't be offered one
+            if (channel == null) parseRelease(http.getJson(LATEST), tv) else pickNewest(http.getJsonArray(RELEASES), tv, channel)
         } catch (_: Exception) {
             _ui.update { it.copy(checking = false, status = if (manual) "Couldn't check for updates" else null) }
             return

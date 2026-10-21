@@ -4,7 +4,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import okhttp3.Call
 import okhttp3.Callback
@@ -41,6 +43,8 @@ class MediaHttp @Inject constructor() {
     }
 
     suspend fun getJson(url: String): JsonObject = json.parseToJsonElement(get(url)).jsonObject
+
+    suspend fun getJsonArray(url: String): JsonArray = json.parseToJsonElement(get(url)).jsonArray
 
     /** First KB of [url] (redirects followed): final URL, status and content type, without reading the body. */
     suspend fun probe(url: String, headers: Map<String, String> = emptyMap()): Probe = withContext(Dispatchers.IO) {
