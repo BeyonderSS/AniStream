@@ -44,7 +44,7 @@ Hello on connect: `{type:"hello", deviceId, deviceName, kind:"phone"|"tv"}` → 
 ## Watch together (Durable Object `Room`, keyed by room code; no account needed)
 - `POST /v1/rooms` `{payload}` → `{code}` (6 chars, A–Z/2–9). `payload` = what to play (same opaque shape as history).
 - `GET  /v1/rooms/:code` WebSocket. Client sends `{type:"join", name, avatar}`; server replies
-  `{type:"state", payload, playing, position, at, members:[{id,name,avatar}]}`.
+  `{type:"state", you, payload, playing, position, at, members:[{id,name,avatar}]}`.
 - Any member sends `{type:"play"|"pause"|"seek", position}`; server stamps `at` (server ms) and broadcasts
   `{type, position, at, by}`. Clients apply `position + (now - at)` when playing. Room dies 1 h after the last member leaves.
 

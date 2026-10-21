@@ -379,9 +379,10 @@ export class Room extends DurableObject<Env> {
     const m = parse(raw), s = this.ctx.storage;
     if (!m) return;
     if (m.type === "join") {
-      ws.serializeAttachment({ id: uuid(), name: String(m.name ?? "Guest").slice(0, 32), avatar: String(m.avatar ?? "").slice(0, 64) } satisfies Member);
+      const id = uuid();
+      ws.serializeAttachment({ id, name: String(m.name ?? "Guest").slice(0, 32), avatar: String(m.avatar ?? "").slice(0, 64) } satisfies Member);
       const st = await s.get(["payload", "playing", "position", "at"]);
-      send(ws, { type: "state", payload: st.get("payload"), playing: st.get("playing"), position: st.get("position"), at: st.get("at"), members: this.members() });
+      send(ws, { type: "state", you: id, payload: st.get("payload"), playing: st.get("playing"), position: st.get("position"), at: st.get("at"), members: this.members() });
       this.broadcast({ type: "members", members: this.members() }, ws);
       return;
     }
