@@ -2,11 +2,12 @@ package com.anistream.core.database.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 
-@Entity(tableName = "watch_history")
+
+/** One row per (item, profile); profileId "" = local-only (signed out). [deleted] = tombstone kept for sync. */
+@Entity(tableName = "watch_history", primaryKeys = ["animeSlug", "profileId"])
 data class WatchHistoryEntity(
-    @PrimaryKey val animeSlug: String,
+    val animeSlug: String,
     val animeTitle: String,
     val malId: Long? = null,
     val posterUrl: String? = null,
@@ -21,5 +22,7 @@ data class WatchHistoryEntity(
     @ColumnInfo(defaultValue = "0") val season: Int = 0,
     val mediaId: String? = null,
     /** e.g. "S1 · E2" */
-    val subtitle: String? = null
+    val subtitle: String? = null,
+    @ColumnInfo(defaultValue = "''") val profileId: String = "",
+    @ColumnInfo(defaultValue = "0") val deleted: Boolean = false
 )

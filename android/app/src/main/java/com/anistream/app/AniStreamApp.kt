@@ -19,6 +19,7 @@ import javax.inject.Inject
 @HiltAndroidApp
 class AniStreamApp : Application(), Configuration.Provider, ImageLoaderFactory {
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var accountRuntime: com.anistream.core.account.AccountRuntime
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
@@ -28,6 +29,7 @@ class AniStreamApp : Application(), Configuration.Provider, ImageLoaderFactory {
         super.onCreate()
         createNotificationChannels(this)
         schedulePeriodicWork(this)
+        accountRuntime.start(this, if (BuildConfig.FLAVOR == "tv") "tv" else "phone")
     }
 
     /** Phone: Coil defaults. Low-end TV: memory cache ≤ 15 % of heap, RGB_565, every decode ≤ 300 px wide. */

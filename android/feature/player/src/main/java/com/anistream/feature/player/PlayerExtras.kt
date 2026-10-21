@@ -377,6 +377,9 @@ internal suspend fun saveFrame(ctx: Context, view: PlayerView?) {
     Toast.makeText(ctx, if (ok) "Screenshot saved to Pictures/Reelm" else "Couldn't save the screenshot", Toast.LENGTH_SHORT).show()
 }
 
+/** Playback position as a 0..1 fraction (0 until the duration is known). */
+internal fun Player.progressFraction(): Float = if (duration > 0) (currentPosition.toFloat() / duration).coerceIn(0f, 1f) else 0f
+
 /** Phone settings-sheet section: speed, audio track, subtitle options, sleep timer. */
 @Composable
 internal fun PlayerTweaksSection(player: Player, tweaks: PlayerTweaks, live: Boolean, autoSkipToggle: Boolean = false) {

@@ -13,7 +13,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.anistream.core.account.ui.AccountScreen
+import com.anistream.core.account.ui.AccountViewModel
+import com.anistream.core.account.ui.AvatarImage
+import com.anistream.core.account.ui.ProfilePickerGate
+import com.anistream.core.ui.theme.Ink
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -68,6 +82,7 @@ object Routes {
     const val LIVE_TV = "live_tv"
     const val ADDONS = "addons"
     const val LIBRARY = "library"
+    const val ACCOUNT = "account?code={code}"
 
     fun animeDetail(slug: String) = "anime_detail/$slug"
     fun movieDetail(id: String) = "movie_detail/${Uri.encode(id)}"
@@ -108,6 +123,7 @@ fun AniStreamNavGraph() {
 
     // No system-bar insets here: the only padding the Scaffold contributes is the bottom bar
     // (which itself sits above the gesture bar). Screens decide about the status bar; see [Insetted].
+    ProfilePickerGate {
     Scaffold(
         containerColor = Bg.base,
         contentWindowInsets = WindowInsets(0),
@@ -177,9 +193,17 @@ fun AniStreamNavGraph() {
                 }
             }
 
+            composable(
+                Routes.ACCOUNT,
+                arguments = listOf(navArgument("code") { type = NavType.StringType; nullable = true; defaultValue = null })
+            ) { entry ->
+                Insetted { AccountScreen(onBack = { navController.popBackStack() }, pairCode = entry.arguments?.getString("code")) }
+            }
+
             composable(Routes.LIBRARY) {
                 Insetted {
                     LibraryScreen(
+                        onAccount = { navController.navigate("account") },
                         onOpen = { id -> navController.navigate(Routes.detailFor(id)) },
                         onDiscoverClick = { navigateToTab(Routes.HOME) }
                     )
@@ -331,19 +355,30 @@ fun AniStreamNavGraph() {
             }
         }
     }
+    }
 }
 
 /** Favorites | Downloads under one tab; each keeps its own screen and title. */
 @Composable
-private fun LibraryScreen(onOpen: (String) -> Unit, onDiscoverClick: () -> Unit) {
+private fun LibraryScreen(onOpen: (String) -> Unit, onDiscoverClick: () -> Unit, onAccount: () -> Unit) {
+    val account = androidx.hilt.navigation.compose.hiltViewModel<AccountViewModel>()
+    val session by account.session.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     Column(Modifier.fillMaxSize()) {
-        SegmentedControl(
-            options = listOf("Favorites", "Downloads"),
-            selectedIndex = tab,
-            onSelect = { tab = it },
-            modifier = Modifier.padding(start = Space.lg, end = Space.lg, top = Space.sm)
-        )
+        Row(Modifier.padding(start = Space.lg, end = Space.xs, top = Space.sm), verticalAlignment = Alignment.CenterVertically) {
+            SegmentedControl(
+                options = listOf("Favorites", "Downloads"),
+                selectedIndex = tab,
+                onSelect = { tab = it },
+                modifier = Modifier.weight(1f)
+            )
+            // accounts are optional and hidden when REELM_API_URL is blank
+            if (account.repo.enabled) IconButton(onClick = onAccount) {
+                val p = session?.activeProfile
+                if (p != null) AvatarImage(p.avatar, 32.dp)
+                else Icon(Icons.Outlined.AccountCircle, contentDescription = "Sign in", tint = Ink.high)
+            }
+        }
         Box(Modifier.weight(1f)) {
             if (tab == 0) FavoritesScreen(onAnimeClick = onOpen, onDiscoverClick = onDiscoverClick)
             else DownloadsScreen()

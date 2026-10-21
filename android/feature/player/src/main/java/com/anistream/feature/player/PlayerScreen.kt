@@ -220,6 +220,11 @@ fun PlayerScreen(
                 Spacer(Modifier.height(Space.md))
                 SubDubToggle(ui.language, viewModel::setLanguage)
                 PlayerTweaksSection(viewModel.player, tweaks, live = false, autoSkipToggle = true)
+                com.anistream.core.account.ui.ContinueOnTvSection(
+                    history = { com.anistream.domain.model.WatchHistory(ui.animeSlug, ui.animeTitle, posterUrl = ui.posterUrl, lastEpisodeWatched = ui.episodeNumber, watchProgress = viewModel.player.progressFraction()) },
+                    positionMs = { viewModel.player.currentPosition },
+                    onSent = { showSettings = false }
+                )
             }
         }
     }

@@ -1,6 +1,7 @@
 package com.anistream.core.network.repository
 
 import com.anistream.core.common.Result
+import com.anistream.core.database.ActiveProfile
 import com.anistream.core.database.dao.WatchHistoryDao
 import com.anistream.core.database.entity.WatchHistoryEntity
 import com.anistream.domain.model.WatchHistory
@@ -16,7 +17,7 @@ class WatchHistoryRepositoryImpl @Inject constructor(
 
     override suspend fun getAll(): Result<List<WatchHistory>> {
         return try {
-            val result = dao.getAll().first().map { it.toDomain() }
+            val result = dao.getAll(ActiveProfile.id).first().map { it.toDomain() }
             Result.success(result)
         } catch (e: Exception) {
             Result.error(e)
@@ -25,7 +26,7 @@ class WatchHistoryRepositoryImpl @Inject constructor(
 
     override suspend fun getContinueWatching(kind: String?): Result<List<WatchHistory>> {
         return try {
-            val result = dao.getContinueWatching(kind).first().map { it.toDomain() }
+            val result = dao.getContinueWatching(ActiveProfile.id, kind).first().map { it.toDomain() }
             Result.success(result)
         } catch (e: Exception) {
             Result.error(e)
@@ -34,7 +35,7 @@ class WatchHistoryRepositoryImpl @Inject constructor(
 
     override suspend fun getBySlug(slug: String): Result<WatchHistory?> {
         return try {
-            val entity = dao.getBySlug(slug)
+            val entity = dao.getBySlug(slug, ActiveProfile.id)
             Result.success(entity?.toDomain())
         } catch (e: Exception) {
             Result.error(e)
@@ -44,6 +45,7 @@ class WatchHistoryRepositoryImpl @Inject constructor(
     override suspend fun save(history: WatchHistory): Result<Unit> {
         return try {
             dao.upsert(history.toEntity())
+            ActiveProfile.changes.tryEmit(Unit)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.error(e)
@@ -53,9 +55,10 @@ class WatchHistoryRepositoryImpl @Inject constructor(
     override suspend fun updateProgress(slug: String, episode: Int, progress: Float): Result<Unit> {
         return try {
             // no row yet (player didn't save metadata first) -> insert a minimal one so history is never lost
-            if (dao.updateProgress(slug, episode, progress) == 0) {
-                dao.upsert(WatchHistoryEntity(animeSlug = slug, animeTitle = slug, lastEpisodeWatched = episode, watchProgress = progress))
+            if (dao.updateProgress(slug, episode, progress, ActiveProfile.id) == 0) {
+                dao.upsert(WatchHistoryEntity(animeSlug = slug, animeTitle = slug, lastEpisodeWatched = episode, watchProgress = progress, profileId = ActiveProfile.id))
             }
+            ActiveProfile.changes.tryEmit(Unit)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.error(e)
@@ -64,7 +67,8 @@ class WatchHistoryRepositoryImpl @Inject constructor(
 
     override suspend fun delete(slug: String): Result<Unit> {
         return try {
-            dao.delete(slug)
+            dao.delete(slug, ActiveProfile.id)
+            ActiveProfile.changes.tryEmit(Unit)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.error(e)
@@ -73,7 +77,8 @@ class WatchHistoryRepositoryImpl @Inject constructor(
 
     override suspend fun clear(): Result<Unit> {
         return try {
-            dao.clear()
+            dao.clear(ActiveProfile.id)
+            ActiveProfile.changes.tryEmit(Unit)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.error(e)
@@ -111,6 +116,7 @@ class WatchHistoryRepositoryImpl @Inject constructor(
         kind = kind,
         season = season,
         mediaId = mediaId,
-        subtitle = subtitle
+        subtitle = subtitle,
+        profileId = ActiveProfile.id
     )
 }

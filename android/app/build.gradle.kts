@@ -6,6 +6,12 @@ plugins {
     alias(libs.plugins.hilt.android)
 }
 
+// Same URL the :core:account BuildConfig uses; only its host goes into the manifest (https://<host>/pair/<code> deep link).
+val apiUrl: String = rootProject.file("local.properties").takeIf { it.exists() }
+    ?.readLines()?.firstOrNull { it.startsWith("REELM_API_URL=") }?.substringAfter("=")?.trim()
+    ?: System.getenv("REELM_API_URL")?.trim()
+    ?: ""
+
 android {
     namespace = "com.anistream.app"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -17,6 +23,7 @@ android {
         // CI passes VERSION_CODE / VERSION_NAME per build; local builds stay 1 / 1.0.0
         versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
         versionName = System.getenv("VERSION_NAME") ?: "1.0.0"
+        manifestPlaceholders["apiHost"] = apiUrl.substringAfter("://").substringBefore("/").ifBlank { "account.invalid" }
     }
 
     // Release key comes from CI secrets; without it (local builds) release falls back to the debug key.
@@ -82,6 +89,7 @@ dependencies {
     implementation(project(":core:parser"))
     implementation(project(":core:database"))
     implementation(project(":core:media"))
+    implementation(project(":core:account"))
     implementation(project(":core:common"))
     implementation(project(":core:ui"))
     implementation(project(":domain"))
