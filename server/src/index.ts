@@ -255,6 +255,7 @@ const routes: [string, RegExp, (c: Ctx) => Response | Promise<Response>][] = [
   ["POST", /^\/v1\/pair\/([^/]+)\/claim$/, pairClaim],
   ["GET", /^\/v1\/pair\/([^/]+)$/, pairPoll],
   ["GET", /^\/pair\/([^/]+)$/, pairPage],
+  ["GET", /^\/v1\/proxy$/, proxy],
   ["GET", /^\/v1\/hub$/, hub],
   ["POST", /^\/v1\/rooms$/, createRoom],
   ["GET", /^\/v1\/rooms\/([^/]+)$/, joinRoom],
@@ -262,10 +263,47 @@ const routes: [string, RegExp, (c: Ctx) => Response | Promise<Response>][] = [
     new Response(c.env.ASSET_LINKS || "[]", { headers: { "content-type": "application/json" } })],
 ];
 
+// ---- stream proxy (web player) ----------------------------------------------
+// Anime HLS needs a Referer and no CORS headers; the browser can't send either. Hosts the parsers return only.
+const PROXY_HOSTS = ["dramahot.top", "drama1.cfd", "zokoanime.video", "zokoanime.com", "zokoanime.net", "hianime.at"];
+const hostOk = (h: string) => PROXY_HOSTS.some((p) => h === p || h.endsWith("." + p));
+const isPrivate = (h: string) => h === "localhost" || h.endsWith(".local") || h.startsWith("[") || /^(0|10|127)\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\.|^169\.254\./.test(h);
+
+/** Point every segment/key/variant URL of a playlist back at the proxy. */
+export function rewritePlaylist(text: string, base: string, proxyBase: string, referer: string, any: boolean) {
+  const wrap = (u: string) => `${proxyBase}?u=${encodeURIComponent(new URL(u, base).href)}&r=${encodeURIComponent(referer)}${any ? "&any=1" : ""}`;
+  return text.split("\n").map((l) => {
+    const t = l.trim();
+    if (!t) return l;
+    return t.startsWith("#") ? l.replace(/URI="([^"]+)"/g, (_, u) => `URI="${wrap(u)}"`) : wrap(t);
+  }).join("\n");
+}
+
+async function proxy({ req, url }: Ctx) {
+  let u: URL;
+  try { u = new URL(url.searchParams.get("u") ?? ""); } catch { return json({ error: "bad url" }, 400); }
+  const any = url.searchParams.get("any") === "1"; // live TV: channels live on arbitrary hosts
+  if (!/^https?:$/.test(u.protocol) || isPrivate(u.hostname) || !(any || hostOk(u.hostname))) return json({ error: "host not allowed" }, 403);
+  const referer = url.searchParams.get("r") ?? "";
+  const up = await fetch(u, { headers: {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    ...(referer ? { Referer: referer } : {}), ...(req.headers.get("range") ? { Range: req.headers.get("range")! } : {}),
+  } });
+  const ct = up.headers.get("content-type") ?? "";
+  if (up.ok && (u.pathname.endsWith(".m3u8") || /mpegurl/i.test(ct))) {
+    const body = rewritePlaylist(await up.text(), u.href, `${url.origin}/v1/proxy`, referer, any);
+    return new Response(body, { headers: { "content-type": "application/vnd.apple.mpegurl", "cache-control": "no-store" } });
+  }
+  const h = new Headers();
+  for (const k of ["content-type", "content-length", "content-range", "accept-ranges"]) if (up.headers.has(k)) h.set(k, up.headers.get(k)!);
+  return new Response(up.body, { status: up.status, headers: h });
+}
+
 const CORS = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-  "access-control-allow-headers": "authorization,content-type",
+  "access-control-allow-headers": "authorization,content-type,range",
+  "access-control-expose-headers": "content-length,content-range",
 };
 
 async function route(req: Request, env: Env): Promise<Response> {

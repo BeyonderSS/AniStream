@@ -166,3 +166,13 @@ describe("rooms", () => {
     expect((await call("/v1/rooms/NOPE23", { headers: { Upgrade: "websocket" } })).status).toBe(404);
   });
 });
+
+describe("proxy", () => {
+  it("rewrites playlist urls through the proxy and refuses unlisted hosts", async () => {
+    const { rewritePlaylist } = await import("../src/index");
+    const out = rewritePlaylist('#EXT-X-KEY:METHOD=AES-128,URI="k.key"\n#EXTINF:4,\nseg/1.ts', "https://x.zokoanime.video/a/b.m3u8", "https://p/v1/proxy", "https://zokoanime.video/", false);
+    expect(out).toContain("https://p/v1/proxy?u=https%3A%2F%2Fx.zokoanime.video%2Fa%2Fk.key");
+    expect(out).toContain("u=https%3A%2F%2Fx.zokoanime.video%2Fa%2Fseg%2F1.ts&r=");
+    expect((await call("/v1/proxy?u=" + encodeURIComponent("https://example.com/a.m3u8"))).status).toBe(403);
+  });
+});
