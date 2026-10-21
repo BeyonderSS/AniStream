@@ -74,7 +74,7 @@ object Routes {
     const val HOME = "home"
     const val SEARCH = "search"
     const val FAVORITES = "favorites"
-    const val DOWNLOADS = "downloads"
+    const val DOWNLOADS = "downloads?play={play}"
     const val ANIME_DETAIL = "anime_detail/{slug}"
     const val PLAYER = "player/{slug}/{episode}"
     /** path is optional: absent = genre picker, else a category path like "top-airing" or "genres/action". */
@@ -95,6 +95,8 @@ object Routes {
     fun moviesCatalog(key: String, title: String) = "movies_catalog/${Uri.encode(key)}?title=${Uri.encode(title)}"
     /** Favourites hold both kinds; media ids ("mb:…", "tt…") open the movie detail. */
     fun detailFor(id: String) = if (isMediaKey(id)) movieDetail(id) else animeDetail(id)
+    /** [play] = a downloaded file to open in the local player right away (from the "Download finished" notification) */
+    fun downloads(play: String? = null) = if (play == null) "downloads" else "downloads?play=${Uri.encode(play)}"
     fun player(slug: String, episode: Int) = "player/$slug/$episode"
     fun webPlayer(imdb: String, season: Int, episode: Int) = "web_player/${Uri.encode(imdb)}/$season/$episode"
     fun browse(path: String? = null) = if (path == null) "genre_browse" else "genre_browse?path=${Uri.encode(path)}"
@@ -209,7 +211,11 @@ fun AniStreamNavGraph() {
                     onMenuClick = { showMenu = true },
                     onPlayEpisode = { slug, episode ->
                         navController.navigate(Routes.player(slug, episode))
-                    }
+                    },
+                    onMediaClick = { id -> navController.navigate(Routes.movieDetail(id)) },
+                    onMediaSeeAll = { key, title -> navController.navigate(Routes.moviesCatalog(key, title)) },
+                    onLiveTvClick = { navigateToTab(Routes.LIVE_TV) },
+                    onPlayLive = { navController.navigate(Routes.MEDIA_PLAYER) }
                 )
             }
 
@@ -251,8 +257,11 @@ fun AniStreamNavGraph() {
                 }
             }
 
-            composable(Routes.DOWNLOADS) {
-                Insetted { DownloadsScreen() }
+            composable(
+                Routes.DOWNLOADS,
+                arguments = listOf(navArgument("play") { type = NavType.StringType; nullable = true; defaultValue = null })
+            ) { entry ->
+                Insetted { DownloadsScreen(initialPlay = entry.arguments?.getString("play")) }
             }
 
             composable(Routes.MOVIES) {

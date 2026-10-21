@@ -35,7 +35,9 @@ data class UpdateUi(
     val progress: Float? = null,
     val checking: Boolean = false,
     /** one-line result of the last manual check / failure, shown in the menu and dialog */
-    val status: String? = null
+    val status: String? = null,
+    /** the downloaded APK's installer intent, so a notification can reopen it */
+    val installIntent: Intent? = null
 )
 
 private const val LATEST = "https://api.github.com/repos/BeyonderSS/Reelm/releases/latest"
@@ -71,7 +73,7 @@ class UpdateManager @Inject constructor(
         scope.launch { check(manual = true) }
     }
 
-    fun dismiss() = _ui.update { it.copy(release = null, status = null) }
+    fun dismiss() = _ui.update { it.copy(release = null, status = null, installIntent = null) }
 
     private suspend fun check(manual: Boolean) {
         _ui.update { it.copy(checking = true, status = null) }
@@ -146,11 +148,11 @@ class UpdateManager @Inject constructor(
 
     private fun install(file: File) {
         val uri = if (Build.VERSION.SDK_INT >= 24) FileProvider.getUriForFile(context, "${context.packageName}.updates", file) else Uri.fromFile(file)
-        start(
-            Intent(Intent.ACTION_VIEW)
-                .setDataAndType(uri, "application/vnd.android.package-archive")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        )
+        val intent = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(uri, "application/vnd.android.package-archive")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        _ui.update { it.copy(installIntent = intent) }
+        start(Intent(intent))
     }
 
     private fun start(intent: Intent) {

@@ -19,6 +19,7 @@ import javax.inject.Inject
 @HiltAndroidApp
 class AniStreamApp : Application(), Configuration.Provider, ImageLoaderFactory {
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var updates: com.anistream.feature.party.UpdateManager
     @Inject lateinit var accountRuntime: com.anistream.core.account.AccountRuntime
 
     override val workManagerConfiguration: Configuration
@@ -29,6 +30,7 @@ class AniStreamApp : Application(), Configuration.Provider, ImageLoaderFactory {
         super.onCreate()
         createNotificationChannels(this)
         schedulePeriodicWork(this)
+        com.anistream.app.work.notifyUpdates(this, updates, kotlinx.coroutines.MainScope())
         accountRuntime.start(this, if (BuildConfig.FLAVOR == "tv") "tv" else "phone")
     }
 

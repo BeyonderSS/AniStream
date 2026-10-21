@@ -4,8 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.anistream.core.common.Result
 import com.anistream.domain.model.Channel
-import com.anistream.domain.model.MediaStream
-import com.anistream.domain.model.PlaybackRequest
+import com.anistream.domain.model.liveRequest
 import com.anistream.domain.model.Playlist
 import com.anistream.domain.repository.LiveTvRepository
 import com.anistream.domain.repository.NowPlaying
@@ -95,15 +94,7 @@ class LiveTvViewModel @Inject constructor(private val repo: LiveTvRepository) : 
     }
 
     fun play(c: Channel) {
-        NowPlaying.request = PlaybackRequest(
-            historyKey = null,
-            mediaId = null,
-            title = c.name,
-            subtitle = c.group,
-            posterUrl = c.logoUrl,
-            streams = listOf(MediaStream(url = c.url, qualityLabel = "LIVE", headers = c.headers, sourceName = "Live", isDirectFile = false)),
-            isLive = true
-        )
+        NowPlaying.request = c.liveRequest()
     }
 
     fun addPlaylist(name: String, url: String) {
