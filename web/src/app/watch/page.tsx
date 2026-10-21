@@ -48,7 +48,10 @@ function Player() {
   const applying = useRef(false), youId = useRef("");
   const [sources, setSources] = useState<Source[]>([]), [si, setSi] = useState(0);
   const [subs, setSubs] = useState<Sub[]>([]), [subIdx, setSubIdx] = useState(-1);
-  const [err, setErr] = useState(""), [nonce, setNonce] = useState(0);
+  const [err, setErr] = useState(""), [nonce, setNonce] = useState(0), [embed, setEmbed] = useState(false);
+  // same VidSrc fallback as the apps' WebEmbedPlayer; needs an IMDb id (Cinemeta titles have one, MovieBox ids don't)
+  const imdb = p && p.kind === "movie" && /^tt\d+$/.test(p.id) ? p.id : "";
+  const embedUrl = imdb && (p!.type === "series" ? `https://vsembed.ru/embed/tv?imdb=${imdb}&season=${p!.season ?? 1}&episode=${p!.episode ?? 1}` : `https://vsembed.ru/embed/movie?imdb=${imdb}`);
   const [members, setMembers] = useState<Member[]>([]), [devices, setDevices] = useState<Device[]>([]);
   const [eps, setEps] = useState<any[]>([]), [skips, setSkips] = useState<{ s: number; e: number; type: string }[]>([]);
   const [cur, setCur] = useState(0), [drawer, setDrawer] = useState(false);
@@ -286,6 +289,7 @@ function Player() {
       )}
         </VideoSkin>
       </VideoPlayer>
+      {embed && embedUrl && <iframe src={embedUrl} allowFullScreen allow="autoplay; fullscreen; encrypted-media" referrerPolicy="no-referrer" className="absolute inset-x-0 bottom-0 top-16 z-40 h-[calc(100%-4rem)] w-full border-0 bg-black" />}
           {fe && (
             <div className="absolute inset-0 z-50 grid place-items-center bg-dusk/80 p-6 backdrop-blur-md">
               <div role="alert" className="page-in flex max-w-sm flex-col items-center gap-3 rounded-[24px] bg-haze p-7 text-center shadow-[0_24px_60px_rgb(10_12_18/0.6)]">
@@ -298,6 +302,7 @@ function Player() {
                   <Link href={back} className={pill.secondary}>Back</Link>
                 </div>
                 {next && <button className="mt-1 text-sm text-primary hover:underline" onClick={() => go(next)}>Play the next episode instead</button>}
+                {embedUrl && <button className="mt-1 text-sm text-primary hover:underline" onClick={() => { setEmbed(true); setErr(""); }}>Try the web player</button>}
               </div>
             </div>
           )}
