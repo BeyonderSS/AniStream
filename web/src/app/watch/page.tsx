@@ -239,14 +239,14 @@ function Player() {
                 {room && members.length > 0 && <span className="rounded-full bg-primary/20 px-1.5 text-xs">{members.length}</span>}
               </button>
             )}
-            {(sources.length > 1 || p?.kind === "anime") && (
+            {(sources.length > 0 || p?.kind === "anime") && (
               <details className="relative">
-                {sources.length > 1
+                {sources.length > 0
                   ? <summary aria-label="Quality, audio and episodes" className={cn(pill.ghost, "h-10 list-none cursor-pointer px-4 font-semibold")}>{sources[si]?.label ?? "Quality"}<MenuIcon className="size-4" /></summary>
                   : <summary aria-label="Audio and episodes" className={cn(ctl, "list-none cursor-pointer")}><MenuIcon /></summary>}
                 <div className="page-in absolute right-0 mt-2 max-h-[60vh] w-72 overflow-y-auto rounded-[24px] bg-haze/95 p-2 shadow-[0_24px_60px_rgb(10_12_18/0.6)] ring-1 ring-white/8 backdrop-blur-xl">
-                  {sources.length > 1 && <>
-                    <p className="px-3 pt-2 pb-1 text-xs font-semibold text-foreground/52">Quality</p>
+                  {sources.length > 0 && <>
+                    <p className="px-3 pt-2 pb-1 text-xs font-semibold text-foreground/52">{sources.length > 1 ? "Quality" : "Quality (only one available)"}</p>
                     {sources.map((x, i) => <button key={i} onClick={() => setSi(i)} className={row(si === i)}><Check className={cn("size-4", si !== i && "invisible")} />{x.label}</button>)}
                   </>}
                   {p?.kind === "anime" && <>
@@ -256,6 +256,12 @@ function Player() {
                       <p className="px-3 pt-3 pb-1 text-xs font-semibold text-foreground/52">Episode</p>
                       <div className="grid grid-cols-5 gap-1 px-2 pb-2">{eps.map((e) => <button key={e.id} onClick={() => go({ ...p, ep: e.number, epId: e.id })} className={cn("beam rounded-lg py-1.5 text-sm", e.number === p.ep ? "bg-primary text-primary-foreground" : "bg-white/8 hover:bg-white/12")}>{e.number}</button>)}</div>
                     </>}
+                  </>}
+                  {p?.kind === "movie" && series?.seasons?.length > 0 && <>
+                    <p className="px-3 pt-3 pb-1 text-xs font-semibold text-foreground/52">Season</p>
+                    <div className="flex flex-wrap gap-1 px-2">{series.seasons.map((x: any) => <button key={x.season} onClick={() => x.season !== p.season && go({ ...p, season: x.season, episode: 1 })} className={cn("beam rounded-lg px-3 py-1.5 text-sm", x.season === p.season ? "bg-primary text-primary-foreground" : "bg-white/6 hover:bg-white/12")}>{x.season}</button>)}</div>
+                    <p className="px-3 pt-3 pb-1 text-xs font-semibold text-foreground/52">Episode</p>
+                    <div className="grid grid-cols-5 gap-1 px-2 pb-2">{Array.from({ length: series.seasons.find((x: any) => x.season === p.season)?.episodes ?? 0 }, (_, i) => i + 1).map((n) => <button key={n} onClick={() => go({ ...p, episode: n })} className={cn("beam rounded-lg py-1.5 text-sm", n === p.episode ? "bg-primary text-primary-foreground" : "bg-white/6 hover:bg-white/12")}>{n}</button>)}</div>
                   </>}
                 </div>
               </details>
