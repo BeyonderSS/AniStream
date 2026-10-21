@@ -200,7 +200,7 @@ private fun buildRows(
         HomeFilter.ALL -> anime.continueWatching + media.continueWatching
         HomeFilter.MEDIA -> media.continueWatching
         HomeFilter.ANIME -> anime.continueWatching
-    }.sortedByDescending { it.lastWatchedTimestamp }.map(::historyItem)
+    }.sortedByDescending { it.lastWatchedTimestamp }.distinctBy { it.animeSlug }.map(::historyItem) // anime list already holds media rows too
 
     fun animeRow(title: String, list: List<AnimeSearchResult>) = TvRow(title, list.distinctBy { it.slug }.map { animeItem(title, it) })
     val mediaRows = media.rows.map { r -> TvRow(r.title, r.items.distinctBy { it.id }.map { mediaItem(r.title, it) }) }
