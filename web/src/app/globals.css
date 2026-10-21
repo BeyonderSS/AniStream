@@ -46,6 +46,45 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
+  --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
+  --animate-marquee: marquee var(--duration) infinite linear;
+  --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+  @keyframes shimmer-slide {
+  to {
+    transform: translate(calc(100cqw - 100%), 0);
+    }
+  }
+  @keyframes spin-around {
+  0% {
+    transform: translateZ(0) rotate(0);
+    }
+  15%, 35% {
+    transform: translateZ(0) rotate(90deg);
+    }
+  65%, 85% {
+    transform: translateZ(0) rotate(270deg);
+    }
+  100% {
+    transform: translateZ(0) rotate(360deg);
+    }
+  }
+  @keyframes marquee {
+  from {
+    transform: translateX(0);
+    }
+  to {
+    transform: translateX(calc(-100% - var(--gap)));
+    }
+  }
+  @keyframes marquee-vertical {
+  from {
+    transform: translateY(0);
+    }
+  to {
+    transform: translateY(calc(-100% - var(--gap)));
+    }
+  }
 }
 
 :root {
@@ -141,6 +180,60 @@ html.dark {
   --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
 }
 @theme inline { --font-display: var(--font-bricolage), var(--font-figtree), sans-serif; }
-.beam:focus-visible, .beam:hover { box-shadow: 0 0 28px rgb(242 180 90 / 0.3); outline: 2px solid var(--primary); outline-offset: 2px; }
+@theme inline {
+  --color-dusk: #15171f; --color-slate: #1d2029; --color-haze: #272b37; --color-lamp: #f2b45a; --color-signal: #7fd1b9;
+  --ease-dusk: cubic-bezier(0.2, 0, 0, 1);
+}
+:root { color-scheme: dark; }
+body { background: #15171f; }
+/* the projector light: focused or hovered elements get a soft amber glow, never a hard grey ring */
+.beam { transition: box-shadow 200ms var(--ease-dusk), transform 200ms var(--ease-dusk); }
+.beam:focus-visible { box-shadow: 0 0 0 2px #f2b45a, 0 0 28px rgb(242 180 90 / 0.35); outline: none; }
+@media (hover: hover) { .beam:hover { box-shadow: 0 0 28px rgb(242 180 90 / 0.25); } }
+:focus-visible { outline: 2px solid #f2b45a; outline-offset: 2px; }
 .no-scrollbar { scrollbar-width: none; } .no-scrollbar::-webkit-scrollbar { display: none; }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+.lamp { background: radial-gradient(60% 50% at 50% 0%, rgb(242 180 90 / 0.14), transparent 70%); }
+
+/* page transition (app/template.tsx) */
+@keyframes page-in { from { opacity: 0; transform: translateY(6px); } }
+.page-in { animation: page-in 260ms var(--ease-dusk); }
+
+/* skeleton shimmer */
+.skel { background: linear-gradient(100deg, #1d2029 30%, #272b37 50%, #1d2029 70%) 0 0 / 300% 100%; animation: skel 1.4s linear infinite; }
+@keyframes skel { to { background-position: -150% 0; } }
+
+/* hero slide progress */
+@keyframes fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ---- launch splash: port of android ReelmSplash (1.8 s there, 1.6 s here; timings scaled by 0.89) ---- */
+#splash { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: #15171f; pointer-events: none;
+  animation: splash-out 310ms cubic-bezier(0.2, 0, 0, 1) 1290ms forwards; }
+html[data-splash="off"] #splash { display: none; }
+#splash .glow { position: absolute; left: 50%; top: calc(50% - 38px); width: 440px; height: 440px; margin: -220px 0 0 -220px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(242 180 90 / 0.55), rgb(242 180 90 / 0.14) 55%, transparent);
+  opacity: 0; animation: glow-in 490ms cubic-bezier(0.2, 0, 0, 1) 133ms forwards, glow-settle 445ms cubic-bezier(0.2, 0, 0, 1) 712ms forwards; }
+#splash .stack { display: flex; flex-direction: column; align-items: center; gap: 20px; animation: splash-push 310ms cubic-bezier(0.2, 0, 0, 1) 1290ms forwards; }
+#splash .reel { width: 88px; height: 88px; translate: 0 38px; scale: 1.4545; rotate: -300deg;
+  animation: reel-spin 845ms cubic-bezier(0.2, 0, 0, 1) forwards, reel-lift 587ms cubic-bezier(0.2, 0, 0, 1) 107ms forwards; }
+#splash .word { position: relative; font: 700 52px/56px var(--font-bricolage), sans-serif; letter-spacing: -0.5px; color: #e9eaf0; }
+#splash .word span { display: inline-block; opacity: 0; transform: translateY(18px); animation: letter 329ms cubic-bezier(0.2, 0, 0, 1) forwards; }
+#splash .word .sweep { position: absolute; inset: 0; color: transparent; opacity: 1; transform: none;
+  background: linear-gradient(90deg, transparent 35%, #ffe2b0 50%, transparent 65%) -150% 0 / 250% 100% no-repeat; -webkit-background-clip: text; background-clip: text;
+  animation: sweep 534ms linear 641ms forwards; }
+@keyframes splash-out { to { opacity: 0; visibility: hidden; } }
+@keyframes splash-push { to { transform: scale(1.06); } }
+@keyframes glow-in { to { opacity: 1; } }
+@keyframes glow-settle { from { opacity: 1; } to { opacity: 0.64; } }
+@keyframes reel-spin { to { rotate: 0deg; } }
+@keyframes reel-lift { to { translate: 0 0; scale: 1; } }
+@keyframes letter { to { opacity: 1; transform: none; } }
+@keyframes sweep { to { background-position: 250% 0; } }
+
+/* video player range inputs */
+.range { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+.range::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #f2b45a; box-shadow: 0 0 12px rgb(242 180 90 / 0.6); }
+.range::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #f2b45a; }
+.range::-webkit-slider-runnable-track { background: transparent; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+video::cue { background: rgb(21 23 31 / 0.72); color: #e9eaf0; font-family: var(--font-figtree), sans-serif; font-size: 1.05em; line-height: 1.35; }

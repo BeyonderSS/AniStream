@@ -4,6 +4,7 @@ const j = async (u: string) => { const r = await fetch(u, { headers: { "User-Age
 const meta = (m: any) => ({
   id: m.id as string, type: (m.type === "series" ? "series" : "movie") as "movie" | "series", title: m.name as string, poster: m.poster as string | undefined,
   year: Number(String(m.releaseInfo ?? m.year ?? "").slice(0, 4)) || undefined, rating: Number(m.imdbRating) || undefined, genres: (m.genres ?? []) as string[],
+  backdrop: m.background as string | undefined, description: m.description as string | undefined,
 });
 
 /** key: "<type>/<catalogId>" or "<type>/<catalogId>/genre=Sci-Fi" */

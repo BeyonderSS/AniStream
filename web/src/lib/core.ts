@@ -1,12 +1,19 @@
 export const API = process.env.NEXT_PUBLIC_REELM_API_URL || "https://reelm-api.ssbeyonder.workers.dev";
 export const WS = API.replace(/^http/, "ws");
 
-/** Server-side content routes (same origin). */
-export async function get<T = any>(path: string): Promise<T> {
-  const r = await fetch(`/api/${path}`);
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.error ?? `HTTP ${r.status}`);
-  return d;
+/** Server-side content routes (same origin). Catalog reads are shared per page load (home asked for anime/home four times);
+ *  stream URLs carry expiring tokens, so they are never cached. */
+const memo = new Map<string, Promise<any>>();
+export function get<T = any>(path: string): Promise<T> {
+  const hit = memo.get(path);
+  if (hit) return hit;
+  const p = fetch(`/api/${path}`).then(async (r) => {
+    const d = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+    if (!r.ok) throw new Error(d.error ?? `HTTP ${r.status}`);
+    return d as T;
+  });
+  if (!/stream/.test(path)) { memo.set(path, p); p.catch(() => memo.delete(path)); }
+  return p;
 }
 
 /** Reelm account API (server/API.md). */
@@ -61,10 +68,36 @@ export const kids = {
 // ---- Local library: history (per profile) + favorites ----
 export type Play = { kind: "anime" | "movie" | "live"; id: string; title: string; poster?: string; ep?: number; epId?: number; season?: number; episode?: number; lang?: string; type?: string; year?: number; url?: string };
 export type Entry = { key: string; payload: Play; position: number; duration: number; updatedAt: number; deleted: boolean };
-export type CardData = { href: string; title: string; poster?: string; sub?: string; rating?: string; genres?: string[]; kind?: "anime" | "media" };
+export type CardData = { href: string; title: string; poster?: string; sub?: string; rating?: string; genres?: string[]; kind?: "anime" | "media"; progress?: number };
 
 export const playKey = (p: Play) => p.kind === "anime" ? `anime:${p.id}:${p.ep}` : `movie:${p.id}:${p.season ?? 0}:${p.episode ?? 0}`;
-export const watchHref = (p: Play, t = 0) => `/watch?p=${encodeURIComponent(JSON.stringify(p))}${t ? `&t=${Math.floor(t)}` : ""}`;
+/** `f` resumes at a fraction of the duration (synced entries from the apps store progress as 0..1000 of 1000). */
+export const watchHref = (p: Play, f = 0) => `/watch?p=${encodeURIComponent(JSON.stringify(p))}${f > 0 && f < 0.95 ? `&f=${f.toFixed(4)}` : ""}`;
+export const entryHref = (e: Entry) => watchHref(e.payload, e.duration ? e.position / e.duration : 0);
+export const entrySub = (p: Play) => p.kind === "anime" ? `Episode ${p.ep}` : p.season ? `Season ${p.season}, episode ${p.episode}` : "Movie";
+
+const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+const str = (v: unknown) => (v == null ? "" : String(v).trim());
+/**
+ * Turn any payload the apps write into a web `Play`: web payloads ({kind:"anime",id,ep,epId} / {kind:"movie",id,season,episode,type}),
+ * Android/TV HistoryPayload ({slug,title,kind:"anime"|"media",episode,season,mediaId,poster,progress}) and room payloads.
+ * Anime without an `epId` is resolved by episode number on the watch page.
+ */
+export function toPlay(r: any): Play | null {
+  if (!r || typeof r !== "object") return null;
+  const title = str(r.title ?? r.animeTitle), poster = str(r.poster ?? r.posterUrl) || undefined;
+  if (r.kind === "live") return r.url ? { kind: "live", id: str(r.id) || r.url, title, poster, url: r.url } : null;
+  if (r.kind === "anime" || (!r.kind && !r.mediaId)) {
+    const id = str(r.id ?? r.slug ?? r.animeSlug);
+    if (!id) return null;
+    return { kind: "anime", id, title, poster, ep: Math.max(1, num(r.ep ?? r.episode ?? r.lastEpisodeWatched)), epId: num(r.epId) || undefined, lang: r.lang === "dub" ? "dub" : "sub" };
+  }
+  const id = str(r.kind === "media" ? r.mediaId || r.slug : r.id || r.mediaId).replace(/:s\d+e\d+$/, "");
+  if (!id) return null;
+  const season = num(r.season), episode = num(r.episode);
+  const type = r.type === "series" || r.type === "movie" ? r.type : season > 0 || episode > 0 ? "series" : "movie";
+  return { kind: "movie", id, title, poster, season, episode, type, year: num(r.year) || undefined };
+}
 
 const ls = {
   get<T>(k: string, d: T): T { try { return JSON.parse(localStorage.getItem(k) ?? "") ?? d; } catch { return d; } },
@@ -74,7 +107,17 @@ export const getFavs = () => ls.get<CardData[]>("reelm.fav", []);
 export const toggleFav = (c: CardData) => { const f = getFavs(), has = f.some((x) => x.href === c.href); ls.set("reelm.fav", has ? f.filter((x) => x.href !== c.href) : [c, ...f]); return !has; };
 
 const hKey = (pid: string) => `reelm.hist.${pid}`;
-export const getHistory = (pid: string) => ls.get<Record<string, Entry>>(hKey(pid), {});
+/** History with every payload normalized to `Play` (entries whose payload can't be played are dropped). */
+export function getHistory(pid: string): Record<string, Entry> {
+  const out: Record<string, Entry> = {};
+  for (const [k, e] of Object.entries(ls.get<Record<string, Entry>>(hKey(pid), {}))) {
+    const payload = toPlay(e?.payload);
+    if (payload) out[k] = { ...e, payload };
+  }
+  return out;
+}
+/** Progress (0..1) per history key, for episode grids. */
+export const progressOf = (pid: string) => Object.fromEntries(Object.values(getHistory(pid)).filter((e) => !e.deleted && e.duration).map((e) => [playKey(e.payload), Math.min(1, e.position / e.duration)]));
 /** Latest entry per show, unfinished first-class citizens of Continue Watching. */
 export function continueWatching(pid: string): Entry[] {
   const seen = new Set<string>();
@@ -91,7 +134,7 @@ export async function saveProgress(pid: string, token: string | undefined, p: Pl
 /** Pull the profile's synced history into the local copy (last write wins). */
 export async function syncHistory(pid: string, token: string) {
   const { entries } = await reelm<{ entries: Entry[] }>(`/v1/profiles/${pid}/history?since=0`, { token });
-  const h = getHistory(pid);
+  const h = ls.get<Record<string, Entry>>(hKey(pid), {});
   for (const e of entries) if (!h[e.key] || h[e.key].updatedAt < e.updatedAt) h[e.key] = e;
   ls.set(hKey(pid), h);
 }

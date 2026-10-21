@@ -1,29 +1,33 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Grid } from "@/components/app";
-import { getFavs, getHistory, watchHref, type CardData } from "@/lib/core";
+import { Grid, Notice, pill } from "@/components/app";
+import { entryHref, entrySub, getFavs, getHistory, type CardData } from "@/lib/core";
 import { useSession } from "@/lib/session";
+import { cn } from "@/lib/utils";
 
 export default function Library() {
   const { s } = useSession();
+  const [tab, setTab] = useState<"fav" | "hist">("fav");
   const [favs, setFavs] = useState<CardData[]>([]), [hist, setHist] = useState<CardData[]>([]);
   useEffect(() => {
     setFavs(getFavs());
-    setHist(Object.values(getHistory(s.profile?.id ?? "guest")).filter((e) => !e.deleted).sort((a, b) => b.updatedAt - a.updatedAt).map((e) => ({
-      href: watchHref(e.payload, e.position), title: e.payload.title, poster: e.payload.poster,
-      sub: e.payload.kind === "anime" ? `Episode ${e.payload.ep}` : e.payload.season ? `S${e.payload.season} E${e.payload.episode}` : "Movie",
+    setHist(Object.values(getHistory(s.profile?.id ?? "guest")).filter((e) => !e.deleted && e.payload.kind !== "live").sort((a, b) => b.updatedAt - a.updatedAt).map((e) => ({
+      href: entryHref(e), title: e.payload.title || "Untitled", poster: e.payload.poster, sub: entrySub(e.payload), progress: e.duration ? e.position / e.duration : 0,
     })));
   }, [s.profile]);
+  const list = tab === "fav" ? favs : hist;
   return (
-    <main className="space-y-5 px-4 pb-16 md:px-10">
-      <h1 className="font-display text-3xl font-bold">Library</h1>
-      <Tabs defaultValue="fav">
-        <TabsList><TabsTrigger value="fav">Favorites</TabsTrigger><TabsTrigger value="hist">History</TabsTrigger></TabsList>
-        <TabsContent value="fav" className="pt-4">{favs.length ? <Grid items={favs} /> : <p className="text-muted-foreground">Nothing saved yet.</p>}</TabsContent>
-        <TabsContent value="hist" className="pt-4">{hist.length ? <Grid items={hist} /> : <p className="text-muted-foreground">Your watch history will show up here.</p>}
-          {s.token && <p className="mt-4 text-xs text-muted-foreground">History syncs with your account across devices.</p>}</TabsContent>
-      </Tabs>
+    <main className="mx-auto max-w-[1400px] space-y-6 px-4 pt-4 pb-16 md:px-10">
+      <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">Library</h1>
+      <div role="tablist" aria-label="Library" className="inline-flex rounded-full bg-white/8 p-1">
+        {([["fav", "Saved"], ["hist", "History"]] as const).map(([v, label]) => (
+          <button key={v} role="tab" aria-selected={tab === v} onClick={() => setTab(v)} className={cn("beam rounded-full px-5 py-2 text-sm font-medium transition-colors", tab === v ? "bg-primary text-primary-foreground" : "text-foreground/72 hover:text-foreground")}>{label}</button>
+        ))}
+      </div>
+      {list.length ? <Grid items={list} /> : tab === "fav"
+        ? <Notice title="Nothing saved yet" body="Use Add to library on any title to keep it here."><Link href="/" className={pill.secondary}>Browse home</Link></Notice>
+        : <Notice title="No history yet" body={s.token ? "What you watch on any of your devices shows up here." : "What you watch in this browser shows up here."} />}
     </main>
   );
 }

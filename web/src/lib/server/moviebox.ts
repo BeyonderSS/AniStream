@@ -44,6 +44,14 @@ export const clientToken = (ts: number) => `${ts},${md5([...String(ts)].reverse(
 
 class AuthError extends Error {}
 
+/** MovieBox answers HTTP 440 to Cloudflare Workers (CF-Worker header), so when MOVIEBOX_RELAY is set the signed request
+ *  goes through the relay in /relay, which replays it byte for byte from a plain Node host. */
+function send(method: string, host: string, path: string, headers: Record<string, string>, body?: BodyInit) {
+  const relay = process.env.MOVIEBOX_RELAY;
+  if (!relay) return fetch(`https://${host}${path}`, { method, headers, body });
+  return fetch(`${relay}?host=${host}&path=${encodeURIComponent(path)}`, { method, headers: { ...headers, "x-relay-key": process.env.RELAY_KEY ?? "" }, body });
+}
+
 async function request(method: string, path: string, body: string | null, tok?: string): Promise<any> {
   let last: Error | undefined;
   for (let a = 0; a < HOSTS.length; a++) {
@@ -56,7 +64,7 @@ async function request(method: string, path: string, body: string | null, tok?: 
     };
     if (tok) h.Authorization = `Bearer ${tok}`;
     try {
-      const r = await fetch(url, { method, headers: h, body: method === "POST" ? new TextEncoder().encode(body ?? "{}") : undefined });
+      const r = await send(method, HOSTS[idx], path, h, method === "POST" ? new TextEncoder().encode(body ?? "{}") : undefined);
       const xu = r.headers.get("x-user");
       if (xu) try { const t = JSON.parse(xu).token; if (t) token = t; } catch {}
       if (r.status === 401) throw new AuthError();

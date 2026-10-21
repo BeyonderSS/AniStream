@@ -1,0 +1,6 @@
+{
+  "name": "reelm-relay",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "devDependencies": { "@types/node": "^20" }
+}
