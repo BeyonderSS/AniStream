@@ -1,6 +1,7 @@
 import * as mb from "@/lib/server/moviebox";
 import * as misc from "@/lib/server/misc";
 import * as dr from "@/lib/server/dramachi";
+import { bridge, helperOld, helperVersion } from "@/lib/bridge";
 
 // MovieBox refuses datacenter IPs (Cloudflare, Vercel: HTTP 440) but allows CORS, so the browser runs these
 // from the viewer's own connection (see get() in core.ts). The API route keeps them for local dev.
@@ -37,9 +38,14 @@ export const movieRoutes: Record<string, (q: URLSearchParams) => Promise<unknown
       if (!q.get("title")) return []; // an "mb:" id arrives without a title
       return typeof window === "undefined" ? movieRoutes["movies/dramachi"](q) : (await fetch(`/api/movies/dramachi?${q}`)).json();
     };
-    const r = await Promise.allSettled([mbPart(), drPart()]);
+    // 4KHDHub blocks datacenter IPs and has no CORS: only the Reelm Helper (1.1+) can reach it, from the viewer's browser.
+    const fkPart = async () => {
+      if (typeof document === "undefined" || !q.get("title") || helperOld() || !helperVersion()) return [];
+      return (await import("./fourkhdhub")).streams(bridge, q.get("title")!, num(q.get("year")), q.get("type") === "series" ? "series" : "movie", num(q.get("s")), num(q.get("e")));
+    };
+    const r = await Promise.allSettled([mbPart(), drPart(), fkPart()]);
     const list = r.flatMap((x) => (x.status === "fulfilled" ? (x.value as any[]) : []));
     if (!list.length) throw new Error((r.find((x) => x.status === "rejected") as PromiseRejectedResult | undefined)?.reason?.message ?? "No streams found");
-    return list; // Android order: MovieBox first, then the title sources, each best-first
+    return list; // Android order: MovieBox first, then the title sources (Dramachi, 4KHDHub), each best-first
   },
 };

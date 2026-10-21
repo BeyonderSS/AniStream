@@ -10,6 +10,7 @@ import { ArrowLeft, Check, Copy, MonitorPlay, RotateCcw, SkipForward, Users, X, 
 import { Avatar, pill } from "@/components/app";
 import { ReelMark } from "@/components/reel";
 import { deviceId, get, getHistory, epKey, playKey, proxied, reelm, saveProgress, toPlay, WS, type Play as P } from "@/lib/core";
+import { helperOld } from "@/lib/bridge";
 import { useApi, useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 type Source = { src: string; hls: boolean; label: string; codec?: string };
@@ -248,6 +249,7 @@ function Player() {
                   {sources.length > 0 && <>
                     <p className="px-3 pt-2 pb-1 text-xs font-semibold text-foreground/52">{sources.length > 1 ? "Quality" : "Quality (only one available)"}</p>
                     {sources.map((x, i) => <button key={i} onClick={() => setSi(i)} className={row(si === i)}><Check className={cn("size-4", si !== i && "invisible")} />{x.label}</button>)}
+                    {helperOld() && <a href={HELPER_URL()} target="_blank" rel="noreferrer" className="block px-3 pt-2 pb-1 text-xs text-foreground/52 underline">Update Reelm Helper for more sources</a>}
                   </>}
                   {p?.kind === "anime" && <>
                     <p className="px-3 pt-3 pb-1 text-xs font-semibold text-foreground/52">Audio</p>

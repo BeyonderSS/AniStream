@@ -1,12 +1,62 @@
 {
   "manifest_version": 3,
   "name": "Reelm Helper",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Lets the Reelm website play movies by sending the video host the user agent it expects.",
-  "icons": { "128": "icon.png" },
-  "permissions": ["declarativeNetRequest"],
-  "host_permissions": ["*://*.hakunaymatata.com/*", "https://reelm-web.ssbeyonder.workers.dev/*", "http://localhost/*"],
-  "declarative_net_request": { "rule_resources": [{ "id": "ua", "enabled": true, "path": "rules.json" }] },
-  "content_scripts": [{ "matches": ["https://reelm-web.ssbeyonder.workers.dev/*", "http://localhost/*"], "js": ["content.js"], "run_at": "document_start" }],
-  "browser_specific_settings": { "gecko": { "id": "helper@reelm.app", "strict_min_version": "128.0" } }
+  "icons": {
+    "128": "icon.png"
+  },
+  "permissions": [
+    "declarativeNetRequest"
+  ],
+  "host_permissions": [
+    "*://*.hakunaymatata.com/*",
+    "https://reelm-web.ssbeyonder.workers.dev/*",
+    "http://localhost/*",
+    "https://4khdhub.one/*",
+    "https://*.greenmotors.club/*",
+    "https://*.greenmotors.cc/*",
+    "https://*.hubdrive.bar/*",
+    "https://*.hubcloud.ist/*",
+    "https://*.hubcloud.cx/*",
+    "https://*.hubcloud.fans/*",
+    "https://gamerxyt.com/*",
+    "https://pixeldrain.dev/*",
+    "https://pixeldrain.com/*",
+    "https://*.googleusercontent.com/*",
+    "https://*.workers.dev/*"
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ua",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://reelm-web.ssbeyonder.workers.dev/*",
+        "http://localhost/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "helper@reelm.app",
+      "strict_min_version": "128.0"
+    }
+  },
+  "background": {
+    "service_worker": "bg.js",
+    "scripts": [
+      "bg.js"
+    ]
+  }
 }
