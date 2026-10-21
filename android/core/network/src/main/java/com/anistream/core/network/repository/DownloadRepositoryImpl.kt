@@ -97,7 +97,8 @@ class DownloadRepositoryImpl @Inject constructor(
         stream: StreamSource,
         animeSlug: String,
         title: String,
-        episodeNumber: Int
+        episodeNumber: Int,
+        posterUrl: String?
     ): Result<Unit> {
         return try {
             val id = downloadId(animeSlug, episodeNumber)
@@ -110,7 +111,8 @@ class DownloadRepositoryImpl @Inject constructor(
                     episodeNumber = episodeNumber,
                     quality = stream.qualityLabel,
                     filePath = video.path,
-                    state = DownloadState.PENDING.name
+                    state = DownloadState.PENDING.name,
+                    posterUrl = posterUrl
                 )
             )
             enqueue(
@@ -122,7 +124,7 @@ class DownloadRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun startMediaDownload(stream: MediaStream, key: String, title: String, subtitle: String?): Result<Unit> {
+    override suspend fun startMediaDownload(stream: MediaStream, key: String, title: String, subtitle: String?, posterUrl: String?): Result<Unit> {
         return try {
             if (!stream.isDirectFile) return Result.error(IOException("Only direct files can be downloaded"))
             val id = downloadId(key, 0)
@@ -137,7 +139,8 @@ class DownloadRepositoryImpl @Inject constructor(
                     quality = stream.qualityLabel,
                     filePath = video.path,
                     state = DownloadState.PENDING.name,
-                    subtitle = subtitle
+                    subtitle = subtitle,
+                    posterUrl = posterUrl
                 )
             )
             val track = stream.subtitles.firstOrNull()
@@ -344,6 +347,7 @@ class DownloadRepositoryImpl @Inject constructor(
         progress = progress,
         state = runCatching { DownloadState.valueOf(state) }.getOrDefault(DownloadState.PENDING),
         createdAt = createdAt,
-        subtitle = subtitle
+        subtitle = subtitle,
+        posterUrl = posterUrl
     )
 }

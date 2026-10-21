@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import com.anistream.core.ui.components.EmptyState
 import com.anistream.core.ui.components.LoadingShimmer
 import com.anistream.core.ui.theme.Accent
@@ -136,6 +137,15 @@ fun DownloadsScreen(
                                     Modifier.padding(top = Space.md, bottom = Space.xs).animateItem(),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    eps.firstNotNullOfOrNull { it.posterUrl }?.let { poster ->
+                                        AsyncImage(
+                                            model = poster,
+                                            contentDescription = null,
+                                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                            modifier = Modifier.padding(end = Space.md).size(width = 40.dp, height = 60.dp)
+                                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                                        )
+                                    }
                                     Text(
                                         title,
                                         style = AppType.bodyStrong,
@@ -143,7 +153,7 @@ fun DownloadsScreen(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f, fill = false)
                                     )
-                                    Text("  ${eps.size} ep", style = AppType.numeric)
+                                    if (eps.any { it.episodeNumber > 0 || it.subtitle != null }) Text("  ${eps.size} ep", style = AppType.numeric)
                                 }
                             }
                             items(eps, key = { it.episodeId }) { d ->
@@ -241,7 +251,7 @@ private fun DownloadRow(
         Column(Modifier.weight(1f).padding(horizontal = Space.md)) {
             // media downloads (movies & TV) have no anime episode number
             Text(
-                if (download.episodeNumber > 0) "Episode ${download.episodeNumber}" else download.subtitle ?: "Movie",
+                if (download.episodeNumber > 0) "Episode ${download.episodeNumber}" else download.subtitle ?: download.animeTitle,
                 style = AppType.bodyStrong
             )
             val size = download.fileSizeBytes

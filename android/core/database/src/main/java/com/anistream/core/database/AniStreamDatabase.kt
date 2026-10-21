@@ -31,7 +31,7 @@ import com.anistream.core.database.entity.WatchHistoryEntity
         PlaylistEntity::class,
         RecommendationEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AniStreamDatabase : RoomDatabase() {
@@ -63,6 +63,13 @@ abstract class AniStreamDatabase : RoomDatabase() {
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `recommendations` (`kind` TEXT NOT NULL, `id` TEXT NOT NULL, `title` TEXT NOT NULL, `posterUrl` TEXT, `year` INTEGER, `rating` REAL, `mediaType` TEXT, `because` TEXT, `position` INTEGER NOT NULL, PRIMARY KEY(`kind`, `id`))")
+            }
+        }
+
+        /** v5: downloads keep the poster so the list shows art. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE downloads ADD COLUMN posterUrl TEXT")
             }
         }
 

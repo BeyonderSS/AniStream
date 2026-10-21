@@ -15,5 +15,6 @@ data class DownloadEntity(
     val state: String = "PENDING",
     val createdAt: Long = System.currentTimeMillis(),
     /** movies & TV: "S1 · E2" (null for anime and movies) */
-    val subtitle: String? = null
+    val subtitle: String? = null,
+    val posterUrl: String? = null
 )
