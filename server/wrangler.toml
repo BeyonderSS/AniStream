@@ -4,7 +4,7 @@ compatibility_date = "2025-09-01"
 
 # Create the database with `npx wrangler d1 create reelm`, then paste its id below.
 [[d1_databases]]
-binding = "reelm"
+binding = "DB"
 database_name = "reelm"
 database_id = "fb0c3004-3e73-4c88-b3cf-db83b951e0e0"
 migrations_dir = "migrations"
