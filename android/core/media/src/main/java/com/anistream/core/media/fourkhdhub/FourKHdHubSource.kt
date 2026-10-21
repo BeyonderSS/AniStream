@@ -92,8 +92,8 @@ class FourKHdHubSource @Inject constructor(private val http: MediaHttp) : Stream
     }
 
     private companion object {
-        const val BASE = "https://4khdhub.one"
-        val HEADERS = mapOf("Referer" to BASE, "User-Agent" to MediaHttp.USER_AGENT)
+        val BASE: String get() = com.anistream.core.common.ScraperConfig.fourKHdHubBase
+        val HEADERS: Map<String, String> get() = mapOf("Referer" to BASE, "User-Agent" to MediaHttp.USER_AGENT)
         const val PER_QUALITY = 2
         const val MAX_RELEASES = 4
         const val MAX_PROBES = 6
@@ -114,7 +114,7 @@ internal object FourKHdHubParser {
     private val SXE = Regex("""(?i)S(\d{1,2})E(\d{1,3})""")
     private val ANCHOR = Regex("""<a\s([^>]*)>(.*?)</a>""", RegexOption.DOT_MATCHES_ALL)
     private val PIXELDRAIN = Regex("""https://(pixeldrain\.(?:dev|com))/(?:u|api/file)/([A-Za-z0-9_-]+)""")
-    private val MIRROR_HOSTS = listOf("hubcloud.", "hubdrive.", "greenmotors.", "greenmountmotors.", "pixeldrain.")
+    private val MIRROR_HOSTS: List<String> get() = com.anistream.core.common.ScraperConfig.fourKHdHubMirrors
 
     fun search(html: String): List<MediaItem> = CARD.findAll(html).mapNotNull { m ->
         val href = m.groupValues[1]

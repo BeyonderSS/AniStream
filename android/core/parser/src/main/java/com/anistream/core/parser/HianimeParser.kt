@@ -23,7 +23,7 @@ data class EmbedConfig(val masterUrl: String, val subtitleUrl: String?)
 /** Pure hianime.at / zokoanime parsing, no Android or network so it unit-tests on the JVM. */
 object HianimeParser {
 
-    private const val EMBED_KEY = "otaku-embed-v1"
+    private val EMBED_KEY get() = com.anistream.core.common.ScraperConfig.embedKey
     private val BLOB = Regex("""window\.__P\s*=\s*"([^"]+)"""")
     private val DIGITS = Regex("""\d+""")
     private val YEAR = Regex("""\b(19|20)\d{2}\b""")
@@ -143,7 +143,7 @@ object HianimeParser {
         }
         return Jsoup.parse(jsonHtml(json))
             .select(".server-item[data-type=$type]")
-            .sortedByDescending { it.attr("data-server-name").equals("ZokoAnime", true) }
+            .sortedByDescending { it.attr("data-server-name").equals(com.anistream.core.common.ScraperConfig.hianimeServer, true) }
             .mapNotNull { runCatching { String(Base64.getDecoder().decode(it.attr("data-hash").trim()), Charsets.UTF_8) }.getOrNull() }
             .filter { it.contains("zokoanime", ignoreCase = true) }
             .distinct()

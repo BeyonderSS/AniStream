@@ -21,6 +21,7 @@ class AniStreamApp : Application(), Configuration.Provider, ImageLoaderFactory {
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var updates: com.anistream.feature.party.UpdateManager
     @Inject lateinit var accountRuntime: com.anistream.core.account.AccountRuntime
+    @Inject lateinit var scraperConfig: com.anistream.core.network.ScraperConfigUpdater
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
@@ -28,6 +29,7 @@ class AniStreamApp : Application(), Configuration.Provider, ImageLoaderFactory {
     override fun onCreate() {
         LowEnd.eligible = BuildConfig.FLAVOR == "tv"
         super.onCreate()
+        scraperConfig.start() // signed scraper constants, applied before the first request is made
         createNotificationChannels(this)
         schedulePeriodicWork(this)
         com.anistream.app.work.notifyUpdates(this, updates, kotlinx.coroutines.MainScope())

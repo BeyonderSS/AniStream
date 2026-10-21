@@ -12,10 +12,8 @@ import javax.crypto.spec.SecretKeySpec
  * Pure JVM so it is unit-testable.
  */
 object MovieBoxSigner {
-    private val KEY = intArrayOf(
-        0xef, 0xa8, 0x91, 0x97, 0x4e, 0xec, 0xd3, 0x14, 0x8d, 0xf6, 0x3a, 0xa6, 0x11, 0x60, 0x2d,
-        0xef, 0xd1, 0x01, 0x25, 0x9b, 0xa5, 0x21, 0x02, 0x2c, 0x57, 0xae, 0x05, 0x66, 0xbd, 0x8e
-    ).map { it.toByte() }.toByteArray()
+    // the shipped key lives in ScraperConfig, which scrapers.json can rotate without an app release
+    private val KEY: ByteArray get() = com.anistream.core.common.ScraperConfig.movieBoxSecret
 
     private const val BODY_HASH_LIMIT = 102_400
     const val JSON = "application/json"

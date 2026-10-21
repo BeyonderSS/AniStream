@@ -19,7 +19,7 @@ class AnidbHttpClient @Inject constructor(
 ) {
     companion object {
         const val CHROME_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
-        const val BASE_URL = "https://hianime.at"
+        val BASE_URL: String get() = com.anistream.core.common.ScraperConfig.hianimeBase
     }
 
     private val client: OkHttpClient by lazy {
@@ -75,7 +75,9 @@ class AnidbHttpClient @Inject constructor(
         return withContext(Dispatchers.IO) { client.newCall(builder.build()).execute() }
     }
 
-    private fun isHianime(url: String): Boolean = url.toHttpUrlOrNull()?.host?.endsWith("hianime.at") == true
+    private fun isHianime(url: String): Boolean = url.toHttpUrlOrNull()?.host?.endsWith(baseHost()) == true
+
+    private fun baseHost(): String = BASE_URL.toHttpUrlOrNull()?.host ?: "hianime.at"
 
     private fun isCloudflareBlocked(response: Response): Boolean {
         if (response.code == 403) return true
@@ -93,7 +95,7 @@ class AnidbHttpClient @Inject constructor(
             var request = chain.request()
             val cookies = cookieJarHolder.getCookies()
             // don't leak hianime cookies to the embed / stream hosts
-            if (cookies != null && request.url.host.endsWith("hianime.at")) {
+            if (cookies != null && request.url.host.endsWith(baseHost())) {
                 request = request.newBuilder()
                     .header("Cookie", cookies)
                     .build()

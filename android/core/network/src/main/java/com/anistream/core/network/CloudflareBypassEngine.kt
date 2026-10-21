@@ -58,7 +58,7 @@ class CloudflareBypassEngine @Inject constructor(
                     override fun onPageFinished(view: WebView?, loadUrl: String?) {
                         val cookieManager = CookieManager.getInstance()
                         val cookies = cookieManager.getCookie(url)
-                            ?: cookieManager.getCookie("https://hianime.at")
+                            ?: cookieManager.getCookie(com.anistream.core.common.ScraperConfig.hianimeBase)
 
                         if (cookies != null && cookies.contains("cf_clearance")) {
                             cachedCookies = cookies

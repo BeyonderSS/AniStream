@@ -43,18 +43,19 @@ jobs:
         working-directory: Reelm
         run: node scraper-sync/sync.mjs --ani ../ani-cli --mb ../MovieBox-Tui --report "$RUNNER_TEMP/report.md" ${{ inputs.accept && '--accept' || '' }}
 
+      # clients only apply a file whose signature verifies, so without the secret they keep their built-in values
       - name: Sign
-        if: steps.sync.outputs.changed == 'true' && env.SCRAPER_SIGNING_KEY != ''
+        if: env.SCRAPER_SIGNING_KEY != ''
         working-directory: Reelm
         run: node scraper-sync/sign.mjs sign scrapers/scrapers.json
 
       - name: Publish
-        if: steps.sync.outputs.changed == 'true'
         working-directory: Reelm
         run: |
+          git add scrapers
+          if git diff --cached --quiet; then echo "nothing to publish"; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add scrapers
           git commit -m "chore(scrapers): sync upstream constants"
           git push
 

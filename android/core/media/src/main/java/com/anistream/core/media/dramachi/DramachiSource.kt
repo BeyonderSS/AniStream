@@ -52,7 +52,7 @@ class DramachiSource @Inject constructor(private val http: MediaHttp) : StreamSo
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
 
     private companion object {
-        const val BASE = "https://api.nodeobjects.com/"
+        val BASE: String get() = com.anistream.core.common.ScraperConfig.dramachiBase
     }
 }
 
@@ -71,7 +71,7 @@ internal object DramachiParser {
             type = if (o.str("content")?.lowercase() in setOf("movie", "movies")) MediaType.MOVIE else MediaType.SERIES,
             title = raw.replace(TRAILING_YEAR, ""),
             year = year,
-            posterUrl = o.str("thumb")?.let { "https://static.nodeobjects.com/thumbnail/$it" }
+            posterUrl = o.str("thumb")?.let { "${com.anistream.core.common.ScraperConfig.dramachiImageCdn}$it" }
         )
     }
 

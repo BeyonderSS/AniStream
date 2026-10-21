@@ -1,14 +1,16 @@
 // 4KHDHub (4khdhub.one) via the Reelm Helper bridge. Port of android .../fourkhdhub/FourKHdHubSource.kt (release links go
 // GreenMotors -> HubDrive -> HubCloud -> resolver page -> file CDN). `f` is the bridge (injectable so node can test it).
 export type F = (url: string, o?: { headers?: Record<string, string>; probe?: boolean }) => Promise<{ status: number; url: string; headers: Record<string, string>; text: string }>;
-const BASE = "https://4khdhub.one";
+import { scraperConfig } from "@/lib/scraperConfig";
+
+// Defaults match what shipped; scrapers/scrapers.json (verified at runtime) can override them without a deploy.
+const D = { base: "https://4khdhub.one", mirrors: ["hubcloud.", "hubdrive.", "greenmotors.", "greenmountmotors.", "pixeldrain."] };
 const unesc = (s: string) => s.replace(/&#(\d+);/g, (_, d) => String.fromCharCode(+d)).replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
 const b64 = (s: string) => new TextDecoder().decode(Uint8Array.from(atob(s.trim()), (c) => c.charCodeAt(0)));
 const rot13 = (s: string) => s.replace(/[a-z]/gi, (c) => String.fromCharCode(((c.charCodeAt(0) & 95) < 78 ? c.charCodeAt(0) + 13 : c.charCodeAt(0) - 13)));
 const BR = /\[[^\]]*\]|\([^)]*\)/g;
 const norm = (t: string) => t.toLowerCase().replace(BR, " ").replace(/[^\p{L}\p{N}]+/gu, " ").trim().replace(/\s+(s\d{1,2}|season \d{1,2})$/, "").trim();
 const height = (t: string) => +(t.match(/\b(2160|1440|1080|720|576|480|360|240)p\b/i)?.[1] ?? (/\b(4k|uhd)\b/i.test(t) ? 2160 : 0));
-const MIRRORS = ["hubcloud.", "hubdrive.", "greenmotors.", "greenmountmotors.", "pixeldrain."];
 const PIXEL = /https:\/\/(pixeldrain\.(?:dev|com))\/(?:u|api\/file)\/([A-Za-z0-9_-]+)/;
 const pixelApi = (u: string) => { const m = u.match(PIXEL); return m && `https://${m[1]}/api/file/${m[2]}?download`; };
 
@@ -35,7 +37,7 @@ export function parseSearch(html: string) {
   });
 }
 
-export function parseReleases(html: string, season: number, episode: number) {
+export function parseReleases(html: string, season: number, episode: number, mirrors: string[] = D.mirrors) {
   const items = season > 0 ? html.split('id="episodes"').slice(1).join("").split('class="episode-download-item"').slice(1) : html.split('class="download-item ').slice(1);
   const seen = new Set<string>();
   return items.flatMap((c) => {
@@ -45,7 +47,7 @@ export function parseReleases(html: string, season: number, episode: number) {
     if (l.endsWith(".zip") || l.includes("complete season") || l.includes("season pack")) return [];
     const se = t.match(/S(\d{1,2})E(\d{1,3})/i);
     if (season > 0 && !(se && +se[1] === season && +se[2] === episode)) return [];
-    const links = [...new Set([...c.matchAll(/href="(https:\/\/[^"]+)"/g)].map((m) => unesc(m[1])).filter((u) => !u.includes("logout") && MIRRORS.some((x) => u.includes(x))))];
+    const links = [...new Set([...c.matchAll(/href="(https:\/\/[^"]+)"/g)].map((m) => unesc(m[1])).filter((u) => !u.includes("logout") && mirrors.some((x) => u.includes(x))))];
     const k = t.toLowerCase().replace(/[^a-z0-9]/g, "");
     if (!links.length || seen.has(k)) return [];
     seen.add(k);
@@ -85,12 +87,13 @@ export function candidates(html: string): [string, string][] {
 
 export async function streams(f: F, title: string, year: number, type: "movie" | "series", season: number, episode: number) {
   const get = async (u: string) => (await f(u)).text;
+  const cfg = await scraperConfig("fourkhdhub", D), BASE = cfg.base.replace(/\/$/, "");
   const q = title.replace(BR, " ").replace(/\s+(s\d{1,2}|season \d{1,2})\s*$/i, "").replace(/\s+/g, " ").trim();
   // ponytail: series match ignores the year (a per-season subject carries that season's year)
   const m = parseSearch(await get(`${BASE}/?s=${encodeURIComponent(q)}`)).filter((h) => h.series === (type === "series") && norm(h.title) === norm(title) && (type === "series" || !year || !h.year || Math.abs(h.year - year) <= 1))
     .sort((a, b) => +/\[[^\]]*\]/.test(a.title) - +/\[[^\]]*\]/.test(b.title))[0];
   if (!m) return [];
-  const rel = parseReleases(await get(BASE + m.id), season, episode), per: Record<number, number> = {};
+  const rel = parseReleases(await get(BASE + m.id), season, episode, cfg.mirrors), per: Record<number, number> = {};
   const picked = rel.filter((r) => (per[r.height] = (per[r.height] ?? 0) + 1) <= 2).slice(0, 4);
   const mirror = async (u: string, d = 0): Promise<[string, string][]> => {
     if (d > 3) return [];

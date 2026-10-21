@@ -23,4 +23,6 @@ android {
 
 dependencies {
     implementation(libs.coroutines.core)
+
+    testImplementation(libs.junit)
 }

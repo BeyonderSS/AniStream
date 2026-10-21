@@ -1,25 +1,41 @@
 import * as md5ns from "js-md5";
 const md5: any = (md5ns as any).default ?? md5ns;
 
-// Port of MovieBoxSigner/MovieBoxClient (oneroom mobile API).
-const KEY = Uint8Array.from([0xef,0xa8,0x91,0x97,0x4e,0xec,0xd3,0x14,0x8d,0xf6,0x3a,0xa6,0x11,0x60,0x2d,0xef,0xd1,0x01,0x25,0x9b,0xa5,0x21,0x02,0x2c,0x57,0xae,0x05,0x66,0xbd,0x8e]);
-const HOSTS = ["api6.aoneroom.com", "api5.aoneroom.com", "api4.aoneroom.com", "api4sg.aoneroom.com", "api3.aoneroom.com", "api6sg.aoneroom.com", "api.inmoviebox.com"];
+import { scraperConfig } from "@/lib/scraperConfig";
+
+// Port of MovieBoxSigner/MovieBoxClient (oneroom mobile API). Defaults match what shipped; scrapers/scrapers.json
+// (verified at runtime) can rotate the signing key, hosts and client identity without a deploy.
+const D = {
+  secret: [0xef,0xa8,0x91,0x97,0x4e,0xec,0xd3,0x14,0x8d,0xf6,0x3a,0xa6,0x11,0x60,0x2d,0xef,0xd1,0x01,0x25,0x9b,0xa5,0x21,0x02,0x2c,0x57,0xae,0x05,0x66,0xbd,0x8e],
+  hosts: ["https://api6.aoneroom.com", "https://api5.aoneroom.com", "https://api4.aoneroom.com", "https://api4sg.aoneroom.com", "https://api3.aoneroom.com", "https://api6sg.aoneroom.com", "https://api.inmoviebox.com"],
+  retryStatus: [403, 406, 407, 429, 500, 502, 503, 504],
+  versionCodes: [50020117, 50020118, 50020119, 50020120, 50020121],
+  androidVersions: [["10", "QP1A.191005.007.A3"], ["11", "RP1A.200720.011"], ["12", "S1B.220414.015"], ["13", "TQ2A.230405.003"]],
+  devices: [["23078RKD5C", "Redmi"], ["2201117TY", "Redmi"], ["2201117TG", "Redmi"], ["22101316G", "Redmi"], ["M2012K11AG", "Redmi"]],
+  packageName: "com.community.oneroom", versionName: "4.0.01.0813.03", spCode: "40401", cronet: "135.0.7012.3",
+};
+type C = typeof D;
 const JSON_T = "application/json";
-const RETRY = new Set([403, 406, 407, 429, 500, 502, 503, 504]);
 const hex = (n: number) => [...Array(n)].map(() => Math.floor(Math.random() * 16).toString(16)).join("");
 const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)];
 
-// ponytail: identity + token live per isolate; a cold isolate just logs in again.
-const vc = pick([50020117, 50020118, 50020119, 50020120, 50020121]);
-const [os, build] = pick([["10", "QP1A.191005.007.A3"], ["11", "RP1A.200720.011"], ["12", "S1B.220414.015"], ["13", "TQ2A.230405.003"]]);
-const model = pick(["23078RKD5C", "2201117TY", "2201117TG", "22101316G", "M2012K11AG"]);
-const UA = `com.community.oneroom/${vc} (Linux; U; Android ${os}; en_US; ${model}; Build/${build}; Cronet/135.0.7012.3)`;
-const CLIENT_INFO = JSON.stringify({
-  package_name: "com.community.oneroom", version_name: "4.0.01.0813.03", version_code: vc, os: "android", os_version: os, install_ch: "ps",
-  device_id: hex(32), install_store: "ps", gaid: crypto.randomUUID(), brand: "Redmi", model, system_language: "en", net: "NETWORK_WIFI",
-  region: "US", timezone: "Asia/Kolkata", sp_code: "40401", "X-Play-Mode": "2",
-});
+// ponytail: identity + token live per isolate; a cold isolate just logs in again. The identity is rebuilt when the config changes.
 const IP = `${pick(["103.241", "49.36", "117.195", "106.198", "122.162", "157.32"])}.${1 + Math.floor(Math.random() * 253)}.${1 + Math.floor(Math.random() * 253)}`;
+const DEVICE_ID = hex(32), GAID = crypto.randomUUID();
+let ident: { key: string; ua: string; info: string } | undefined;
+const identity = (c: C) => {
+  const key = JSON.stringify(c);
+  if (ident?.key === key) return ident;
+  const vc = pick(c.versionCodes), [os, build] = pick(c.androidVersions), [model, brand] = pick(c.devices);
+  return (ident = {
+    key,
+    ua: `${c.packageName}/${vc} (Linux; U; Android ${os}; en_US; ${model}; Build/${build}; Cronet/${c.cronet})`,
+    info: JSON.stringify({
+      package_name: c.packageName, version_name: c.versionName, version_code: vc, os: "android", os_version: os, install_ch: "ps", device_id: DEVICE_ID,
+      install_store: "ps", gaid: GAID, brand, model, system_language: "en", net: "NETWORK_WIFI", region: "US", timezone: "Asia/Kolkata", sp_code: c.spCode, "X-Play-Mode": "2",
+    }),
+  });
+};
 let token: string | undefined;
 let hostIdx = 0;
 
@@ -33,11 +49,11 @@ function canonicalUrl(url: string) {
   return pairs.length ? `${u.pathname}?${pairs.map(([k, v]) => `${k}=${v}`).join("&")}` : u.pathname;
 }
 
-export function sign(method: string, url: string, body: string | null, ts: number) {
+export function sign(method: string, url: string, body: string | null, ts: number, secret: number[] = D.secret) {
   const bytes = body == null ? null : new TextEncoder().encode(body);
   const hash = bytes ? md5(bytes.length > 102400 ? bytes.slice(0, 102400) : bytes) : "";
   const canon = [method.toUpperCase(), JSON_T, JSON_T, bytes ? String(bytes.length) : "", String(ts), hash, canonicalUrl(url)].join("\n");
-  const mac = new Uint8Array(md5.hmac.arrayBuffer(KEY, canon));
+  const mac = new Uint8Array(md5.hmac.arrayBuffer(Uint8Array.from(secret), canon));
   return `${ts}|2|${btoa(String.fromCharCode(...mac))}`;
 }
 export const clientToken = (ts: number) => `${ts},${md5([...String(ts)].reverse().join(""))}`;
@@ -50,22 +66,24 @@ function send(method: string, host: string, path: string, headers: Record<string
 }
 
 async function request(method: string, path: string, body: string | null, tok?: string): Promise<any> {
+  const c = await scraperConfig("moviebox", D), id = identity(c);
+  const hosts = c.hosts.map((x) => x.replace(/^https:\/\//, "")), retry = new Set(c.retryStatus);
   let last: Error | undefined;
-  for (let a = 0; a < HOSTS.length; a++) {
-    const idx = (hostIdx + a) % HOSTS.length;
-    const url = `https://${HOSTS[idx]}${path}`;
+  for (let a = 0; a < hosts.length; a++) {
+    const idx = (hostIdx + a) % hosts.length;
+    const url = `https://${hosts[idx]}${path}`;
     const ts = Date.now();
     const h: Record<string, string> = {
-      "User-Agent": UA, Accept: JSON_T, "Content-Type": JSON_T, "x-client-token": clientToken(ts),
-      "x-tr-signature": sign(method, url, body, ts), "x-client-info": CLIENT_INFO, "x-client-status": "0", "x-forwarded-for": IP,
+      "User-Agent": id.ua, Accept: JSON_T, "Content-Type": JSON_T, "x-client-token": clientToken(ts),
+      "x-tr-signature": sign(method, url, body, ts, c.secret), "x-client-info": id.info, "x-client-status": "0", "x-forwarded-for": IP,
     };
     if (tok) h.Authorization = `Bearer ${tok}`;
     try {
-      const r = await send(method, HOSTS[idx], path, h, method === "POST" ? new TextEncoder().encode(body ?? "{}") : undefined);
+      const r = await send(method, hosts[idx], path, h, method === "POST" ? new TextEncoder().encode(body ?? "{}") : undefined);
       const xu = r.headers.get("x-user");
       if (xu) try { const t = JSON.parse(xu).token; if (t) token = t; } catch {}
       if (r.status === 401) throw new AuthError();
-      if (RETRY.has(r.status)) { last = new Error(`MovieBox host returned HTTP ${r.status}`); continue; }
+      if (retry.has(r.status)) { last = new Error(`MovieBox host returned HTTP ${r.status}`); continue; }
       if (!r.ok) throw new Error(`MovieBox returned HTTP ${r.status} ${(await r.text()).slice(0, 120)}`);
       const root = await r.json() as any;
       const code = Number(root.code ?? 0);

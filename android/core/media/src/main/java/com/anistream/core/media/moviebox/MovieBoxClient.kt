@@ -1,6 +1,7 @@
 package com.anistream.core.media.moviebox
 
 import android.content.Context
+import com.anistream.core.common.ScraperConfig
 import com.anistream.domain.model.AudioVariant
 import com.anistream.domain.model.MediaDetail
 import com.anistream.domain.model.MediaItem
@@ -189,26 +190,26 @@ class MovieBoxClient @Inject constructor(
     private class Profile(val userAgent: String, val clientInfo: String, val ip: String) {
         companion object {
             fun load(prefs: android.content.SharedPreferences): Profile {
-                prefs.getString("ua", null)?.let { ua ->
+                // the identity is persisted per install, but rebuilt when scrapers.json changes its ingredients
+                val fp = ScraperConfig.movieBoxIdentityKey()
+                prefs.getString("ua", null)?.takeIf { prefs.getString("fp", null) == fp }?.let { ua ->
                     return Profile(ua, prefs.getString("ci", "")!!, prefs.getString("ip", "")!!)
                 }
-                val (android, build) = listOf(
-                    "10" to "QP1A.191005.007.A3", "11" to "RP1A.200720.011", "12" to "S1B.220414.015", "13" to "TQ2A.230405.003"
-                ).random()
-                val model = listOf("23078RKD5C", "2201117TY", "2201117TG", "22101316G", "M2012K11AG").random()
-                val versionCode = listOf(50020117, 50020118, 50020119, 50020120, 50020121).random()
-                val ua = "com.community.oneroom/$versionCode (Linux; U; Android $android; en_US; $model; Build/$build; Cronet/135.0.7012.3)"
+                val (android, build) = ScraperConfig.movieBoxAndroid.random()
+                val model = ScraperConfig.movieBoxModels.random()
+                val versionCode = ScraperConfig.movieBoxVersionCodes.random()
+                val ua = "${ScraperConfig.movieBoxPackage}/$versionCode (Linux; U; Android $android; en_US; $model; Build/$build; Cronet/${ScraperConfig.movieBoxCronet})"
                 val ci = buildJsonObject {
-                    put("package_name", "com.community.oneroom"); put("version_name", "4.0.01.0813.03")
+                    put("package_name", ScraperConfig.movieBoxPackage); put("version_name", ScraperConfig.movieBoxVersionName)
                     put("version_code", versionCode); put("os", "android"); put("os_version", android)
                     put("install_ch", "ps"); put("device_id", (1..32).joinToString("") { "%x".format(Random.nextInt(16)) })
                     put("install_store", "ps"); put("gaid", UUID.randomUUID().toString()); put("brand", "Redmi")
                     put("model", model); put("system_language", "en"); put("net", "NETWORK_WIFI"); put("region", "US")
-                    put("timezone", "Asia/Kolkata"); put("sp_code", "40401"); put("X-Play-Mode", "2")
+                    put("timezone", "Asia/Kolkata"); put("sp_code", ScraperConfig.movieBoxSpCode); put("X-Play-Mode", "2")
                 }.toString()
                 val prefix = listOf("103.241", "49.36", "117.195", "106.198", "122.162", "157.32", "182.70", "103.58", "27.60", "59.90").random()
                 val ip = "$prefix.${Random.nextInt(1, 254)}.${Random.nextInt(1, 254)}"
-                prefs.edit().putString("ua", ua).putString("ci", ci).putString("ip", ip).apply()
+                prefs.edit().putString("ua", ua).putString("ci", ci).putString("ip", ip).putString("fp", fp).apply()
                 return Profile(ua, ci, ip)
             }
         }
@@ -217,12 +218,8 @@ class MovieBoxClient @Inject constructor(
     companion object {
         private const val KEY_TOKEN = "token"
         private val JSON = Json { ignoreUnknownKeys = true }
-        private val RETRY_CODES = setOf(403, 406, 407, 429, 500, 502, 503, 504)
-        private val HOSTS = listOf(
-            "https://api6.aoneroom.com", "https://api5.aoneroom.com", "https://api4.aoneroom.com",
-            "https://api4sg.aoneroom.com", "https://api3.aoneroom.com", "https://api6sg.aoneroom.com",
-            "https://api.inmoviebox.com"
-        )
+        private val RETRY_CODES: Set<Int> get() = ScraperConfig.movieBoxRetry
+        private val HOSTS: List<String> get() = ScraperConfig.movieBoxHosts
     }
 }
 

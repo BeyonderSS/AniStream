@@ -20,7 +20,7 @@ class CookieJarHolder @Inject constructor() {
 
     fun getUserAgent(): String? = userAgent
 
-    fun setCookies(cookiesString: String, url: String = "https://hianime.at") {
+    fun setCookies(cookiesString: String, url: String = com.anistream.core.common.ScraperConfig.hianimeBase) {
         val httpUrl = url.toHttpUrlOrNull() ?: return
         val cookies = cookiesString.split("; ").mapNotNull { cookieStr ->
             val parts = cookieStr.split("=", limit = 2)

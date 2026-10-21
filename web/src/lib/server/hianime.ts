@@ -1,12 +1,21 @@
 import * as cheerio from "cheerio";
 import type { Element } from "domhandler";
 
-const BASE = "https://hianime.at";
-const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
-const KEY = "otaku-embed-v1";
+import { scraperConfig } from "../scraperConfig";
 
-async function get(url: string, referer?: string) {
-  const r = await fetch(url, { headers: { "User-Agent": UA, Accept: "text/html,*/*", ...(referer ? { Referer: referer } : {}) } });
+// Defaults match what shipped; scrapers/scrapers.json (verified at runtime) can override them without a deploy.
+const D = {
+  base: "https://hianime.at",
+  userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+  key: "otaku-embed-v1", server: "ZokoAnime",
+  search: "/search?keyword=%s", episodes: "/api/theme/episode/list/%s", servers: "/api/theme/episode/servers?episodeId=%s",
+};
+type C = typeof D;
+const cfg = () => scraperConfig("hianime", D);
+const fill = (c: C, tpl: string, v: string | number) => c.base + tpl.replace("%s", String(v));
+
+async function get(c: C, url: string, referer?: string) {
+  const r = await fetch(url, { headers: { "User-Agent": c.userAgent, Accept: "text/html,*/*", ...(referer ? { Referer: referer } : {}) } });
   if (!r.ok) throw new Error(`${new URL(url).host} returned HTTP ${r.status}`);
   return r.text();
 }
@@ -31,15 +40,18 @@ function cards($: cheerio.CheerioAPI, root?: cheerio.Cheerio<any>) {
 }
 
 export async function search(q: string, page = 1) {
-  return cards(main(await get(`${BASE}/search?keyword=${encodeURIComponent(q.trim())}&page=${page}`)));
+  const c = await cfg();
+  return cards(main(await get(c, `${fill(c, c.search, encodeURIComponent(q.trim()))}&page=${page}`)));
 }
 
 export async function browse(path: string, page = 1) {
-  return cards(main(await get(`${BASE}/${path.replace(/^\/+|\/+$/g, "")}?page=${page}`)));
+  const c = await cfg();
+  return cards(main(await get(c, `${c.base}/${path.replace(/^\/+|\/+$/g, "")}?page=${page}`)));
 }
 
 export async function home() {
-  const $ = main(await get(`${BASE}/home`));
+  const c = await cfg();
+  const $ = main(await get(c, `${c.base}/home`));
   const trending = $("#trending-home .swiper-slide .item").toArray().map((it) => {
     const e = $(it), a = e.find("a.film-poster").first();
     const slug = slugOf(a.attr("href") ?? "");
@@ -57,7 +69,8 @@ export async function home() {
 }
 
 export async function detail(slug: string) {
-  const $ = main(await get(`${BASE}/${slug}`));
+  const c = await cfg();
+  const $ = main(await get(c, `${c.base}/${slug}`));
   const name = $("h2.film-name").first();
   const stats = $(".film-stats").first();
   const tick = (c: string) => { const m = stats.find(`.tick-${c}`).first().text().match(/\d+/); return m ? +m[0] : undefined; };
@@ -83,32 +96,34 @@ export async function detail(slug: string) {
 export async function episodes(slug: string) {
   const id = Number(slug.split("-").pop());
   if (!id) throw new Error("Invalid slug");
-  const { html } = JSON.parse(await get(`${BASE}/api/theme/episode/list/${id}`)) as { html: string };
+  const c = await cfg();
+  const { html } = JSON.parse(await get(c, fill(c, c.episodes, id))) as { html: string };
   const $ = cheerio.load(html);
   return $("a.ep-item").toArray().filter((a) => ($(a).attr("href") ?? "").includes(`/watch/${slug}?`)).map((a) => ({
     id: Number($(a).attr("data-id")), number: Number($(a).attr("data-number")), title: txt($(a).attr("title")),
   })).filter((e) => e.id && e.number);
 }
 
-function decodeBlob(blob: string) {
-  const b = Uint8Array.from(atob(blob), (c) => c.charCodeAt(0));
-  return new TextDecoder().decode(b.map((x, i) => x ^ KEY.charCodeAt(i % KEY.length)));
+function decodeBlob(blob: string, key: string) {
+  const b = Uint8Array.from(atob(blob), (ch) => ch.charCodeAt(0));
+  return new TextDecoder().decode(b.map((x, i) => x ^ key.charCodeAt(i % key.length)));
 }
 
 /** Resolve an episode to the master playlist + subtitle. The stream host needs `referer`. */
 export async function stream(episodeId: number, lang: string) {
   const type = lang === "dub" || lang === "eng" ? "dub" : "sub";
-  const { html } = JSON.parse(await get(`${BASE}/api/theme/episode/servers?episodeId=${episodeId}`)) as { html: string };
+  const c = await cfg();
+  const { html } = JSON.parse(await get(c, fill(c, c.servers, episodeId))) as { html: string };
   const $ = cheerio.load(html);
   const urls = $(`.server-item[data-type=${type}]`).toArray()
-    .sort((a, b) => +/zokoanime/i.test($(b).attr("data-server-name") ?? "") - +/zokoanime/i.test($(a).attr("data-server-name") ?? ""))
+    .sort((a, b) => +($(b).attr("data-server-name") ?? "").toLowerCase().includes(c.server.toLowerCase()) - +($(a).attr("data-server-name") ?? "").toLowerCase().includes(c.server.toLowerCase()))
     .map((e) => { try { return atob(($(e).attr("data-hash") ?? "").trim()); } catch { return ""; } })
     .filter((u) => /zokoanime/i.test(u));
   for (const embed of new Set(urls)) {
     try {
-      const blob = (await get(embed)).match(/window\.__P\s*=\s*"([^"]+)"/)?.[1];
+      const blob = (await get(c, embed)).match(/window\.__P\s*=\s*"([^"]+)"/)?.[1];
       if (!blob) continue;
-      const cfg = JSON.parse(decodeBlob(blob)) as { src?: string; subtitles?: { src: string; lang?: string; label?: string; default?: boolean }[] };
+      const cfg = JSON.parse(decodeBlob(blob, c.key)) as { src?: string; subtitles?: { src: string; lang?: string; label?: string; default?: boolean }[] };
       if (!cfg.src) continue;
       const subs = cfg.subtitles ?? [];
       return {
@@ -121,11 +136,12 @@ export async function stream(episodeId: number, lang: string) {
 }
 
 export async function schedule() {
+  const c = await cfg();
   const tz = -new Date().getTimezoneOffset();
   const days = await Promise.all([...Array(7)].map(async (_, i) => {
     const d = new Date(Date.now() + i * 864e5);
     const date = d.toISOString().slice(0, 10);
-    const { html } = JSON.parse(await get(`${BASE}/api/theme/schedule/day?tzOffset=${-tz}&date=${date}`)) as { html: string };
+    const { html } = JSON.parse(await get(c, `${c.base}/api/theme/schedule/day?tzOffset=${-tz}&date=${date}`)) as { html: string };
     const $ = cheerio.load(html);
     return { date, day: d.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" }), items: $("a.tsl-link").toArray().map((a) => ({
       slug: slugOf($(a).attr("href") ?? ""), title: $(a).find(".film-name").first().text().trim(),
