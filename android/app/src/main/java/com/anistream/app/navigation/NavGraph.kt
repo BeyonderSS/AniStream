@@ -153,7 +153,7 @@ fun AniStreamNavGraph() {
 
     // No system-bar insets here: the only padding the Scaffold contributes is the bottom bar
     // (which itself sits above the gesture bar). Screens decide about the status bar; see [Insetted].
-    ProfilePickerGate {
+    ProfilePickerGate(onAccount = { navController.navigate("account") }) {
     Scaffold(
         containerColor = Bg.base,
         contentWindowInsets = WindowInsets(0),
@@ -234,7 +234,6 @@ fun AniStreamNavGraph() {
             composable(Routes.LIBRARY) {
                 Insetted {
                     LibraryScreen(
-                        onAccount = { navController.navigate("account") },
                         onOpen = { id -> navController.navigate(Routes.detailFor(id)) },
                         onDiscoverClick = { navigateToTab(Routes.HOME) }
                     )
@@ -391,7 +390,7 @@ fun AniStreamNavGraph() {
 
 /** Favorites | Downloads under one tab; each keeps its own screen and title. */
 @Composable
-private fun LibraryScreen(onOpen: (String) -> Unit, onDiscoverClick: () -> Unit, onAccount: () -> Unit) {
+private fun LibraryScreen(onOpen: (String) -> Unit, onDiscoverClick: () -> Unit) {
     val account = androidx.hilt.navigation.compose.hiltViewModel<AccountViewModel>()
     val session by account.session.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -403,11 +402,11 @@ private fun LibraryScreen(onOpen: (String) -> Unit, onDiscoverClick: () -> Unit,
                 onSelect = { tab = it },
                 modifier = Modifier.weight(1f)
             )
-            // accounts are optional and hidden when REELM_API_URL is blank
-            if (account.repo.enabled) IconButton(onClick = onAccount) {
+            // accounts are optional and hidden when REELM_API_URL is blank; the avatar reopens "Who's watching?"
+            if (account.repo.enabled) IconButton(onClick = account.repo::openGate) {
                 val p = session?.activeProfile
-                if (p != null) AvatarImage(p.avatar, 32.dp)
-                else Icon(Icons.Outlined.AccountCircle, contentDescription = "Sign in", tint = Ink.high)
+                if (p != null) AvatarImage(p.avatar, 32.dp, ring = true, contentDescription = "Switch profile, watching as ${p.name}")
+                else Icon(Icons.Outlined.AccountCircle, contentDescription = "Sign in or switch profile", tint = Ink.high)
             }
         }
         Box(Modifier.weight(1f)) {

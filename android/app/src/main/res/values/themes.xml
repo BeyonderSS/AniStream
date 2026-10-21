@@ -7,4 +7,12 @@
         <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
+
+    <!-- System splash (SplashScreen API, compat down to API 22): dusk + the reel, no white flash. The Compose
+         launch animation picks the reel up from the same spot. -->
+    <style name="Theme.Reelm.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.AniStream</item>
+    </style>
 </resources>

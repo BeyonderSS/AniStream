@@ -40,6 +40,40 @@ object FluentEmojis {
         "Pizza", "Hamburger", "Cupcake", "Doughnut", "Avocado", "Popcorn"
     ).map(::e)
 
+    /** The picker's sections, in [all] order. */
+    val groups: List<Pair<String, List<FluentEmoji>>> get() = listOf("Faces" to all.subList(0, 6), "Animals" to all.subList(6, 18), "Snacks" to all.subList(18, 24))
+
     fun byId(id: String) = all.firstOrNull { it.id == id } ?: all.first()
     fun urlFor(avatarId: String) = byId(avatarId).url
+}
+
+/** Client-side copies of the server rules (server/API.md), so the forms say what is wrong before a round trip. */
+object AuthRules {
+    private val USERNAME = Regex("[a-z0-9_]+")
+
+    fun usernameError(u: String): String? = when {
+        u.isEmpty() -> null
+        !USERNAME.matches(u) -> "Use only lowercase letters, numbers and _"
+        u.length < 3 -> "At least 3 characters"
+        u.length > 32 -> "At most 32 characters"
+        else -> null
+    }
+
+    fun passwordError(p: String): String? = if (p.isNotEmpty() && p.length < 8) "At least 8 characters" else null
+
+    fun canSubmit(u: String, p: String) = u.length >= 3 && usernameError(u) == null && p.length >= 8
+
+    /** A plain line for the errors people actually hit; anything else keeps the server's own text. */
+    fun friendly(e: Throwable, signingUp: Boolean = false): String {
+        val code = (e as? ApiException)?.code ?: 0
+        return when {
+            e is java.net.UnknownHostException || e is java.net.SocketTimeoutException || e is java.net.ConnectException ->
+                "Can't reach Reelm. Check your connection and try again."
+            signingUp && code == 409 -> "That username is taken. Try another."
+            code == 401 -> "That username and password don't match."
+            code == 429 -> "Too many tries. Wait a minute and try again."
+            code >= 500 -> "Reelm is having trouble right now. Try again in a moment."
+            else -> (e.message ?: "Something went wrong").replaceFirstChar { it.uppercase() }
+        }
+    }
 }

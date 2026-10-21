@@ -4,9 +4,11 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.AutoAwesome
@@ -61,6 +63,7 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class TvActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         setContent { ReelmTvTheme { TvProfileGate { TvApp() } } }
     }
@@ -95,7 +98,8 @@ private val rail = listOf(
     RailEntry(TvRoutes.LIBRARY, "Library", Icons.Outlined.VideoLibrary),
     RailEntry(TvRoutes.MORE, "More", Icons.Outlined.MoreHoriz)
 )
-private val accountEntry = RailEntry(TvRoutes.ACCOUNT, "Account", Icons.Outlined.AccountCircle)
+/** Not a screen: shows the active profile's avatar and reopens "Who's watching?". */
+private val accountEntry = RailEntry(TvRoutes.ACCOUNT, "Switch profile", Icons.Outlined.AccountCircle)
 
 @Composable
 private fun TvApp() {
@@ -143,7 +147,6 @@ private fun TvApp() {
             composable(TvRoutes.ANIME) { TvHomeScreen(HomeFilter.ANIME, homeVm, moviesVm, nav) }
             composable(TvRoutes.SEARCH) { TvSearchScreen(onOpen = { nav.navigate(TvRoutes.detail(it)) }) }
             composable(TvRoutes.LIVE) { TvLiveScreen(onPlay = { nav.navigate(TvRoutes.MEDIA_PLAYER) }) }
-            composable(TvRoutes.ACCOUNT) { TvAccountScreen() }
             composable(TvRoutes.LIBRARY) { TvLibraryScreen(onOpen = { nav.navigate(TvRoutes.detail(it)) }) }
             composable(TvRoutes.MORE) {
                 TvMoreScreen(onOpen = { dest ->
@@ -200,10 +203,11 @@ private fun TvApp() {
             ) {
                 entries.forEach { r ->
                     val selected = current == r.route
+                    val profile = if (r.route == TvRoutes.ACCOUNT) session?.activeProfile else null
                     // focused = amber ring + lighter surface; selected (current screen) = soft amber fill + amber icon
                     NavigationDrawerItem(
                         selected = selected,
-                        onClick = { nav.navigateTop(r.route) },
+                        onClick = { if (r.route == TvRoutes.ACCOUNT) acct.repo.openGate() else nav.navigateTop(r.route) },
                         colors = NavigationDrawerItemDefaults.colors(
                             containerColor = Color.Transparent,
                             contentColor = Ink.body,
@@ -220,8 +224,14 @@ private fun TvApp() {
                             focusedSelectedBorder = Border(BorderStroke(3.dp, Accent.main))
                         ),
                         glow = NavigationDrawerItemDefaults.glow(focusedGlow = Glow.None, focusedSelectedGlow = Glow.None),
-                        leadingContent = { Icon(r.icon, contentDescription = r.label, tint = if (selected) Accent.main else LocalContentColor.current) }
-                    ) { Text(r.label) }
+                        leadingContent = {
+                            if (profile != null) coil.compose.AsyncImage(
+                                com.anistream.core.account.FluentEmojis.urlFor(profile.avatar), contentDescription = "Switch profile, watching as ${profile.name}",
+                                modifier = Modifier.size(24.dp)
+                            )
+                            else Icon(r.icon, contentDescription = r.label, tint = if (selected) Accent.main else LocalContentColor.current)
+                        }
+                    ) { Text(profile?.name ?: r.label) }
                 }
             } }
         }

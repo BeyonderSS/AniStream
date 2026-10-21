@@ -50,7 +50,7 @@ import com.anistream.feature.livetv.IPTV_ORG_URL
 import com.anistream.feature.livetv.LiveTvViewModel
 import com.anistream.feature.search.SearchViewModel
 
-private val keys = ('a'..'z').map { it.toString() } + ('1'..'9').map { it.toString() } + "0"
+internal val keys = ('a'..'z').map { it.toString() } + ('1'..'9').map { it.toString() } + "0"
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable

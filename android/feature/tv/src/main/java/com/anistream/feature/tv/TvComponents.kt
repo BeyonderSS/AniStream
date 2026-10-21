@@ -89,12 +89,12 @@ val LocalLowEnd = staticCompositionLocalOf { false }
 private val FocusGlow = Glow(elevationColor = Accent.main.copy(alpha = 0.3f), elevation = 18.dp)
 
 /** Focus in every mode: a 3dp amber ring plus a slight brightness lift. Selected (current tab, watched) is soft amber instead. */
-private val FocusRing = BorderStroke(3.dp, Accent.main)
-private val FocusLift = Color.White.copy(alpha = 0.12f)
+internal val FocusRing = BorderStroke(3.dp, Accent.main)
+internal val FocusLift = Color.White.copy(alpha = 0.12f)
 
 /** Low-end: no glow (a blurred shadow per focus change is too much for the Fire TV Stick 2 GPU). */
 @Composable
-private fun focusGlow() = if (LocalLowEnd.current) Glow.None else FocusGlow
+internal fun focusGlow() = if (LocalLowEnd.current) Glow.None else FocusGlow
 
 @Composable
 fun ReelmTvTheme(content: @Composable () -> Unit) {

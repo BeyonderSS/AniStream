@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TV system splash (compat on Fire OS 5 / API 22): dusk + the reel, then Theme.Reelm.Tv and the Compose animation. -->
+    <style name="Theme.Reelm.Tv.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.Reelm.Tv</item>
+    </style>
+</resources>
