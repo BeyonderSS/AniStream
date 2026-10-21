@@ -61,6 +61,10 @@ class UpdateManager @Inject constructor(
 
     /** App start: at most once every 6 h, and silent unless there is something to install. */
     fun autoCheck() {
+        // a fresh process can't be mid-download, so any APK left in updates/ was already installed (or abandoned)
+        scope.launch(Dispatchers.IO) {
+            listOfNotNull(context.cacheDir, context.getExternalFilesDir(null)).forEach { File(it, "updates").deleteRecursively() }
+        }
         val now = System.currentTimeMillis()
         if (now - prefs.getLong("update_checked_at", 0L) < EVERY_MS) return
         prefs.edit().putLong("update_checked_at", now).apply()
