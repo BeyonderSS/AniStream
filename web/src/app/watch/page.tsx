@@ -12,8 +12,9 @@ import { ReelMark } from "@/components/reel";
 import { deviceId, get, getHistory, epKey, playKey, proxied, reelm, saveProgress, toPlay, WS, type Play as P } from "@/lib/core";
 import { helperOld } from "@/lib/bridge";
 import { useApi, useSession } from "@/lib/session";
+import { useLibavAudio } from "@/lib/use-libav-audio";
 import { cn } from "@/lib/utils";
-type Source = { src: string; hls: boolean; label: string; codec?: string };
+type Source = { src: string; hls: boolean; label: string; codec?: string; dolby?: boolean };
 type Sub = { url: string; label: string; lang: string; default?: boolean };
 type Member = { id: string; name: string; avatar: string };
 type Device = { deviceId: string; deviceName: string; kind: string };
@@ -87,7 +88,7 @@ function Player() {
       if (!document.documentElement.dataset.reelmHelper) throw new Error("helper");
       const list = await get<any[]>(`movies/stream?id=${encodeURIComponent(p.id)}&type=${p.type}&title=${encodeURIComponent(p.title)}&year=${p.year ?? ""}&s=${p.season ?? 0}&e=${p.episode ?? 0}`);
       if (!list.length) throw new Error("No streams found for this title.");
-      return [list.map((x) => ({ src: x.url, hls: /\.m3u8(\?|$)/.test(x.url), label: x.label, codec: x.codec })), (list.find((x) => x.subtitles?.length)?.subtitles ?? []).map((x: Sub) => ({ ...x, url: `/api/sub?u=${encodeURIComponent(x.url)}` }))] as const;
+      return [list.map((x) => ({ src: x.url, hls: /\.m3u8(\?|$)/.test(x.url), label: x.label, codec: x.codec, dolby: x.dolby })), (list.find((x) => x.subtitles?.length)?.subtitles ?? []).map((x: Sub) => ({ ...x, url: `/api/sub?u=${encodeURIComponent(x.url)}` }))] as const;
     })().then((r) => {
       if (!live || !r) return;
       const [a, b] = r;
@@ -100,6 +101,8 @@ function Player() {
   }, [pkey, nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const src = sources[si];
+  // Dolby/DTS audio Chrome can't decode: libav.js decodes it in a worker and plays it in sync with the video
+  const audioNote = useLibavAudio(video, src && !src.hls ? src.src : undefined, !!src?.dolby, `${si}${pkey}${nonce}`);
   // MovieBox often ships HEVC only; browsers without HEVC decode (most Chrome/Firefox on Linux) can't play it
   const fail = (m: string) => {
     const hevc = /hevc|h265/i.test(src?.codec ?? "") && !document.createElement("video").canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"');
@@ -220,6 +223,7 @@ function Player() {
           {src && <Media key={si + pkey + nonce} src={src.src} crossOrigin={src.hls ? "anonymous" : undefined} {...(common as object)} />}
           {!src && !err && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="flex flex-col items-center gap-4"><ReelMark className="size-14 animate-spin [animation-duration:1.6s]" /><p className="text-sm text-foreground/72">{p ? "Finding a stream" : "Joining the room"}</p></div></div>}
 
+          {audioNote && <p role="status" className="pointer-events-none absolute bottom-28 left-1/2 z-10 -translate-x-1/2 rounded-full bg-dusk/80 px-4 py-2 text-sm ring-1 ring-white/15 backdrop-blur">{audioNote}</p>}
           {skip && !err && (
             <button onClick={() => { video.current!.currentTime = skip.e; }} className={cn(pill.secondary, "absolute right-4 bottom-28 z-10 bg-dusk/80 ring-1 ring-white/15 backdrop-blur md:right-8")}>
               <SkipForward />Skip {skip.type.includes("op") ? "intro" : skip.type === "ed" ? "outro" : "recap"}

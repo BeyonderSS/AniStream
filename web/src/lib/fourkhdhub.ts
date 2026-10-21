@@ -119,9 +119,9 @@ export async function streams(f: F, title: string, year: number, type: "movie" |
     const top = [...new Map(c.map((x) => [x[0], x])).values()].sort((a, b) => score(...a) - score(...b)).slice(0, 6);
     const ok = (await Promise.all(top.map(([u, l]) => verify(u).then((v) => ({ v, s: score(u, l) })).catch(() => null)))).filter((x) => x !== null);
     const best = ok.sort((a, b) => +!a.v[1] - +!b.v[1] || a.s - b.s)[0];
-    return best && { url: best.v[0], seek: best.v[1], height: r.height, // Chrome/Firefox can't decode Dolby/DTS audio, so those releases play silently; flag them so AAC ones get picked first
+    return best && { url: best.v[0], seek: best.v[1], height: r.height, // Chrome/Firefox can't decode Dolby/DTS audio; flagged releases get it decoded by libav.js (use-libav-audio) and sort after AAC ones
     dolby: /ddp|dd\+|dd ?[257]\.1|e-?ac-?3|\bac-?3|dts|atmos|truehd/i.test(r.title) && !/aac|opus/i.test(r.title),
-    label: `4KHDHub · ${r.height ? r.height + "p" : "Auto"}${/ddp|dd\+|dd ?[257]\.1|e-?ac-?3|\bac-?3|dts|atmos|truehd/i.test(r.title) && !/aac|opus/i.test(r.title) ? " · Dolby audio, may be silent" : ""}`, codec: /av1/i.test(r.title) ? "AV1" : /hevc|x265|h\.?265/i.test(r.title) ? "HEVC" : /avc|x264|h\.?264/i.test(r.title) ? "H.264" : undefined, subtitles: [] as any[] };
+    label: `4KHDHub · ${r.height ? r.height + "p" : "Auto"}${/ddp|dd\+|dd ?[257]\.1|e-?ac-?3|\bac-?3|dts|atmos|truehd/i.test(r.title) && !/aac|opus/i.test(r.title) ? " · Dolby audio" : ""}`, codec: /av1/i.test(r.title) ? "AV1" : /hevc|x265|h\.?265/i.test(r.title) ? "HEVC" : /avc|x264|h\.?264/i.test(r.title) ? "H.264" : undefined, subtitles: [] as any[] };
   };
   const out = (await Promise.all(picked.map((r) => Promise.race([one(r), new Promise<null>((ok) => setTimeout(ok, 12000, null))]).catch(() => null)))).filter((x) => !!x);
   return out.sort((a, b) => b.height - a.height || +!a.seek - +!b.seek).map(({ seek, ...s }) => s);

@@ -46,6 +46,6 @@ export const movieRoutes: Record<string, (q: URLSearchParams) => Promise<unknown
     const r = await Promise.allSettled([mbPart(), drPart(), fkPart()]);
     const list = r.flatMap((x) => (x.status === "fulfilled" ? (x.value as any[]) : []));
     if (!list.length) throw new Error((r.find((x) => x.status === "rejected") as PromiseRejectedResult | undefined)?.reason?.message ?? "No streams found");
-    return list.sort((a, b) => +!!a.dolby - +!!b.dolby); // stable: silent-in-browser Dolby releases last, else Android order: MovieBox first, then the title sources (Dramachi, 4KHDHub), each best-first
+    return list.sort((a, b) => +!!a.dolby - +!!b.dolby); // stable: Dolby releases (decoded in JS, see use-libav-audio) last, else Android order: MovieBox first, then the title sources (Dramachi, 4KHDHub), each best-first
   },
 };
