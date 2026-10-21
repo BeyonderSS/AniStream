@@ -9,6 +9,7 @@ import com.anistream.domain.model.MediaDetail
 import com.anistream.domain.model.MediaType
 import com.anistream.domain.model.PlaybackRequest
 import com.anistream.domain.model.WatchHistory
+import com.anistream.domain.model.mediaSlug
 import com.anistream.domain.repository.FavoriteRepository
 import com.anistream.domain.repository.MoviesRepository
 import com.anistream.domain.repository.NowPlaying
@@ -103,7 +104,7 @@ class MovieDetailViewModel @Inject constructor(
         viewModelScope.launch {
             val all = history.getAll().getOrNull().orEmpty()
             val h: WatchHistory = all
-                .filter { it.mediaId == d.id || it.animeSlug == d.id || it.animeSlug.startsWith(d.id + ":s") }
+                .filter { it.animeSlug == mediaSlug(d.type == MediaType.SERIES, d.title) || it.mediaId == d.id || it.animeSlug == d.id || it.animeSlug.startsWith(d.id + ":s") }
                 .maxByOrNull { it.lastWatchedTimestamp } ?: run {
                 _uiState.update { it.copy(resume = null) }
                 return@launch
@@ -140,7 +141,7 @@ class MovieDetailViewModel @Inject constructor(
                 return@launch
             }
             NowPlaying.request = PlaybackRequest(
-                historyKey = d.id,
+                historyKey = mediaSlug(d.type == MediaType.SERIES, d.title),
                 mediaId = d.id,
                 title = d.title,
                 subtitle = if (episode > 0) "S$season · E$episode" else null,

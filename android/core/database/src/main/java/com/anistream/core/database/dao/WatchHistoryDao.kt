@@ -24,6 +24,9 @@ interface WatchHistoryDao {
     @Query("SELECT * FROM watch_history WHERE animeSlug = :slug AND profileId = :profileId")
     suspend fun getRaw(slug: String, profileId: String): WatchHistoryEntity?
 
+    @Query("SELECT * FROM watch_history WHERE profileId = :profileId AND kind = 'media' AND deleted = 0")
+    suspend fun liveMedia(profileId: String): List<WatchHistoryEntity>
+
     @Query("SELECT * FROM watch_history WHERE profileId = :profileId AND lastWatchedTimestamp > :since")
     suspend fun changedSince(profileId: String, since: Long): List<WatchHistoryEntity>
 

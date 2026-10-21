@@ -1,6 +1,6 @@
 // node scripts/check-play.mjs — every payload shape the apps write must become a playable web `Play`.
 import assert from "node:assert/strict";
-import { toPlay } from "../src/lib/core.ts";
+import { toPlay, normTitle, playKey } from "../src/lib/core.ts";
 
 // Android/TV media (movie): the payload from the bug report
 assert.deepEqual(toPlay({ slug: "mb:1732378050823619144", title: "Obsession", kind: "media", mediaId: "mb:1732378050823619144", season: 0, episode: 0, poster: "x.jpg" }),
@@ -18,4 +18,11 @@ assert.equal(toPlay({ kind: "live", id: "u", title: "Ch", url: "https://x/y.m3u8
 // junk
 assert.equal(toPlay(null), null);
 assert.equal(toPlay({ kind: "media" }), null);
+// canonical media key: same vectors as Android MediaSlugTest
+assert.equal(normTitle("The Mentalist"), "mentalist");
+assert.equal(normTitle("Mentalist"), "mentalist");
+assert.equal(normTitle("Spider-Man: Brand New Day"), "spidermanbrandnewday");
+assert.equal(normTitle("Fast & Furious"), "fastandfurious");
+assert.equal(playKey({ kind: "movie", id: "tt1", title: "The Mentalist", type: "series" }), playKey({ kind: "movie", id: "mb:9", title: "Mentalist", type: "series" }));
+assert.equal(playKey({ kind: "movie", id: "tt1", title: "The Mentalist", type: "series" }), "media:series:mentalist");
 console.log("toPlay ok");

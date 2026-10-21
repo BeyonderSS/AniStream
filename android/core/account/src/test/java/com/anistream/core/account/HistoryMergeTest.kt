@@ -1,6 +1,7 @@
 package com.anistream.core.account
 
 import kotlinx.serialization.json.JsonObject
+import com.anistream.domain.model.mediaSlug
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -18,5 +19,14 @@ class HistoryMergeTest {
         )
         val applied = HistoryMerge.toApply(remote) { local[it] }.map { it.key }
         assertEquals(listOf("anime:a", "anime:d", "anime:a2"), applied)
+    }
+}
+
+class MediaSlugTest {
+    @Test fun sameVectorsAsWeb() {
+        assertEquals("series:mentalist", mediaSlug(true, "The Mentalist"))
+        assertEquals("series:mentalist", mediaSlug(true, "Mentalist"))
+        assertEquals("movie:spidermanbrandnewday", mediaSlug(false, "Spider-Man: Brand New Day"))
+        assertEquals("movie:fastandfurious", mediaSlug(false, "Fast & Furious"))
     }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import com.anistream.core.database.dao.WatchHistoryDao
 import com.anistream.core.database.entity.WatchHistoryEntity
 import com.anistream.domain.model.WatchHistory
+import com.anistream.domain.model.mediaSlug
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -38,6 +39,9 @@ object HistoryMerge {
 /** The one place a history row becomes the opaque `payload` (history sync and Continue-on-TV both use it). */
 object HistoryPayload {
     fun key(h: WatchHistory) = "${h.kind}:${h.animeSlug}"
+
+    /** Media rows saved under a catalog id ("tt…", "mb:…") rather than [mediaSlug]. */
+    fun isLegacyMedia(h: WatchHistory) = h.kind == "media" && !h.animeSlug.startsWith("movie:") && !h.animeSlug.startsWith("series:")
 
     fun encode(h: WatchHistory): JsonObject = buildJsonObject {
         put("slug", h.animeSlug); put("title", h.animeTitle); put("kind", h.kind)
@@ -99,6 +103,7 @@ class HistorySync @Inject constructor(
         val local = entries.mapNotNull { e -> localRow(profile, e.key)?.let { e.key to it.lastWatchedTimestamp } }.toMap()
         val wins = HistoryMerge.toApply(entries) { local[it] }
         wins.forEach { e -> applyEntry(profile, e) }
+        collapseMedia(profile)
         res["now"]?.jsonPrimitive?.longOrNull?.let { prefs.edit().putLong("since:$profile", it).apply() }
         if (wins.isNotEmpty()) _pulled.tryEmit(Unit)
     }
@@ -106,6 +111,7 @@ class HistorySync @Inject constructor(
     suspend fun push(): Unit = lock.withLock {
         val s = account.session.value ?: return@withLock
         val profile = s.activeProfile?.id ?: return@withLock
+        collapseMedia(profile)
         val last = prefs.getLong("pushed:$profile", 0L)
         val rows = dao.changedSince(profile, last)
         if (rows.isEmpty()) return@withLock
@@ -114,6 +120,18 @@ class HistorySync @Inject constructor(
             api.call("PUT", "/v1/profiles/$profile/history", body, s.token)
         }
         prefs.edit().putLong("pushed:$profile", rows.maxOf { it.lastWatchedTimestamp }).apply()
+    }
+
+    /** Re-key per-catalog-id media rows to [mediaSlug] (newest wins) and tombstone the old ones so other devices drop them too. */
+    private suspend fun collapseMedia(profile: String) {
+        val now = System.currentTimeMillis()
+        dao.liveMedia(profile).map { it.toDomain() }.filter(HistoryPayload::isLegacyMedia).groupBy { mediaSlug(it.lastEpisodeWatched > 0 || it.season > 0, it.animeTitle) }.forEach { (slug, rows) ->
+            val newest = rows.maxBy { it.lastWatchedTimestamp }
+            val cur = dao.getRaw(slug, profile)
+            if (cur == null || cur.deleted || cur.lastWatchedTimestamp < newest.lastWatchedTimestamp)
+                dao.upsert(newest.copy(animeSlug = slug, lastWatchedTimestamp = now).toEntity(profile))
+            rows.forEach { dao.delete(it.animeSlug, profile, now) }
+        }
     }
 
     /** Continue on TV: the phone's row arrives as a payload; store it (newest wins) so the player resumes from it. */

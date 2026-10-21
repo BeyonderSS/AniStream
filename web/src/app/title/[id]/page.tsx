@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Play } from "lucide-react";
 import { Chips, FavButton, mediaCard, Notice, pill } from "@/components/app";
 import { Backdrop, DetailSkeleton, EpisodeGrid } from "@/components/detail";
-import { getHistory, kids, KIDS_BLOCKED, progressOf, watchHref, type Entry, type Play as P } from "@/lib/core";
+import { getHistory, playKey, kids, KIDS_BLOCKED, progressOf, watchHref, type Entry, type Play as P } from "@/lib/core";
 import { useApi, useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -16,9 +16,10 @@ function Title({ id }: { id: string }) {
   const [last, setLast] = useState<Entry | null>(null), [prog, setProg] = useState<Record<string, number>>({});
   useEffect(() => {
     const pid = s.profile?.id ?? "guest";
-    setLast(Object.values(getHistory(pid)).filter((x) => !x.deleted && x.payload.kind === "movie" && x.payload.id === id).sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null);
+    const h = m && getHistory(pid)[playKey({ kind: "movie", id, title: m.title, type: m.type })];
+    setLast(h && !h.deleted ? h : null);
     setProg(progressOf(pid));
-  }, [s.profile, id]);
+  }, [s.profile, id, m]);
   if (error) return <Notice title="This title didn't load" body={error}><Link href="/" className={pill.secondary}>Go home</Link></Notice>;
   if (!m) return <DetailSkeleton />;
   if (s.profile?.kids && !kids.media(m.genres, m.certification)) return <Notice title={KIDS_BLOCKED} body="Switch profile to watch this."><Link href="/profiles" className={pill.secondary}>Switch profile</Link></Notice>;

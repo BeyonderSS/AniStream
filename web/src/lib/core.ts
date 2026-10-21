@@ -77,11 +77,17 @@ export type Entry = { key: string; payload: Play; position: number; duration: nu
 export type CardData = { href: string; title: string; poster?: string; sub?: string; rating?: string; genres?: string[]; kind?: "anime" | "media"; progress?: number; onRemove?: () => void };
 
 /** Same key scheme as Android's HistoryPayload.key: one row per title, `anime:<slug>` / `media:<id>` (the row holds the latest episode). */
-export const playKey = (p: Play) => `${p.kind === "anime" ? "anime" : "media"}:${p.id}`;
+export const playKey = (p: Play) => p.kind === "anime" ? `anime:${p.id}` : `media:${mediaSlug(p) || p.id}`;
+/**
+ * Catalog-independent history slug `<movie|series>:<normalized title>`; the key is `media:` + it. Same rules as Android's mediaSlug (domain/model/WatchHistory.kt).
+ * ponytail: same-title remakes collide; include the year when every source provides it.
+ */
+export const normTitle = (t: string) => t.toLowerCase().replace(/&/g, "and").replace(/^\s*the\b/, "").replace(/[^\p{L}\p{N}]/gu, "");
+const mediaSlug = (p: Play) => normTitle(p.title ?? "") && `${p.type === "series" ? "series" : "movie"}:${normTitle(p.title)}`;
 /** Per-episode id, for episode grids and for telling whether a resume row is this episode. */
 export const epKey = (p: Play) => p.kind === "anime" ? `anime:${p.id}:${p.ep}` : `movie:${p.id}:${p.season ?? 0}:${p.episode ?? 0}`;
 /** Keys the web wrote before it matched Android (per-episode); they showed up as duplicates and are retired on sync. */
-const legacy = (k: string) => k.startsWith("movie:") || /^anime:[^:]+:\d+$/.test(k);
+const legacy = (k: string) => k.startsWith("movie:") || /^media:(?!(movie|series):)/.test(k) || /^anime:[^:]+:\d+$/.test(k);
 /** `f` resumes at a fraction of the duration (synced entries from the apps store progress as 0..1000 of 1000). */
 export const watchHref = (p: Play, f = 0) => `/watch?p=${encodeURIComponent(JSON.stringify(p))}${f > 0 && f < 0.95 ? `&f=${f.toFixed(4)}` : ""}`;
 export const entryHref = (e: Entry) => watchHref(e.payload, e.duration ? e.position / e.duration : 0);
@@ -106,7 +112,7 @@ export function toPlay(r: any): Play | null {
   const id = str(r.kind === "media" ? r.mediaId || r.slug : r.id || r.mediaId).replace(/:s\d+e\d+$/, "");
   if (!id) return null;
   const season = num(r.season), episode = num(r.episode);
-  const type = r.type === "series" || r.type === "movie" ? r.type : season > 0 || episode > 0 ? "series" : "movie";
+  const type = r.type === "series" || r.type === "movie" ? r.type : /^series:/.test(r.slug ?? "") || season > 0 || episode > 0 ? "series" : "movie";
   return { kind: "movie", id, title, poster, season, episode, type, year: num(r.year) || undefined };
 }
 
@@ -121,7 +127,7 @@ const hKey = (pid: string) => `reelm.hist.${pid}`;
 const rawHist = (pid: string) => ls.get<Record<string, Entry>>(hKey(pid), {});
 /** The payload an entry carries: the web `Play` plus the fields Android's HistoryPayload.decode reads. */
 const wire = (p: Play, position: number, duration: number): Play => ({
-  ...p, slug: p.id, mediaId: p.id, kind: p.kind === "anime" ? "anime" : "media", episode: p.kind === "anime" ? p.ep : p.episode,
+  ...p, slug: p.kind === "anime" ? p.id : playKey(p).slice(6), mediaId: p.id, kind: p.kind === "anime" ? "anime" : "media", episode: p.kind === "anime" ? p.ep : p.episode,
   progress: duration ? position / duration : 0, subtitle: entrySub(p),
 } as any);
 /** History with every payload normalized to `Play`. Rows for the same title (kind + id) collapse to the newest, so old per-episode duplicates vanish. */
@@ -131,6 +137,7 @@ export function getHistory(pid: string): Record<string, Entry> {
     const payload = toPlay(e?.payload);
     if (!payload) continue;
     const k = playKey(payload);
+    if (e.deleted && e.key !== k) continue; // a retired per-id key's tombstone must not shadow the canonical row
     if (!out[k] || out[k].updatedAt < e.updatedAt) out[k] = { ...e, key: k, payload };
   }
   return out;

@@ -269,7 +269,7 @@ class RecommendationsRepositoryImpl @Inject constructor(
                     id = if (media) h.mediaId ?: h.animeSlug.substringBefore(":s") else h.animeSlug,
                     kind = if (media) "media" else "anime",
                     title = h.animeTitle,
-                    weight = Ranking.seedWeight(completion, ageDays(h.lastWatchedTimestamp), h.animeSlug in favSlugs)
+                    weight = Ranking.seedWeight(completion, ageDays(h.lastWatchedTimestamp), h.animeSlug in favSlugs || h.mediaId in favSlugs)
                 )
             }
             val inHistory = history.map { it.animeSlug }.toSet()
