@@ -87,18 +87,19 @@ class MovieBoxClient @Inject constructor(
                         "failCode" to "404", "resourceNum" to "0", "isVip" to "true"
                     ).joinToString("&") { (k, v) -> "$k=${URLEncoder.encode(v, "UTF-8")}" }
                     val pos = call("GET", "/wefeed-mobile-bff/subject-api/resource-position/v2?$q")
-                    val url = MovieBoxParser.recoveredLink(pos, res) ?: return@runCatching null
+                    // resource/v2's size is the notice clip's (~0.8 MB); the recovered entry carries the real one
+                    val real = MovieBoxParser.recovered(pos, res) ?: return@runCatching null
                     val subs = runCatching {
                         MovieBoxParser.captions(
                             call("GET", "/wefeed-mobile-bff/subject-api/get-ext-captions?subjectId=$subjectId&resourceId=${res.resourceId}")
                         )
                     }.getOrDefault(emptyList())
                     MediaStream(
-                        url = url,
+                        url = real.link,
                         qualityLabel = if (res.height > 0) "${res.height}p" else "AUTO",
                         height = res.height,
                         codec = res.codec,
-                        sizeBytes = res.sizeBytes,
+                        sizeBytes = real.sizeBytes ?: res.sizeBytes,
                         // the MP4 CDN rejects a Referer with HTTP 429; User-Agent only
                         headers = mapOf("User-Agent" to profile.userAgent),
                         subtitles = subs,
@@ -304,12 +305,12 @@ object MovieBoxParser {
             )
         }
 
-    /** The signed MP4 for exactly this resource/season/episode, never the notice clip. */
-    fun recoveredLink(data: JsonElement, original: Resource): String? =
+    /** The signed MP4 for exactly this resource/season/episode, never the notice clip. Its `size` is the real file's. */
+    fun recovered(data: JsonElement, original: Resource): Resource? =
         resources(data).firstOrNull {
             it.resourceId == original.resourceId && it.season == original.season && it.episode == original.episode &&
                 it.link.startsWith("http") && !isNotice(it.link)
-        }?.link
+        }
 
     fun captions(data: JsonElement): List<SubtitleTrack> =
         ((data as? JsonObject)?.get("extCaptions") as? JsonArray).orEmpty().mapNotNull { c ->

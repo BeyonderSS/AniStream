@@ -1,5 +1,6 @@
 package com.anistream.feature.search
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.anistream.core.common.Result
@@ -9,6 +10,7 @@ import com.anistream.domain.model.MediaType
 import com.anistream.domain.repository.AnidbRepository
 import com.anistream.domain.repository.MoviesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,8 +44,11 @@ data class SearchUiState(
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val repository: AnidbRepository,
-    private val movies: MoviesRepository
+    private val movies: MoviesRepository,
+    @ApplicationContext context: Context
 ) : ViewModel() {
+
+    private val prefs = context.getSharedPreferences("search_prefs", Context.MODE_PRIVATE)
 
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
@@ -59,8 +64,14 @@ class SearchViewModel @Inject constructor(
 
     private var mediaPopularRequested = false
 
+    init {
+        // the Anime | Movies & TV choice survives restarts
+        onScopeChange(prefs.getInt(KEY_SCOPE, 0))
+    }
+
     fun onScopeChange(scope: Int) {
         if (scope == _uiState.value.scope) return
+        prefs.edit().putInt(KEY_SCOPE, scope).apply()
         _uiState.update { it.copy(scope = scope, typeFilter = null, results = emptyList()) }
         if (scope == 1 && !mediaPopularRequested) {
             mediaPopularRequested = true
@@ -146,3 +157,5 @@ private fun MediaItem.asCard() = AnimeSearchResult(
     score = rating,
     year = year
 )
+
+private const val KEY_SCOPE = "scope"

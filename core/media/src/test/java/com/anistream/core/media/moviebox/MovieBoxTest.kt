@@ -78,12 +78,14 @@ class MovieBoxTest {
         assertTrue(MovieBoxParser.isNotice(listed.link))
         assertEquals(1, listed.season)
         assertEquals(2, listed.episode)
-        val url = MovieBoxParser.recoveredLink(data("resource_position_s1e2.json"), listed)!!
+        val real = MovieBoxParser.recovered(data("resource_position_s1e2.json"), listed)!!
+        val url = real.link
+        assertEquals(125570821L, real.sizeBytes)
         assertTrue(url.startsWith("https://bcdn.hakunaymatata.com/"))
         assertFalse(MovieBoxParser.isNotice(url))
         // a different resource id or episode must never be accepted
-        assertNull(MovieBoxParser.recoveredLink(data("resource_position_s1e2.json"), listed.copy(resourceId = "other")))
-        assertNull(MovieBoxParser.recoveredLink(data("resource_position_s1e2.json"), listed.copy(episode = 3)))
+        assertNull(MovieBoxParser.recovered(data("resource_position_s1e2.json"), listed.copy(resourceId = "other")))
+        assertNull(MovieBoxParser.recovered(data("resource_position_s1e2.json"), listed.copy(episode = 3)))
     }
 
     @Test
@@ -91,7 +93,7 @@ class MovieBoxTest {
         val listed = MovieBoxParser.resources(data("resource_v2_movie.json"))
         assertTrue(listed.isNotEmpty())
         assertTrue(listed.all { it.season == 0 && it.episode == 0 })
-        assertTrue(MovieBoxParser.recoveredLink(data("resource_position_movie.json"), listed.first()) != null)
+        assertTrue(MovieBoxParser.recovered(data("resource_position_movie.json"), listed.first()) != null)
     }
 
     @Test
