@@ -238,10 +238,12 @@ function Player() {
             )}
             {(sources.length > 1 || p?.kind === "anime") && (
               <details className="relative">
-                <summary aria-label="Source, audio and episodes" className={cn(ctl, "list-none cursor-pointer")}><MenuIcon /></summary>
+                {sources.length > 1
+                  ? <summary aria-label="Quality, audio and episodes" className={cn(pill.ghost, "h-10 list-none cursor-pointer px-4 font-semibold")}>{sources[si]?.label ?? "Quality"}<MenuIcon className="size-4" /></summary>
+                  : <summary aria-label="Audio and episodes" className={cn(ctl, "list-none cursor-pointer")}><MenuIcon /></summary>}
                 <div className="page-in absolute right-0 mt-2 max-h-[60vh] w-72 overflow-y-auto rounded-[24px] bg-haze/95 p-2 shadow-[0_24px_60px_rgb(10_12_18/0.6)] ring-1 ring-white/8 backdrop-blur-xl">
                   {sources.length > 1 && <>
-                    <p className="px-3 pt-2 pb-1 text-xs font-semibold text-foreground/52">Source</p>
+                    <p className="px-3 pt-2 pb-1 text-xs font-semibold text-foreground/52">Quality</p>
                     {sources.map((x, i) => <button key={i} onClick={() => setSi(i)} className={row(si === i)}><Check className={cn("size-4", si !== i && "invisible")} />{x.label}</button>)}
                   </>}
                   {p?.kind === "anime" && <>
