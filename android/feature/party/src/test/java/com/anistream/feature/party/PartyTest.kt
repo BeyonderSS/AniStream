@@ -48,6 +48,15 @@ class PartyTest {
         assertEquals(109, parseRelease(json, tv = true)?.versionCode)
     }
 
+    @Test fun prereleaseIsNeverOffered() {
+        val assets = """"assets":[{"name":"Reelm-v1.0.9.apk","browser_download_url":"https://x/phone.apk","size":7}]"""
+        val pre = Json.parseToJsonElement("""{"tag_name":"v1.0.9","prerelease":true,$assets}""").jsonObject
+        assertNull(parseRelease(pre, tv = false))
+        // CI names feature builds v1.0.<run>-<branch>, which the tag pattern rejects as well
+        assertNull(tagToVersionCode("v1.0.18-port-automation"))
+        assertEquals(109, parseRelease(Json.parseToJsonElement("""{"tag_name":"v1.0.9","prerelease":false,$assets}""").jsonObject, tv = false)?.versionCode)
+    }
+
     @Test fun playingRoomAdvancesByElapsedServerTime() {
         assertEquals(12_500L, targetPosition(10_000, at = 1_000, serverNow = 3_500, playing = true))
         assertEquals(10_000L, targetPosition(10_000, at = 1_000, serverNow = 3_500, playing = false))

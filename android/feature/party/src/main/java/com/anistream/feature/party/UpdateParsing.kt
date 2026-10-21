@@ -2,6 +2,7 @@ package com.anistream.feature.party
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
@@ -25,6 +26,8 @@ fun pickAsset(assets: List<Pair<String, String>>, tv: Boolean): String? {
 fun shouldOffer(current: Int, latest: Int, debuggable: Boolean) = !debuggable && current >= 100 && latest > current
 
 fun parseRelease(json: JsonObject, tv: Boolean): Release? {
+    // /releases/latest already skips these, but a feature-branch build must never reach users even if that endpoint changes
+    if (json["prerelease"]?.jsonPrimitive?.booleanOrNull == true || json["draft"]?.jsonPrimitive?.booleanOrNull == true) return null
     val code = tagToVersionCode(json["tag_name"]?.jsonPrimitive?.contentOrNull ?: return null) ?: return null
     val assets = (json["assets"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
     val asset = assets.firstOrNull { a ->

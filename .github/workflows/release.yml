@@ -86,8 +86,9 @@ jobs:
             cat checksum.txt
             echo '```'
           } > notes.md
+          if [ -n "${PRERELEASE:-}" ]; then flag=--prerelease; else flag=--latest; fi
           gh release create "v$VERSION_NAME" Reelm-*.apk \
             --title "Reelm v$VERSION_NAME${PRERELEASE:+ (pre-release)}" \
             --notes-file notes.md \
             --target "$GITHUB_SHA" \
-            ${PRERELEASE:+--prerelease} ${PRERELEASE:---latest}
+            "$flag"
