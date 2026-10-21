@@ -106,16 +106,17 @@ fun ArtworkImage(
     )
 }
 
-/** Amber pill CTA with dark text and the soft projector glow; deeper amber while pressed. */
+/** Amber pill CTA with dark text and the soft projector glow; deeper amber while pressed. [loading] swaps the icon for a spinner and ignores taps. */
 @Composable
 fun PrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    loading: Boolean = false
 ) {
-    PillButton(text, onClick, modifier, icon, enabled, primary = true)
+    PillButton(text, onClick, modifier, icon, enabled, primary = true, loading = loading)
 }
 
 /** Quiet secondary: slate pill, mist label, haze while pressed. */
@@ -137,7 +138,8 @@ private fun PillButton(
     modifier: Modifier,
     icon: ImageVector?,
     enabled: Boolean,
-    primary: Boolean
+    primary: Boolean,
+    loading: Boolean = false
 ) {
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
@@ -155,13 +157,16 @@ private fun PillButton(
             .then(if (primary && enabled) Modifier.amberGlow() else Modifier)
             .background(bg, Radius.pill)
             .then(if (primary) Modifier else Modifier.border(1.dp, Ink.hairline, Radius.pill))
-            .clickable(interactionSource = source, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
+            .clickable(interactionSource = source, indication = null, enabled = enabled && !loading, role = Role.Button, onClick = onClick)
             .heightIn(min = 52.dp)
             .padding(horizontal = Space.xl),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (icon != null) {
+        if (loading) {
+            androidx.compose.material3.CircularProgressIndicator(color = fg, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(Space.sm))
+        } else if (icon != null) {
             Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(Space.sm))
         }

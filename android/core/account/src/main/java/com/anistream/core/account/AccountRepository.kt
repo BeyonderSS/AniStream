@@ -38,9 +38,18 @@ class AccountRepository @Inject constructor(
     private val _session = MutableStateFlow<Session?>(null)
     val session: StateFlow<Session?> = _session.asStateFlow()
 
-    /** "Who's watching?" is due: set at launch/sign-in when the account has more than one profile, cleared on pick. */
-    private val _pickerPending = MutableStateFlow(false)
-    val pickerPending: StateFlow<Boolean> = _pickerPending.asStateFlow()
+    /**
+     * The launch gate ("Who's watching?", or Welcome when signed out) is showing. It opens on first launch, after sign out
+     * and from the profile button; it closes once a profile or guest mode is chosen, and that choice is remembered so the
+     * next launch goes straight home.
+     */
+    private val _gate = MutableStateFlow(false)
+    val gate: StateFlow<Boolean> = _gate.asStateFlow()
+
+    private val guest: Boolean get() = prefs.getBoolean("guest", false)
+
+    /** True when there is something to go back to: an active profile, or guest mode while signed out. */
+    val hasChoice: Boolean get() = _session.value?.activeProfile != null || (_session.value == null && guest)
 
     val token: String? get() = _session.value?.token
     /** one id per install, shown to the user's other devices in the hub */
@@ -52,8 +61,8 @@ class AccountRepository @Inject constructor(
         if (enabled && token != null && user != null) {
             _profiles.value = prefs.getString("profiles", null)?.let { runCatching { Json.parseToJsonElement(it).jsonArray.map { p -> p.jsonObject.toProfile() } }.getOrNull() }.orEmpty()
             publish(token, user, prefs.getString("activeProfile", null))
-            _pickerPending.value = _profiles.value.size > 1
         }
+        _gate.value = enabled && !hasChoice
     }
 
     private fun publish(token: String, user: User, activeId: String?) {
@@ -67,17 +76,20 @@ class AccountRepository @Inject constructor(
 
     private suspend fun auth(path: String, username: String, password: String) {
         val res = api.call("POST", "/v1/auth/$path", buildJsonObject { put("username", username.trim().lowercase()); put("password", password) })!!
-        signIn(str(res, "token"), res.userObj())
+        signIn(str(res, "token"), res.userObj(), pickSingle = path == "login")
     }
 
-    /** Also the TV path: a claimed pairing code hands back the same token + user. */
-    suspend fun signIn(token: String, user: User) {
-        prefs.edit().putString("token", token).putString("user", buildJsonObject { put("id", user.id); put("username", user.username) }.toString()).remove("activeProfile").apply()
+    /**
+     * Also the TV path: a claimed pairing code hands back the same token + user. With [pickSingle] a lone profile is
+     * picked at once; sign-up passes false so it can name that profile first.
+     */
+    suspend fun signIn(token: String, user: User, pickSingle: Boolean = true) {
+        prefs.edit().putString("token", token).remove("guest").putString("user", buildJsonObject { put("id", user.id); put("username", user.username) }.toString()).remove("activeProfile").apply()
         _profiles.value = emptyList()
         publish(token, user, null)
         refreshProfiles()
         // a single profile needs no picker; with several the user picks
-        if (_profiles.value.size == 1) selectProfile(_profiles.value[0].id) else _pickerPending.value = _profiles.value.size > 1
+        if (pickSingle && _profiles.value.size == 1) selectProfile(_profiles.value[0].id)
     }
 
     suspend fun logout() {
@@ -85,9 +97,19 @@ class AccountRepository @Inject constructor(
         prefs.edit().clear().putString("deviceId", deviceId).apply()
         _profiles.value = emptyList()
         _session.value = null
-        _pickerPending.value = false
         ActiveProfile.id = ""
+        _gate.value = true
     }
+
+    fun continueAsGuest() {
+        prefs.edit().putBoolean("guest", true).apply()
+        _gate.value = false
+    }
+
+    fun openGate() { _gate.value = true }
+
+    /** Back out of the gate when there is a remembered choice to return to. */
+    fun closeGate(): Boolean = hasChoice.also { if (it) _gate.value = false }
 
     suspend fun refreshProfiles() {
         val t = token ?: return
@@ -106,12 +128,13 @@ class AccountRepository @Inject constructor(
         val s = _session.value ?: return
         prefs.edit().putString("activeProfile", id).apply()
         publish(s.token, s.user, id)
-        _pickerPending.value = false
+        _gate.value = false
     }
 
-    suspend fun createProfile(name: String, avatar: String, kids: Boolean) {
+    suspend fun createProfile(name: String, avatar: String, kids: Boolean): Profile {
         val p = api.call("POST", "/v1/profiles", buildJsonObject { put("name", name.trim()); put("avatar", avatar); put("kids", kids) }, token)!!.toProfile()
         setProfiles(_profiles.value + p)
+        return p
     }
 
     suspend fun updateProfile(id: String, name: String, avatar: String, kids: Boolean) {
@@ -123,7 +146,6 @@ class AccountRepository @Inject constructor(
         api.call("DELETE", "/v1/profiles/$id", token = token)
         val rest = _profiles.value.filter { it.id != id }
         setProfiles(rest)
-        if (_session.value?.activeProfile == null && rest.isNotEmpty()) _pickerPending.value = rest.size > 1
     }
 
     // --- TV pairing (device-code flow) ---

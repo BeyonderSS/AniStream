@@ -10,6 +10,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.anistream.app.work.EXTRA_ROUTE
 import com.anistream.app.work.PendingDeepLink
 import com.anistream.app.navigation.AniStreamNavGraph
@@ -19,6 +20,8 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // system splash first (no white flash); it hands straight to the Compose launch animation
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) consumeDeepLink(intent)
         requestNotificationsOnce()

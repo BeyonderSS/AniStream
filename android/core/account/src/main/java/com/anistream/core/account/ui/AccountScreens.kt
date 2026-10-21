@@ -2,58 +2,45 @@ package com.anistream.core.account.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.anistream.core.account.FluentEmojis
-import com.anistream.core.account.Profile
 import com.anistream.core.ui.components.PrimaryButton
 import com.anistream.core.ui.components.SecondaryButton
 import com.anistream.core.ui.components.TextAction
@@ -64,196 +51,82 @@ import com.anistream.core.ui.theme.Ink
 import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Space
 
-/** Round Fluent Emoji avatar. */
+/** Round Fluent Emoji avatar; [contentDescription] null when a parent already labels it. */
 @Composable
-fun AvatarImage(avatarId: String, size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier, ring: Boolean = false) {
+fun AvatarImage(avatarId: String, size: Dp, modifier: Modifier = Modifier, ring: Boolean = false, contentDescription: String? = null) {
     AsyncImage(
         model = FluentEmojis.urlFor(avatarId),
-        contentDescription = null,
+        contentDescription = contentDescription,
         contentScale = ContentScale.Fit,
         modifier = modifier.size(size).clip(CircleShape).background(Bg.overlay)
-            .then(if (ring) Modifier.border(3.dp, Accent.main, CircleShape) else Modifier).padding(size / 8)
-    )
-}
-
-/** Phone overlay: shown at launch when signed in with more than one profile. */
-@Composable
-fun ProfilePickerGate(content: @Composable () -> Unit) {
-    val vm: AccountViewModel = hiltViewModel()
-    val pending by vm.pickerPending.collectAsStateWithLifecycle()
-    val profiles by vm.profiles.collectAsStateWithLifecycle()
-    Box(Modifier.fillMaxSize()) {
-        content()
-        if (pending && profiles.size > 1) {
-            Box(Modifier.fillMaxSize().background(Bg.base).statusBarsPadding().navigationBarsPadding()) {
-                ProfilePicker(profiles, onPick = vm::select)
-            }
-        }
-    }
-}
-
-@Composable
-fun ProfilePicker(profiles: List<Profile>, onPick: (Profile) -> Unit) {
-    Column(Modifier.fillMaxSize().padding(Space.lg), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Text("Who's watching?", style = AppType.title)
-        Spacer(Modifier.height(Space.xxl))
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            horizontalArrangement = Arrangement.spacedBy(Space.xl),
-            verticalArrangement = Arrangement.spacedBy(Space.xl),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(profiles, key = { it.id }) { p ->
-                Column(Modifier.clip(Radius.lg).clickable { onPick(p) }.padding(Space.sm), horizontalAlignment = Alignment.CenterHorizontally) {
-                    AvatarImage(p.avatar, 104.dp)
-                    Spacer(Modifier.height(Space.sm))
-                    Text(p.name, style = AppType.bodyStrong, maxLines = 1)
-                    if (p.kids) Text("Kids", style = AppType.caption)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun field(value: String, onChange: (String) -> Unit, hint: String, password: Boolean = false, type: KeyboardType = KeyboardType.Text) {
-    TextField(
-        value = value, onValueChange = onChange, singleLine = true,
-        placeholder = { Text(hint, style = AppType.body.copy(color = Ink.faint)) },
-        textStyle = AppType.body.copy(color = Ink.high),
-        visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
-        keyboardOptions = KeyboardOptions(keyboardType = if (password) KeyboardType.Password else type),
-        modifier = Modifier.fillMaxWidth().clip(Radius.md),
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = Bg.raised, unfocusedContainerColor = Bg.raised,
-            focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
-            cursorColor = Accent.main, focusedTextColor = Ink.high, unfocusedTextColor = Ink.high
-        )
+            .then(if (ring) Modifier.border(2.dp, Accent.main, CircleShape) else Modifier).padding(size / 8)
     )
 }
 
 /**
- * Sign in / register (optional, never forced) plus, when signed in: profiles, "sign in a TV" and sign out.
- * [pairCode] comes from a deep link (reelm://pair/<code>) and is offered for approval.
+ * Account settings: who is watching (with a switch back to "Who's watching?"), approving a TV and sign out.
+ * Guests get a way into sign in / sign up. [pairCode] comes from a deep link (reelm://pair/<code>) and is ready to approve.
  */
 @Composable
 fun AccountScreen(onBack: () -> Unit, pairCode: String? = null, vm: AccountViewModel = hiltViewModel()) {
     val session by vm.session.collectAsStateWithLifecycle()
-    val profiles by vm.profiles.collectAsStateWithLifecycle()
     val ui by vm.ui.collectAsStateWithLifecycle()
-    var editing by remember { mutableStateOf<Profile?>(null) }
-    var creating by remember { mutableStateOf(false) }
     var code by rememberSaveable { mutableStateOf(pairCode.orEmpty()) }
     LaunchedEffect(session?.token) { if (session != null) vm.refresh() }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Space.lg, vertical = Space.sm)) {
+    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = Space.lg, vertical = Space.sm)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.Rounded.ArrowBack, contentDescription = "Back", tint = Ink.high) }
-            Text(if (session == null) "Sign in" else "Account", style = AppType.heading)
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = Ink.high) }
+            Text("Account", style = AppType.heading, modifier = Modifier.semantics { heading() })
         }
         Spacer(Modifier.height(Space.lg))
 
         val s = session
         if (s == null) {
-            SignInForm(ui.busy, vm::signIn)
-        } else {
-            Text("Signed in as @${s.user.username}", style = AppType.body)
-            Spacer(Modifier.height(Space.xl))
-            Text("Profiles", style = AppType.heading)
-            Spacer(Modifier.height(Space.md))
-            profiles.forEach { p ->
-                val active = p.id == s.activeProfile?.id
-                Row(
-                    Modifier.fillMaxWidth().padding(vertical = Space.xs).clip(Radius.lg).background(if (active) Accent.faint else Bg.raised)
-                        .clickable { vm.select(p) }.padding(Space.md),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    AvatarImage(p.avatar, 48.dp, ring = active)
-                    Column(Modifier.weight(1f).padding(horizontal = Space.md)) {
-                        Text(p.name, style = AppType.bodyStrong)
-                        Text(if (active) "Watching now" else if (p.kids) "Kids" else "Tap to switch", style = AppType.caption)
-                    }
-                    IconButton(onClick = { editing = p }) { Icon(Icons.Rounded.Edit, contentDescription = "Edit ${p.name}", tint = Ink.body) }
-                }
-            }
-            if (profiles.size < 5) {
-                Spacer(Modifier.height(Space.sm))
-                SecondaryButton("Add profile", onClick = { creating = true }, icon = Icons.Rounded.Add)
-            }
-
-            Spacer(Modifier.height(Space.xxl))
-            Text("Sign in a TV", style = AppType.heading)
-            Text("Open Reelm on the TV, choose Sign in with phone, then scan its QR code or type the code here.", style = AppType.caption, modifier = Modifier.padding(vertical = Space.sm))
-            field(code, { code = it.uppercase().filter { c -> c.isLetterOrDigit() }.take(8) }, "TV code")
+            Text("You're watching as a guest", style = AppType.heading)
             Spacer(Modifier.height(Space.sm))
-            PrimaryButton("Approve TV", onClick = { vm.claim(code); code = "" }, enabled = code.length >= 6 && !ui.busy)
-
-            Spacer(Modifier.height(Space.xxl))
-            TextAction("Sign out", onClick = vm::signOut)
+            Text("Your history stays on this phone. Sign in to sync it with your TV and keep separate profiles.", style = AppType.body)
+            Spacer(Modifier.height(Space.xl))
+            PrimaryButton("Sign in or create account", onClick = vm.repo::openGate, modifier = Modifier.fillMaxWidth())
+            return@Column
         }
 
-        ui.error?.let { Text(it, style = AppType.body.copy(color = Accent.danger), modifier = Modifier.padding(top = Space.lg)) }
-        ui.message?.let { Text(it, style = AppType.body.copy(color = Accent.live), modifier = Modifier.padding(top = Space.lg)) }
-    }
+        val p = s.activeProfile
+        Row(
+            Modifier.fillMaxWidth().clip(Radius.lg).background(Bg.raised).padding(Space.lg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (p != null) AvatarImage(p.avatar, 56.dp, ring = true)
+            Column(Modifier.weight(1f).padding(horizontal = Space.md)) {
+                Text(p?.name ?: "No profile picked", style = AppType.bodyStrong)
+                Text("@${s.user.username}", style = AppType.caption)
+            }
+            SecondaryButton("Switch", onClick = vm.repo::openGate, icon = Icons.Rounded.SwapHoriz)
+        }
 
-    if (creating || editing != null) {
-        ProfileEditor(
-            initial = editing, canDelete = profiles.size > 1,
-            onDismiss = { creating = false; editing = null },
-            onSave = { name, avatar, kids -> vm.save(editing?.id, name, avatar, kids); creating = false; editing = null },
-            onDelete = { editing?.let { vm.delete(it.id) }; editing = null }
+        Spacer(Modifier.height(Space.xxl))
+        Text("Sign in a TV", style = AppType.heading, modifier = Modifier.semantics { heading() })
+        Spacer(Modifier.height(Space.sm))
+        Text("On the TV, choose Sign in with phone. Scan its QR code with your camera, or type the code shown under it.", style = AppType.body)
+        Spacer(Modifier.height(Space.lg))
+        AuthField(
+            code, { code = it.uppercase().filter { c -> c.isLetterOrDigit() }.take(8) }, "TV code",
+            imeAction = ImeAction.Done, onIme = { if (code.length >= 6) { vm.claim(code); code = "" } }
         )
-    }
-}
-
-@Composable
-private fun SignInForm(busy: Boolean, submit: (String, String, Boolean) -> Unit) {
-    var register by rememberSaveable { mutableStateOf(false) }
-    var user by rememberSaveable { mutableStateOf("") }
-    var pass by rememberSaveable { mutableStateOf("") }
-    Text("An account keeps your watch history in sync across your phone and TV. It is optional.", style = AppType.body)
-    Spacer(Modifier.height(Space.lg))
-    field(user, { user = it.lowercase().filter { c -> c.isLetterOrDigit() || c == '_' } }, "Username (a-z, 0-9, _)")
-    Spacer(Modifier.height(Space.sm))
-    field(pass, { pass = it }, if (register) "Password (8+ characters)" else "Password", password = true)
-    Spacer(Modifier.height(Space.lg))
-    PrimaryButton(if (register) "Create account" else "Sign in", onClick = { submit(user, pass, register) }, enabled = !busy && user.length >= 3 && pass.length >= 8)
-    Spacer(Modifier.height(Space.sm))
-    TextAction(if (register) "I already have an account" else "Create an account", onClick = { register = !register })
-}
-
-/** Add / edit a profile: name, kids switch and the Fluent Emoji avatar grid. */
-@Composable
-private fun ProfileEditor(initial: Profile?, canDelete: Boolean, onDismiss: () -> Unit, onSave: (String, String, Boolean) -> Unit, onDelete: () -> Unit) {
-    var name by remember { mutableStateOf(initial?.name.orEmpty()) }
-    var avatar by remember { mutableStateOf(initial?.avatar ?: FluentEmojis.all.first().id) }
-    var kids by remember { mutableStateOf(initial?.kids ?: false) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Bg.raised,
-        title = { Text(if (initial == null) "New profile" else "Edit profile", style = AppType.heading) },
-        text = {
-            Column {
-                field(name, { name = it.take(20) }, "Name")
-                Spacer(Modifier.height(Space.md))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Kids profile", style = AppType.body, modifier = Modifier.weight(1f))
-                    Switch(checked = kids, onCheckedChange = { kids = it })
-                }
-                Spacer(Modifier.height(Space.md))
-                LazyVerticalGrid(columns = GridCells.Fixed(4), horizontalArrangement = Arrangement.spacedBy(Space.sm), verticalArrangement = Arrangement.spacedBy(Space.sm), modifier = Modifier.height(260.dp)) {
-                    items(FluentEmojis.all, key = { it.id }) { e ->
-                        AvatarImage(e.id, 56.dp, ring = e.id == avatar, modifier = Modifier.clickable { avatar = e.id })
-                    }
-                }
-            }
-        },
-        confirmButton = { TextAction("Save", onClick = { if (name.isNotBlank()) onSave(name, avatar, kids) }) },
-        dismissButton = {
-            Row {
-                if (initial != null && canDelete) TextAction("Delete", onClick = onDelete)
-                TextAction("Cancel", onClick = onDismiss)
+        Spacer(Modifier.height(Space.sm))
+        PrimaryButton("Approve TV", onClick = { vm.claim(code); code = "" }, enabled = code.length >= 6, loading = ui.busy, modifier = Modifier.fillMaxWidth())
+        ui.error?.let { Spacer(Modifier.height(Space.md)); ErrorNote(it) }
+        ui.message?.let {
+            Spacer(Modifier.height(Space.md))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = Accent.live, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(Space.sm))
+                Text(it, style = AppType.body.copy(color = Accent.live))
             }
         }
-    )
+
+        Spacer(Modifier.height(Space.xxl))
+        TextAction("Sign out", onClick = vm::signOut, color = Accent.danger)
+        Spacer(Modifier.height(Space.xl))
+    }
 }

@@ -127,6 +127,7 @@ dependencies {
     implementation(libs.coil.compose)
 
     implementation(libs.core.ktx)
+    implementation(libs.core.splashscreen)
     implementation(libs.lifecycle.runtime)
     implementation(libs.coroutines.android)
 
