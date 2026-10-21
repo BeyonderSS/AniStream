@@ -64,7 +64,13 @@ fun TvHomeScreen(filter: HomeFilter, homeVm: HomeViewModel, moviesVm: MoviesHome
 
     val lowEnd = LocalLowEnd.current
     // ponytail: rows rebuild only when the data changes, not on every D-pad move
-    val rows = remember(anime, media, filter, lowEnd) { buildRows(filter, anime, media, lowEnd, nav) }
+    var removing by remember { mutableStateOf<WatchHistory?>(null) }
+    val rows = remember(anime, media, filter, lowEnd) { buildRows(filter, anime, media, lowEnd, nav) { removing = it } }
+    removing?.let { h ->
+        TvConfirm("Remove ${h.animeTitle} from history?", "Remove", {
+            (if (h.kind == "media") moviesVm::removeHistory else homeVm::removeHistory)(h.animeSlug); removing = null
+        }, { removing = null })
+    }
 
     // Focus is written here but read only by the backdrop/hero composables below, so a D-pad move
     // recomposes those two and the two cards whose focus changed, never the whole screen.
@@ -161,7 +167,8 @@ private fun buildRows(
     anime: com.anistream.feature.home.HomeUiState,
     media: com.anistream.feature.movies.MoviesHomeUiState,
     lowEnd: Boolean,
-    nav: NavController
+    nav: NavController,
+    onRemove: (WatchHistory) -> Unit
 ): List<TvRow> {
     fun animeItem(row: String, a: AnimeSearchResult) = TvItem(
         key = "$row|${a.slug}", title = a.title, imageUrl = a.posterUrl,
@@ -180,6 +187,7 @@ private fun buildRows(
         subtitle = h.subtitle ?: h.lastEpisodeWatched.takeIf { it > 0 }?.let { "Episode $it" },
         meta = listOfNotNull(if (h.kind == "media") "Movies & TV" else "Anime", h.subtitle),
         progress = h.watchProgress,
+        onLongClick = { onRemove(h) },
         // anime resumes straight into the player; media goes through detail, where Resume is the first focus
         onClick = {
             if (h.kind == "media") nav.navigate(TvRoutes.movie(h.mediaId ?: h.animeSlug.substringBefore(":s")))

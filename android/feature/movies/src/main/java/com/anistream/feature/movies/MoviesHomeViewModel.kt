@@ -76,6 +76,10 @@ class MoviesHomeViewModel @Inject constructor(
         }
     }
 
+    fun removeHistory(slug: String) {
+        viewModelScope.launch { history.delete(slug); refreshContinueWatching() }
+    }
+
     fun refreshContinueWatching() {
         viewModelScope.launch {
             val list = history.getContinueWatching("media").getOrNull().orEmpty()

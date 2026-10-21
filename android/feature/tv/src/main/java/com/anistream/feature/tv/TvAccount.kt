@@ -184,7 +184,8 @@ private fun TvGate(vm: AccountViewModel) {
                 onPick = { p -> if (manage) { editId = p.id; go(TvPage.Edit) } else vm.select(p) },
                 onAdd = { editId = ""; go(TvPage.Edit) },
                 onManage = { manage = !manage },
-                onSignOut = vm::signOut
+                onSignOut = vm::signOut,
+                onClearHistory = vm::clearHistory
             )
         }
     }
@@ -246,8 +247,11 @@ private fun TvWhosWatching(
     onPick: (Profile) -> Unit,
     onAdd: () -> Unit,
     onManage: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    onClearHistory: () -> Unit
 ) {
+    var confirm by remember { mutableStateOf(false) }
+    if (confirm) TvConfirm("Clear watch history for this profile? It empties on all your devices.", "Clear all", { confirm = false; onClearHistory() }, { confirm = false })
     if (profiles.isEmpty()) { TvMessage("Loading profiles"); return }
     // land on the profile in use (or the first), and again after leaving manage mode
     val focusIndex = profiles.indexOfFirst { it.id == activeId }.coerceAtLeast(0)
@@ -269,6 +273,7 @@ private fun TvWhosWatching(
             if (manage) TvPill("Done", onManage)
             else {
                 TvPill("Manage profiles", onManage, icon = Icons.Rounded.Edit)
+                TvPill("Clear history", { confirm = true })
                 TvPill("Sign out", onSignOut)
             }
         }

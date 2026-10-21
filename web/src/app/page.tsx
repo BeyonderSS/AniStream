@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Info, Play } from "lucide-react";
-import { animeCard, Chips, ContinueRow, kidsOk, mediaCard, pill, Row } from "@/components/app";
+import { animeCard, Chips, ContinueRow, RecommendedRow, kidsOk, mediaCard, pill, Row } from "@/components/app";
 import { ShimmerButton } from "@/components/ui/shimmer-button";
 import { useApi, useSession } from "@/lib/session";
 import { watchHref } from "@/lib/core";
@@ -83,6 +83,7 @@ export default function HomePage() {
     <main className="pb-16">
       {loading && !slides.length ? <div className="skel -mt-16 md:-mt-20 h-[78vh] max-h-[820px] min-h-[500px]" /> : slides.length ? <Hero slides={slides} /> : <div className="h-8" />}
       <ContinueRow />
+      <RecommendedRow />
       <Row title="Trending anime" path="anime/home" map={(d) => d.trending.map(animeCard)} />
       <Row title="Popular movies" path="movies/catalog?key=movie/top" map={(d) => d.map(mediaCard)} />
       <Row title="Popular series" path="movies/catalog?key=series/top" map={(d) => d.map(mediaCard)} />

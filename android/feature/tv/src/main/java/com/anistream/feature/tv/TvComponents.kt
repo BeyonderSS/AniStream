@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.BorderStroke
@@ -133,6 +134,7 @@ data class TvItem(
     val meta: List<String> = emptyList(),
     val progress: Float? = null,
     val subtitle: String? = null,
+    val onLongClick: (() -> Unit)? = null,
     val onClick: () -> Unit
 )
 
@@ -191,6 +193,7 @@ fun TvCard(item: TvItem, wide: Boolean, onFocused: () -> Unit, modifier: Modifie
     var focused by remember { mutableStateOf(false) }
     Card(
         onClick = item.onClick,
+        onLongClick = item.onLongClick,
         modifier = modifier
             .width(if (wide) 248.dp else 132.dp)
             .aspectRatio(if (wide) 16f / 9f else 2f / 3f)
@@ -314,3 +317,19 @@ fun TvMessage(text: String, modifier: Modifier = Modifier, action: (@Composable 
 }
 
 fun scoreLabel(score: Double?): String? = score?.takeIf { it > 0 }?.let { "★ " + String.format(java.util.Locale.US, "%.1f", it) }
+
+/** Modal yes/no for destructive actions (remove one item, clear all); focus starts on Cancel. */
+@Composable
+fun TvConfirm(message: String, confirmLabel: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        val first = remember { FocusRequester() }
+        LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
+        Column(Modifier.background(Bg.overlay, Radius.md).padding(32.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            Text(message, style = TvType.body.copy(color = Ink.high))
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                TvPill("Cancel", onDismiss, Modifier.focusRequester(first))
+                TvPill(confirmLabel, onConfirm)
+            }
+        }
+    }
+}

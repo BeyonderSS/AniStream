@@ -9,7 +9,7 @@ import "@videojs/react/video/skin.css";
 import { ArrowLeft, Check, Copy, MonitorPlay, RotateCcw, SkipForward, Users, X, Menu as MenuIcon } from "lucide-react";
 import { Avatar, pill } from "@/components/app";
 import { ReelMark } from "@/components/reel";
-import { deviceId, get, getHistory, playKey, proxied, reelm, saveProgress, toPlay, WS, type Play as P } from "@/lib/core";
+import { deviceId, get, getHistory, epKey, playKey, proxied, reelm, saveProgress, toPlay, WS, type Play as P } from "@/lib/core";
 import { useApi, useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 type Source = { src: string; hls: boolean; label: string; codec?: string };
@@ -106,7 +106,7 @@ function Player() {
   };
   const onMeta = (v: HTMLVideoElement) => {
     if (p?.kind === "live") return;
-    const hist = getHistory(pid)[p ? playKey(p) : ""];
+    const hist = p && epKey(getHistory(pid)[playKey(p)]?.payload ?? p) === epKey(p) ? getHistory(pid)[playKey(p)] : undefined;
     const at = keep.current || t0 || (f0 && v.duration ? f0 * v.duration : 0) || (hist && hist.duration && hist.position / hist.duration < 0.95 ? hist.position : 0);
     if (at > 5) v.currentTime = at;
   };

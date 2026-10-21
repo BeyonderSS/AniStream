@@ -68,6 +68,7 @@ class HomeViewModel @Inject constructor(
     private val movies: MoviesRepository,
     private val liveTv: LiveTvRepository,
     private val favorites: FavoriteRepository,
+    private val history: com.anistream.domain.repository.WatchHistoryRepository,
     recommendations: RecommendationsRepository,
     sync: HistorySync
 ) : ViewModel() {
@@ -114,6 +115,10 @@ class HomeViewModel @Inject constructor(
             _uiState.update { it.copy(channels = channels.take(CHANNELS_ON_HOME)) }
         }
         refreshContinueWatching()
+    }
+
+    fun removeHistory(slug: String) {
+        viewModelScope.launch { history.delete(slug); refreshContinueWatching() }
     }
 
     /** Called on every resume so progress saved by the player shows up immediately. */

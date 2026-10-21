@@ -31,7 +31,8 @@ data class FavoritesUiState(
 @HiltViewModel
 class FavoritesViewModel @Inject constructor(
     private val getFavorites: GetFavoritesUseCase,
-    private val favoriteRepository: FavoriteRepository
+    private val favoriteRepository: FavoriteRepository,
+    private val history: com.anistream.domain.repository.WatchHistoryRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FavoritesUiState())
@@ -74,6 +75,8 @@ class FavoritesViewModel @Inject constructor(
         applySort()
         viewModelScope.launch { favoriteRepository.remove(favorite.animeSlug) }
     }
+
+    fun clearHistory() { viewModelScope.launch { history.clear() } }
 
     fun restoreFavorite(favorite: FavoriteAnime) {
         viewModelScope.launch {

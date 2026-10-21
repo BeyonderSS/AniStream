@@ -101,6 +101,15 @@ fun FavoritesScreen(
         }
     }
 
+    var confirmClear by remember { mutableStateOf(false) }
+    if (confirmClear) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { confirmClear = false },
+        title = { Text("Clear watch history?") },
+        text = { Text("Continue Watching empties on all your devices. Favourites stay.") },
+        confirmButton = { TextButton(onClick = { confirmClear = false; viewModel.clearHistory() }) { Text("Clear all") } },
+        dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } }
+    )
+
     Scaffold(
         containerColor = Bg.base,
         contentWindowInsets = WindowInsets(0),
@@ -113,6 +122,7 @@ fun FavoritesScreen(
             ) {
                 Text("Favourites", style = AppType.title, modifier = Modifier.weight(1f))
                 if (uiState.favorites.isNotEmpty()) SortMenu(uiState.sortOption, viewModel::onSortChange)
+                TextButton(onClick = { confirmClear = true }) { Text("Clear history", style = AppType.label, color = Ink.body) }
             }
 
             val state = when {

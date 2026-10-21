@@ -52,6 +52,10 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -257,7 +261,7 @@ fun HomeScreen(
                                         horizontalArrangement = Arrangement.spacedBy(Space.md)
                                     ) {
                                         items(uiState.continueWatching, key = { it.animeSlug }) { h ->
-                                            ResumeCard(h) {
+                                            ResumeCard(h, onRemove = { viewModel.removeHistory(h.animeSlug) }) {
                                                 if (h.kind == "media") onMediaClick(h.mediaId ?: h.animeSlug.replace(EpisodeSuffix, ""))
                                                 else onPlayEpisode(h.animeSlug, h.resumeEpisode())
                                             }
@@ -577,12 +581,13 @@ private fun HeroPage(item: HeroItem, inList: Boolean, onPlay: () -> Unit, onTogg
 
 /** 16:9 resume card for anime and Movies & TV: artwork, play glyph, amber progress edge, title + where you are. */
 @Composable
-private fun ResumeCard(history: WatchHistory, onClick: () -> Unit) {
+private fun ResumeCard(history: WatchHistory, onRemove: () -> Unit, onClick: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
     Column(
         Modifier
             .width(240.dp)
             .clip(Radius.md)
-            .pressClickable(onClick = onClick)
+            .pressClickable(onLongClick = { menu = true }, onClick = onClick)
     ) {
         Box(
             Modifier
@@ -621,6 +626,9 @@ private fun ResumeCard(history: WatchHistory, onClick: () -> Unit) {
         Text(history.animeTitle, style = AppType.captionStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
         val where = if (history.kind == "media") history.subtitle else "Episode ${history.resumeEpisode()}"
         if (!where.isNullOrBlank()) Text(where, style = AppType.numeric, maxLines = 1)
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(text = { Text("Remove from history") }, onClick = { menu = false; onRemove() })
+        }
     }
 }
 

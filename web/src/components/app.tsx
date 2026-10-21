@@ -3,10 +3,10 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Search, Tv, Library, CalendarDays, Home, Play, Check, Plus, ChevronLeft, ChevronRight, Star, Users, Popcorn, LogOut } from "lucide-react";
+import { X, Search, Tv, Library, CalendarDays, Home, Play, Check, Plus, ChevronLeft, ChevronRight, Star, Users, Popcorn, LogOut } from "lucide-react";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { ReelMark } from "@/components/reel";
-import { avatarUrl, continueWatching, EMOJI_GROUPS, entryHref, entrySub, getFavs, kids, toggleFav, type CardData } from "@/lib/core";
+import { avatarUrl, continueWatching, EMOJI_GROUPS, entryHref, entrySub, getFavs, kids, recSeeds, removeHistory, toggleFav, type CardData } from "@/lib/core";
 import { useApi, useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -132,7 +132,8 @@ const Img = ({ src, className }: { src?: string; className?: string }) => {
 
 export function PosterCard({ c, wide, fill }: { c: CardData; wide?: boolean; fill?: boolean }) {
   return (
-    <Link href={c.href} className={cn("group block shrink-0 snap-start rounded-xl outline-none", fill ? "w-full" : wide ? "w-64 sm:w-72" : "w-32 sm:w-40 lg:w-44")}>
+    <div className={cn("group/rm relative shrink-0 snap-start", fill ? "w-full" : wide ? "w-64 sm:w-72" : "w-32 sm:w-40 lg:w-44")}>
+    <Link href={c.href} className="group block w-full rounded-xl outline-none">
       <div className={cn("beam relative overflow-hidden rounded-xl bg-slate shadow-[0_8px_24px_rgb(10_12_18/0.5)] group-focus-visible:shadow-[0_0_0_2px_#f2b45a,0_0_28px_rgb(242_180_90/0.35)]", wide ? "aspect-video" : "aspect-[2/3]")}>
         <Img src={c.poster} className="size-full object-cover transition-transform duration-500 ease-dusk group-hover:scale-[1.06]" />
         {c.rating && <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-dusk/80 px-2 py-0.5 text-[11px] font-semibold backdrop-blur"><Star className="size-3 fill-primary text-primary" />{c.rating}</span>}
@@ -147,6 +148,11 @@ export function PosterCard({ c, wide, fill }: { c: CardData; wide?: boolean; fil
       <p className="mt-2 line-clamp-1 text-sm font-medium text-foreground/90">{c.title}</p>
       {c.sub && <p className="line-clamp-1 text-xs text-foreground/52">{c.sub}</p>}
     </Link>
+    {c.onRemove && (
+      <button type="button" aria-label={`Remove ${c.title} from history`} onClick={c.onRemove}
+        className="absolute right-2 top-2 grid size-7 place-items-center rounded-full bg-dusk/80 text-foreground backdrop-blur transition-opacity hover:bg-dusk focus-visible:opacity-100 md:opacity-0 md:group-hover/rm:opacity-100"><X className="size-4" /></button>
+    )}
+    </div>
   );
 }
 
@@ -218,11 +224,32 @@ export const mediaCard = (m: any): CardData => ({
 export function ContinueRow() {
   const { s } = useSession();
   const [items, setItems] = useState<CardData[]>([]);
+  const load = () => {
+    if (!s.profile) return;
+    const pid = s.profile.id;
+    setItems(continueWatching(pid).map((e) => ({ href: entryHref(e), title: e.payload.title || "Untitled", poster: e.payload.poster, sub: entrySub(e.payload), progress: e.duration ? e.position / e.duration : 0,
+      onRemove: () => removeHistory(pid, s.token, e.payload).then(load) })));
+  };
+  useEffect(load, [s.profile]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <Rail title="Continue watching" items={items} wide />;
+}
+
+/** "Recommended for you": TMDB + hianime picks ranked server-side (/api/recs) from this profile's history; kids profiles only see kid-safe picks. */
+export function RecommendedRow() {
+  const { s } = useSession();
+  const [items, setItems] = useState<CardData[]>([]);
   useEffect(() => {
     if (!s.profile) return;
-    setItems(continueWatching(s.profile.id).map((e) => ({ href: entryHref(e), title: e.payload.title || "Untitled", poster: e.payload.poster, sub: entrySub(e.payload), progress: e.duration ? e.position / e.duration : 0 })));
+    const body = recSeeds(s.profile.id);
+    if (!body.seeds.length) return setItems([]);
+    let live = true;
+    fetch("/api/recs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...body, kids: !!s.profile.kids }) })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d: CardData[]) => live && setItems(d.filter((c) => allowed(c, s.profile?.kids))))
+      .catch(() => {});
+    return () => { live = false; };
   }, [s.profile]);
-  return <Rail title="Continue watching" items={items} wide />;
+  return <Rail title="Recommended for you" items={items} />;
 }
 
 export function FavButton({ c }: { c: CardData }) {

@@ -16,7 +16,10 @@ data class AccountUi(val busy: Boolean = false, val error: String? = null, val m
 
 /** Shared by the launch gate (welcome, sign in, sign up, who's watching, profile editor) and the account screen. */
 @HiltViewModel
-class AccountViewModel @Inject constructor(val repo: AccountRepository) : ViewModel() {
+class AccountViewModel @Inject constructor(val repo: AccountRepository, private val history: com.anistream.domain.repository.WatchHistoryRepository) : ViewModel() {
+    /** tombstones every row of the active profile; HistorySync pushes them (guests stay local) */
+    fun clearHistory() { viewModelScope.launch { history.clear() } }
+
     val session = repo.session
     val profiles = repo.profiles
     val gate = repo.gate
