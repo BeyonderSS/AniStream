@@ -20,8 +20,13 @@ type Device = { deviceId: string; deviceName: string; kind: string };
 const parse = (v: string | null) => { try { return toPlay(JSON.parse(v ?? "")); } catch { return null; } };
 const href = (p: P, extra = "") => `/watch?p=${encodeURIComponent(JSON.stringify(p))}${extra}`;
 /** Raw errors from the stream hosts are not for people; say what happened and what to try. */
+// MovieBox's video host only serves app user agents; the Reelm Helper extension sets one for that host alone.
+const HELPER_URL = () => /firefox/i.test(navigator.userAgent)
+  ? process.env.NEXT_PUBLIC_HELPER_FIREFOX || "/reelm-helper.zip"
+  : process.env.NEXT_PUBLIC_HELPER_CHROME || "/reelm-helper.zip";
 const friendly = (m: string) =>
-  m === "hevc" ? { t: "Your browser can't play this format", b: "This title is only available in HEVC (H.265). Open it in Edge or Safari, or in the Reelm phone or TV app." }
+  m === "helper" ? { t: "One quick install to watch movies", b: "Movies need the free Reelm Helper browser extension. Install it, then press Retry. Anime and Live TV work without it." }
+  : m === "hevc" ? { t: "Your browser can't play this format", b: "This title is only available in HEVC (H.265). Open it in Edge or Safari, or in the Reelm phone or TV app." }
   : /isn't available|not available|no stream|no streams|release/i.test(m) ? { t: "This one isn't streaming yet", b: "No source has it right now. Try again later, or pick another episode." }
   : /network|fetch|manifest|frag|level|load/i.test(m) ? { t: "The stream stopped loading", b: "The video host didn't answer. Retry, or switch quality in settings." }
   : /4\d\d|5\d\d|440/.test(m) ? { t: "The video host turned us away", b: "This usually clears up in a minute. Retry to ask again." }
@@ -75,6 +80,7 @@ function Player() {
         if (r.malId) get(`aniskip?mal=${r.malId}&ep=${p.ep}`).then((d) => live && setSkips((d.results ?? []).map((x: any) => ({ s: x.interval.startTime, e: x.interval.endTime, type: x.skipType })))).catch(() => {});
         return [[{ src: proxied(r.master, r.referer), hls: true, label: "Auto" }], r.subtitles.map((x: Sub) => ({ ...x, url: proxied(x.url, r.referer) }))] as const;
       }
+      if (!document.documentElement.dataset.reelmHelper) throw new Error("helper");
       const list = await get<any[]>(`movies/stream?id=${encodeURIComponent(p.id)}&type=${p.type}&title=${encodeURIComponent(p.title)}&year=${p.year ?? ""}&s=${p.season ?? 0}&e=${p.episode ?? 0}`);
       if (!list.length) throw new Error("No streams found for this title.");
       return [list.map((x) => ({ src: x.url, hls: /\.m3u8(\?|$)/.test(x.url), label: x.label, codec: x.codec })), list[0].subtitles.map((x: Sub) => ({ ...x, url: `/api/sub?u=${encodeURIComponent(x.url)}` }))] as const;
@@ -216,7 +222,8 @@ function Player() {
                 <h2 className="font-display text-xl font-semibold">{fe.t}</h2>
                 <p className="text-sm text-foreground/72">{fe.b}</p>
                 <div className="mt-2 flex gap-2">
-                  <button className={pill.primary} onClick={() => { setErr(""); setSi(0); setNonce(nonce + 1); }}><RotateCcw />Retry</button>
+                  {err === "helper" && <a href={HELPER_URL()} target="_blank" rel="noreferrer" className={pill.primary}>Install Reelm Helper</a>}
+                  <button className={err === "helper" ? pill.secondary : pill.primary} onClick={() => { setErr(""); setSi(0); setNonce(nonce + 1); }}><RotateCcw />Retry</button>
                   <Link href={back} className={pill.secondary}>Back</Link>
                 </div>
                 {next && <button className="mt-1 text-sm text-primary hover:underline" onClick={() => go(next)}>Play the next episode instead</button>}

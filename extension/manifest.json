@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Reelm Helper",
+  "version": "1.0.0",
+  "description": "Lets the Reelm website play movies by sending the video host the user agent it expects.",
+  "icons": { "128": "icon.png" },
+  "permissions": ["declarativeNetRequest"],
+  "host_permissions": ["*://*.hakunaymatata.com/*"],
+  "declarative_net_request": { "rule_resources": [{ "id": "ua", "enabled": true, "path": "rules.json" }] },
+  "content_scripts": [{ "matches": ["https://reelm-web.ssbeyonder.workers.dev/*", "http://localhost/*"], "js": ["content.js"], "run_at": "document_start" }],
+  "browser_specific_settings": { "gecko": { "id": "helper@reelm.app", "strict_min_version": "128.0" } }
+}

@@ -1,0 +1,6 @@
+[{
+  "id": 1,
+  "priority": 1,
+  "action": { "type": "modifyHeaders", "requestHeaders": [{ "header": "user-agent", "operation": "set", "value": "okhttp/4.12.0" }] },
+  "condition": { "requestDomains": ["hakunaymatata.com"], "resourceTypes": ["media", "xmlhttprequest", "other"] }
+}]
