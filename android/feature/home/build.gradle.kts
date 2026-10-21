@@ -26,6 +26,7 @@ android {
 
 dependencies {
     implementation(project(":domain"))
+    implementation(project(":core:account"))
     implementation(project(":core:common"))
     implementation(project(":core:ui"))
 

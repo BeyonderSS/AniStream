@@ -387,7 +387,15 @@ export class Room extends DurableObject<Env> {
       return;
     }
     const me = ws.deserializeAttachment() as Member | null;
-    if (!me || !["play", "pause", "seek"].includes(m.type) || typeof m.position !== "number") return;
+    if (!me) return;
+    if (m.type === "load") { // switch media: new payload, playback reset
+      if (!m.payload || typeof m.payload !== "object") return;
+      const at = now();
+      await s.put({ payload: m.payload, playing: false, position: 0, at });
+      this.broadcast({ type: "load", payload: m.payload, at, by: me.id });
+      return;
+    }
+    if (!["play", "pause", "seek"].includes(m.type) || typeof m.position !== "number") return;
     const at = now();
     const playing = m.type === "seek" ? await s.get("playing") : m.type === "play";
     await s.put({ playing, position: m.position, at });

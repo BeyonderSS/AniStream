@@ -131,6 +131,7 @@ import com.anistream.core.ui.theme.Ink
 import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Space
 import com.anistream.feature.party.PartyOverlay
+import com.anistream.feature.party.animePayload
 import com.anistream.feature.party.WatchTogetherSection
 import com.anistream.feature.party.animePayload
 import kotlinx.coroutines.delay
@@ -204,7 +205,7 @@ fun PlayerScreen(
             }
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
-        PartyOverlay(viewModel.player, Modifier.align(Alignment.TopEnd))
+        PartyOverlay(viewModel.player, Modifier.align(Alignment.TopEnd), payload = ui.animeSlug.takeIf { it.isNotBlank() }?.let { animePayload(it, ui.animeTitle, ui.episodeNumber, ui.posterUrl) })
     }
 
     if (showSettings) {

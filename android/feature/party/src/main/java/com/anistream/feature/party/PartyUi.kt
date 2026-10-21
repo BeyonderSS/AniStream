@@ -55,7 +55,6 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-// ponytail: display name is a parameter; the accounts agent wires the profile name in where these defaults are used
 const val GUEST = "Guest"
 
 /**
@@ -106,7 +105,7 @@ private class Sync(val player: Player, val client: PartyClient, host: Boolean) :
  * and draws the member avatar strip at the top end.
  */
 @Composable
-fun PartyOverlay(player: Player, modifier: Modifier = Modifier, vm: PartyViewModel = hiltViewModel()) {
+fun PartyOverlay(player: Player, modifier: Modifier = Modifier, payload: JsonObject? = null, vm: PartyViewModel = hiltViewModel()) {
     val room by vm.client.room.collectAsStateWithLifecycle()
     val r = room ?: return
     val sync = remember(player) { Sync(player, vm.client, r.host) }
@@ -114,7 +113,15 @@ fun PartyOverlay(player: Player, modifier: Modifier = Modifier, vm: PartyViewMod
         player.addListener(sync)
         onDispose {
             player.removeListener(sync)
-            vm.client.leave() // leaving the player leaves the party
+            // leaving the player leaves the party, unless a `load` is swapping this screen for the next one
+            if (vm.client.switching) vm.client.switching = false else vm.client.leave()
+        }
+    }
+    // we switched episode/movie: tell the room (the server pauses everyone at 0), then resume it if we are playing
+    LaunchedEffect(payload) {
+        if (payload != null && !samePayload(payload, vm.client.room.value?.payload)) {
+            vm.client.load(payload)
+            if (player.playWhenReady) vm.client.send("play", player.currentPosition)
         }
     }
     LaunchedEffect(sync) {
@@ -140,7 +147,7 @@ private fun Avatar(m: Member) {
 
 /** Phone player sheet: "Watch together" (create a room, show the code, share it) or the live room with Leave. */
 @Composable
-fun WatchTogetherSection(payload: JsonObject, name: String = GUEST, vm: PartyViewModel = hiltViewModel()) {
+fun WatchTogetherSection(payload: JsonObject, vm: PartyViewModel = hiltViewModel()) {
     if (!vm.client.enabled) return
     val room by vm.client.room.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -154,7 +161,7 @@ fun WatchTogetherSection(payload: JsonObject, name: String = GUEST, vm: PartyVie
     if (r == null) {
         PrimaryButton(if (busy) "Creating room…" else "Start a party", enabled = !busy, modifier = Modifier.fillMaxWidth(), onClick = {
             busy = true; failed = false
-            scope.launch { failed = vm.create(payload, name) == null; busy = false }
+            scope.launch { failed = vm.create(payload) == null; busy = false }
         })
         if (failed) Text("Couldn't create a room", style = AppType.caption.copy(color = Accent.danger), modifier = Modifier.padding(top = Space.sm))
     } else {
@@ -174,7 +181,7 @@ fun WatchTogetherSection(payload: JsonObject, name: String = GUEST, vm: PartyVie
 
 /** Code entry; on success hands the destination to [onJoined]. */
 @Composable
-fun JoinPartyDialog(onDismiss: () -> Unit, onJoined: (PartyDestination) -> Unit, name: String = GUEST, vm: PartyViewModel = hiltViewModel()) {
+fun JoinPartyDialog(onDismiss: () -> Unit, onJoined: (PartyDestination) -> Unit, vm: PartyViewModel = hiltViewModel()) {
     var code by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -201,7 +208,7 @@ fun JoinPartyDialog(onDismiss: () -> Unit, onJoined: (PartyDestination) -> Unit,
             TextButton(enabled = code.length == 6 && !busy, onClick = {
                 busy = true
                 scope.launch {
-                    val dest = vm.join(code, name)
+                    val dest = vm.join(code)
                     busy = false
                     if (dest == null) error = "Couldn't join that party" else onJoined(dest)
                 }
@@ -214,7 +221,7 @@ fun JoinPartyDialog(onDismiss: () -> Unit, onJoined: (PartyDestination) -> Unit,
 /** Phone "Reelm" menu: Join party + Check for updates. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReelmMenu(onDismiss: () -> Unit, onOpen: (PartyDestination) -> Unit, name: String = GUEST, vm: UpdateViewModel = hiltViewModel(), party: PartyViewModel = hiltViewModel()) {
+fun ReelmMenu(onDismiss: () -> Unit, onOpen: (PartyDestination) -> Unit, vm: UpdateViewModel = hiltViewModel(), party: PartyViewModel = hiltViewModel()) {
     val ui by vm.updates.ui.collectAsStateWithLifecycle()
     var joining by remember { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Bg.raised) {
@@ -225,7 +232,7 @@ fun ReelmMenu(onDismiss: () -> Unit, onOpen: (PartyDestination) -> Unit, name: S
             MenuRow(if (ui.checking) "Checking…" else "Check for updates", ui.status) { vm.updates.checkNow() }
         }
     }
-    if (joining) JoinPartyDialog(onDismiss = { joining = false }, onJoined = { joining = false; onDismiss(); onOpen(it) }, name = name)
+    if (joining) JoinPartyDialog(onDismiss = { joining = false }, onJoined = { joining = false; onDismiss(); onOpen(it) })
 }
 
 @Composable

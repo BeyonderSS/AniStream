@@ -1,12 +1,16 @@
 package com.anistream.feature.party
 
 import androidx.lifecycle.ViewModel
+import com.anistream.core.account.AccountRepository
 import com.anistream.core.common.Result
 import com.anistream.domain.model.PlaybackRequest
 import com.anistream.domain.repository.MoviesRepository
 import com.anistream.domain.repository.NowPlaying
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
@@ -37,16 +41,23 @@ fun mediaPayload(r: PlaybackRequest): JsonObject = buildJsonObject {
 @HiltViewModel
 class PartyViewModel @Inject constructor(
     val client: PartyClient,
-    private val movies: MoviesRepository
+    private val movies: MoviesRepository,
+    private val accounts: AccountRepository
 ) : ViewModel() {
+    private val profile get() = accounts.session.value?.activeProfile
+    private val name get() = profile?.name?.ifBlank { null } ?: GUEST
+    private val avatar get() = profile?.avatar.orEmpty()
 
-    /** Creates a room for [payload] and joins it as host; returns the code or null. */
-    suspend fun create(payload: JsonObject, name: String): String? =
-        client.create(payload)?.also { client.join(it, name, host = true) }
+    /** Other members switching media: the player destination to replace the current one with. Collect from the nav host. */
+    val loads: Flow<PartyDestination> = client.loads.map { resolve(it) }.filterNotNull().onEach { client.switching = true }
+
+    /** Creates a room for [payload] and joins it as host (as the active profile, "Guest" if none); returns the code or null. */
+    suspend fun create(payload: JsonObject): String? =
+        client.create(payload)?.also { client.join(it, name, avatar, host = true) }
 
     /** Joins [code], waits for the room `state`, and prepares the player for its payload. Null = couldn't join. */
-    suspend fun join(code: String, name: String): PartyDestination? {
-        client.join(code, name)
+    suspend fun join(code: String): PartyDestination? {
+        client.join(code, name, avatar)
         val room = withTimeoutOrNull(8_000) { client.room.filterNotNull().first() }
         val payload = room?.payload
         val dest = payload?.let { resolve(it) }

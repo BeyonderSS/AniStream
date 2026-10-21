@@ -2,6 +2,7 @@ package com.anistream.feature.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.anistream.core.account.HistorySync
 import com.anistream.domain.model.Recommendation
 import com.anistream.domain.model.WatchHistory
 import com.anistream.domain.repository.RecommendationsRepository
@@ -29,7 +30,8 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     private val getContinueWatching: GetContinueWatchingUseCase,
     private val getHomeContent: GetHomeContentUseCase,
-    recommendations: RecommendationsRepository
+    recommendations: RecommendationsRepository,
+    sync: HistorySync
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -37,6 +39,8 @@ class HomeViewModel @Inject constructor(
 
     init {
         loadContent()
+        // a history pull from the account changes Continue Watching
+        viewModelScope.launch { sync.pulled.collect { refreshContinueWatching() } }
         viewModelScope.launch {
             recommendations.observe("anime").collect { picks -> _uiState.update { it.copy(picks = picks) } }
         }

@@ -154,6 +154,15 @@ describe("rooms", () => {
     expect(seek.at).toBeGreaterThan(0);
     expect(seek.by).toBe(st.members[0].id);
 
+    // load: stored as the room payload, broadcast with `by`, and visible to late joiners
+    const next = { title: "Movie 2", episode: 2 };
+    a.ws.send(JSON.stringify({ type: "load", payload: next, position: 0 }));
+    const load = await until(() => b.msgs.find((m) => m.type === "load"));
+    expect(load).toMatchObject({ payload: next, by: st.members[0].id });
+    expect(load.at).toBeGreaterThan(0);
+    const c = await open("carol");
+    expect(await until(() => c.msgs.find((m) => m.type === "state"))).toMatchObject({ payload: next, playing: false, position: 0 });
+
     expect((await call("/v1/rooms/NOPE23", { headers: { Upgrade: "websocket" } })).status).toBe(404);
   });
 });

@@ -48,6 +48,10 @@ Hello on connect: `{type:"hello", deviceId, deviceName, kind:"phone"|"tv"}` → 
 - Any member sends `{type:"play"|"pause"|"seek", position}`; server stamps `at` (server ms) and broadcasts
   `{type, position, at, by}`. Clients apply `position + (now - at)` when playing. Room dies 1 h after the last member leaves.
 
+- Any member switching media (episode, season, movie, new title) sends `{type:"load", payload, position:0}`; the server stores
+  `payload`, resets `position` to 0 and `playing` to false, stamps `at`, and broadcasts `{type:"load", payload, at, by}` to everyone
+  including the sender (ignore `by == you`). Members open the payload and stay in the room; late joiners get it in `state`.
+
 ## App updates
 No server needed: the app reads `https://api.github.com/repos/BeyonderSS/Reelm/releases/latest`, compares the tag
 `v1.0.N` (versionCode `100+N`) to its own, and downloads `Reelm-v*.apk` (phone) or `Reelm-TV-v*.apk` (tv).

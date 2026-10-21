@@ -53,6 +53,7 @@ import com.anistream.feature.home.HomeViewModel
 import com.anistream.feature.movies.MoviesHomeViewModel
 import com.anistream.feature.movies.isMediaKey
 import com.anistream.feature.party.PartyDestination
+import com.anistream.feature.party.PartyViewModel
 import com.anistream.feature.player.WebEmbedPlayer
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -123,6 +124,17 @@ private fun TvApp() {
     LaunchedEffect(profileId) { homeVm.refreshContinueWatching(); moviesVm.refreshContinueWatching() }
     LaunchedEffect(Unit) { acct.sync.pulled.collect { homeVm.refreshContinueWatching(); moviesVm.refreshContinueWatching() } }
 
+    // another member switched media: swap the player for the new one, staying in the party
+    val party: PartyViewModel = hiltViewModel()
+    LaunchedEffect(Unit) {
+        party.loads.collect { dest ->
+            val route = when (dest) {
+                is PartyDestination.Anime -> TvRoutes.player(dest.slug, dest.episode)
+                PartyDestination.Media -> TvRoutes.MEDIA_PLAYER
+            }
+            nav.navigate(route) { nav.currentDestination?.id?.let { popUpTo(it) { inclusive = true } } }
+        }
+    }
     TvUpdateHost()
     val host = @Composable {
         NavHost(nav, startDestination = TvRoutes.HOME) {

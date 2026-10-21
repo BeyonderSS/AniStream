@@ -180,7 +180,7 @@ fun MediaPlayerScreen(
             }
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
-        PartyOverlay(viewModel.player, Modifier.align(Alignment.TopEnd))
+        PartyOverlay(viewModel.player, Modifier.align(Alignment.TopEnd), payload = request?.takeIf { !ui.isLive }?.let(::mediaPayload))
     }
 
     if (showSettings && request != null) {

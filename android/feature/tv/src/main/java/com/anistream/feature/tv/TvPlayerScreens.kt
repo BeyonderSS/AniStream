@@ -95,7 +95,14 @@ import com.anistream.core.ui.theme.Ink
 import com.anistream.core.ui.theme.Radius
 import com.anistream.feature.player.MediaPlayerViewModel
 import com.anistream.feature.player.PlayerViewModel
+import com.anistream.feature.party.PartyViewModel
+import com.anistream.feature.party.animePayload
+import com.anistream.feature.party.mediaPayload
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 import java.util.Locale
 
 private enum class Panel { NONE, SETTINGS, STRIP }
@@ -141,8 +148,13 @@ private fun TvPlayerChrome(
     /** AniSkip intervals; non-empty replaces the fixed +85 s chip */
     skips: List<SkipInterval> = emptyList(),
     /** offer the "Auto-skip intro and recap" setting (anime) */
-    skipSetting: Boolean = false
+    skipSetting: Boolean = false,
+    /** what is playing, for "Watch together" and for telling the room when it changes; null = not shareable (live) */
+    partyPayload: JsonObject? = null
 ) {
+    val party: PartyViewModel = hiltViewModel()
+    var partyOpen by remember { mutableStateOf(false) }
+    val partyFocus = remember { FocusRequester() }
     var visible by remember { mutableStateOf(true) }
     var panel by remember { mutableStateOf(Panel.NONE) }
     var poke by remember { mutableIntStateOf(0) }
@@ -173,6 +185,7 @@ private fun TvPlayerChrome(
         SettingGroup("Subtitle delay", if (subs) SubtitleDelays else emptyList(), ::delayLabel, { it == tweaks.subDelayMs }) { tweaks.subDelayMs = it },
         SettingGroup("Sleep timer", SleepOptions, ::sleepLabel, { it == tweaks.sleep }, tweaks::updateSleep),
         SettingGroup("Auto-skip intro and recap", if (skipSetting) listOf(true, false) else emptyList(), { if (it) "On" else "Off" }, { it == tweaks.autoSkip }, tweaks::updateAutoSkip),
+        SettingGroup("Watch together", if (partyPayload != null && party.client.enabled) listOf(true) else emptyList(), { "Start or manage a party" }, { false }) { partyOpen = true },
         SettingGroup("Low-end mode (applies on restart)", listOf(true, false), { if (it) "On" else "Off" }, { it == lowEnd }) { lowEnd = it; LowEnd.set(context, it) }
     )
     val hasSettings = allSettings.any { it.options.isNotEmpty() }
@@ -203,13 +216,14 @@ private fun TvPlayerChrome(
             delay(500)
         }
     }
-    LaunchedEffect(poke, panel, playing) {
-        if (panel == Panel.NONE && playing) { delay(4000); visible = false }
+    LaunchedEffect(poke, panel, playing, partyOpen) {
+        if (panel == Panel.NONE && playing && !partyOpen) { delay(4000); visible = false }
     }
     LaunchedEffect(panel) {
         if (panel != Panel.NONE) { withFrameNanos { }; runCatching { panelFocus.requestFocus() } }
     }
     LaunchedEffect(Unit) { withFrameNanos { }; runCatching { rootFocus.requestFocus() } }
+    LaunchedEffect(partyOpen) { if (partyOpen) { withFrameNanos { }; runCatching { partyFocus.requestFocus() } } }
     LaunchedEffect(showIntro) { if (!showIntro && introFocused) runCatching { rootFocus.requestFocus() } }
     LaunchedEffect(message) { if (message != null) { delay(3500); onMessageShown() } }
     // AniSkip auto-skip: intro/recap once per interval, with a short toast
@@ -228,13 +242,15 @@ private fun TvPlayerChrome(
         if (panel != Panel.NONE) closePanel() else visible = false
     }
 
+    BackHandler(enabled = partyOpen && panel == Panel.NONE) { partyOpen = false; closePanel() }
+
     Box(
         Modifier
             .fillMaxSize()
             .background(Color.Black)
             .onPreviewKeyEvent { e ->
                 // the up-next card's buttons take the D-pad
-                if (panel != Panel.NONE || error != null || upNextShown) { poke++; return@onPreviewKeyEvent false }
+                if (panel != Panel.NONE || partyOpen || error != null || upNextShown) { poke++; return@onPreviewKeyEvent false }
                 if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 // the skip-intro chip (reached with ↓) takes OK; ↑ backs out; anything else acts as usual
                 val fromIntro = introFocused
@@ -288,14 +304,14 @@ private fun TvPlayerChrome(
             },
             modifier = Modifier.fillMaxSize()
         )
-        com.anistream.feature.party.PartyOverlay(player, Modifier.align(Alignment.TopEnd))
+        com.anistream.feature.party.PartyOverlay(player, Modifier.align(Alignment.TopEnd), payload = partyPayload)
 
         if (loading && error == null) {
             Text("Loading…", style = TvType.title, modifier = Modifier.align(Alignment.Center).background(Bg.badge, Radius.pill).padding(horizontal = 24.dp, vertical = 10.dp))
         }
 
         AnimatedVisibility(
-            visible = visible || panel != Panel.NONE || error != null,
+            visible = visible || panel != Panel.NONE || partyOpen || error != null,
             enter = if (reduce) EnterTransition.None else fadeIn(),
             exit = if (reduce) ExitTransition.None else fadeOut()
         ) {
@@ -317,6 +333,7 @@ private fun TvPlayerChrome(
                         Panel.STRIP -> if (strip != null) StripPanel(strip, panelFocus) { closePanel() }
                         Panel.NONE -> Unit
                     }
+                    if (partyOpen && partyPayload != null) TvPartyPanel(partyPayload, partyFocus, onClose = { partyOpen = false; closePanel() })
                     if (panel != Panel.NONE) Spacer(Modifier.height(20.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = null, tint = Ink.high)
@@ -408,6 +425,38 @@ private fun TvPlayerChrome(
     }
 }
 
+/** "Watch together" on TV: start a party for [payload] (the phone flow), then show its code large with Leave. */
+@Composable
+private fun TvPartyPanel(payload: JsonObject, focus: FocusRequester, onClose: () -> Unit, vm: PartyViewModel = hiltViewModel()) {
+    val room by vm.client.room.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+    val r = room
+    // the button under focus changes when the room appears
+    LaunchedEffect(r == null) { withFrameNanos { }; runCatching { focus.requestFocus() } }
+    Column(Modifier.fillMaxWidth().padding(bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        if (r == null) {
+            TvPill(if (busy) "Creating room…" else "Start a party", {
+                busy = true; failed = false
+                scope.launch { failed = vm.create(payload) == null; busy = false }
+            }, enabled = !busy, modifier = Modifier.focusRequester(focus))
+            if (failed) Text("Couldn't create a room", style = TvType.body.copy(color = Accent.danger), modifier = Modifier.padding(top = 12.dp))
+        } else {
+            var codeFocused by remember { mutableStateOf(false) }
+            Text(
+                r.code.toList().joinToString(" "),
+                style = TvType.display.copy(letterSpacing = 6.sp),
+                modifier = Modifier.onFocusChanged { codeFocused = it.isFocused }.focusable()
+                    .background(if (codeFocused) Bg.overlay else Color.Transparent, Radius.md).padding(horizontal = 24.dp, vertical = 8.dp)
+            )
+            Text("${r.members.size} watching. Friends enter this code under Reelm, Join party.", style = TvType.body)
+            Spacer(Modifier.height(16.dp))
+            TvPill("Leave", { vm.client.leave(); onClose() }, modifier = Modifier.focusRequester(focus))
+        }
+    }
+}
+
 /** Next-episode preview: art under the countdown ring, "Episode N", Play now (focused) / Cancel. The ring runs the countdown. */
 @Composable
 private fun UpNextCard(imageUrl: String?, episodeLabel: String, title: String, onPlay: () -> Unit, onCancel: () -> Unit, modifier: Modifier) {
@@ -494,7 +543,8 @@ fun TvAnimePlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel(
         episodic = true,
         upNextImage = s.posterUrl,
         skips = s.skips,
-        skipSetting = true
+        skipSetting = true,
+        partyPayload = s.animeSlug.takeIf { it.isNotBlank() }?.let { animePayload(it, s.animeTitle, s.episodeNumber, s.posterUrl) }
     )
 }
 
@@ -546,7 +596,8 @@ fun TvMediaPlayerScreen(
         tweaksKey = r?.historyKey ?: r?.title ?: "media",
         episodic = (r?.episode ?: 0) > 0,
         onWebPlayer = if (s.canWebPlay) vm::openWebPlayer else null,
-        upNextImage = r?.posterUrl
+        upNextImage = r?.posterUrl,
+        partyPayload = r?.takeIf { !s.isLive }?.let(::mediaPayload)
     )
 }
 

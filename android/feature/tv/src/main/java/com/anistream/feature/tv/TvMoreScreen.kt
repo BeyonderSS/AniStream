@@ -37,7 +37,6 @@ import com.anistream.core.ui.theme.Accent
 import com.anistream.core.ui.theme.Bg
 import com.anistream.core.ui.theme.Ink
 import com.anistream.core.ui.theme.Radius
-import com.anistream.feature.party.GUEST
 import com.anistream.feature.party.PartyDestination
 import com.anistream.feature.party.PartyViewModel
 import com.anistream.feature.party.UpdateViewModel
@@ -80,8 +79,7 @@ fun TvMoreScreen(onOpen: (PartyDestination) -> Unit, party: PartyViewModel = hil
                 TvPill(if (busy) "Joining…" else "Join", {
                     busy = true
                     scope.launch {
-                        // ponytail: pass the profile display name here once accounts land
-                        val dest = party.join(code, GUEST)
+                        val dest = party.join(code)
                         busy = false
                         if (dest == null) error = "Couldn't join that party" else onOpen(dest)
                     }

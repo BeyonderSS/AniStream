@@ -32,7 +32,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.anistream.feature.party.PartyDestination
+import com.anistream.feature.party.PartyViewModel
 import com.anistream.feature.party.ReelmMenu
 import com.anistream.feature.party.UpdateHost
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -116,6 +118,17 @@ fun AniStreamNavGraph() {
     val showBottomBar = currentRoute in bottomBarRoutes
     var showMenu by rememberSaveable { mutableStateOf(false) }
     UpdateHost()
+    // another member switched media: swap the player for the new one, staying in the party
+    val party: PartyViewModel = hiltViewModel()
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        party.loads.collect { dest ->
+            val route = when (dest) {
+                is PartyDestination.Anime -> Routes.player(dest.slug, dest.episode)
+                PartyDestination.Media -> Routes.MEDIA_PLAYER
+            }
+            navController.navigate(route) { navController.currentDestination?.id?.let { popUpTo(it) { inclusive = true } } }
+        }
+    }
     if (showMenu) ReelmMenu(
         onDismiss = { showMenu = false },
         onOpen = { dest ->
@@ -126,7 +139,6 @@ fun AniStreamNavGraph() {
                 }
             )
         }
-        // ponytail: pass the profile display name as `name =` once accounts land
     )
 
     val navigateToTab: (String) -> Unit = { route ->

@@ -46,6 +46,12 @@ class PartyClient @Inject constructor(private val http: MediaHttp) {
     private val _events = MutableSharedFlow<PartyEvent>(extraBufferCapacity = 32)
     val events: SharedFlow<PartyEvent> = _events.asSharedFlow()
 
+    /** payloads other members switched the room to (own echoes are dropped) */
+    private val _loads = MutableSharedFlow<JsonObject>(extraBufferCapacity = 8)
+    val loads: SharedFlow<JsonObject> = _loads.asSharedFlow()
+    /** set while the player is being replaced for a `load`, so the old screen's dispose doesn't leave the room */
+    @Volatile var switching = false
+
     private var socket: WebSocket? = null
     /** our member id if the server tells us ("you" in `state`); the contract doesn't, so echoes also fall to the drift check */
     @Volatile var selfId: String? = null
@@ -94,6 +100,12 @@ class PartyClient @Inject constructor(private val http: MediaHttp) {
         socket?.send(buildJsonObject { put("type", type); put("position", position) }.toString())
     }
 
+    /** We switched media: tell the room. The server's echo is ignored; our own copy of the room is updated now. */
+    fun load(payload: JsonObject) {
+        socket?.send(buildJsonObject { put("type", "load"); put("payload", payload); put("position", 0) }.toString())
+        _room.value = _room.value?.copy(payload = payload)
+    }
+
     fun leave() {
         val s = socket
         socket = null
@@ -121,6 +133,14 @@ class PartyClient @Inject constructor(private val http: MediaHttp) {
                 val playing = msg["playing"]?.jsonPrimitive?.contentOrNull == "true"
                 val last = PartyEvent(if (playing) "play" else "pause", msg["position"]?.jsonPrimitive?.longOrNull ?: 0L, at ?: serverNow(), "")
                 _room.value = Room(code, members(msg["members"]), msg["payload"] as? JsonObject, host, last)
+            }
+            "load" -> {
+                val payload = msg["payload"] as? JsonObject ?: return
+                val by = msg["by"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                if (isEcho(by, selfId)) return
+                // the server reset playback; a non-host member must not push its own state into the new media
+                _room.value = _room.value?.copy(payload = payload, host = false, last = PartyEvent("pause", 0L, at ?: serverNow(), by))
+                _loads.tryEmit(payload)
             }
             "members" -> _room.value = _room.value?.copy(members = members(msg["members"]))
             "play", "pause", "seek" -> {
