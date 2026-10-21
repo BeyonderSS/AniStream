@@ -265,7 +265,7 @@ const routes: [string, RegExp, (c: Ctx) => Response | Promise<Response>][] = [
 
 // ---- stream proxy (web player) ----------------------------------------------
 // Anime HLS needs a Referer and no CORS headers; the browser can't send either. Hosts the parsers return only.
-const PROXY_HOSTS = ["dramahot.top", "drama1.cfd", "zokoanime.video", "zokoanime.com", "zokoanime.net", "hianime.at"];
+const PROXY_HOSTS = ["dramahot.top", "drama1.cfd", "zokoanime.video", "zokoanime.com", "zokoanime.net", "hianime.at", "hakunaymatata.com"];
 const hostOk = (h: string) => PROXY_HOSTS.some((p) => h === p || h.endsWith("." + p));
 const isPrivate = (h: string) => h === "localhost" || h.endsWith(".local") || h.startsWith("[") || /^(0|10|127)\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\.|^169\.254\./.test(h);
 
@@ -286,7 +286,8 @@ async function proxy({ req, url }: Ctx) {
   if (!/^https?:$/.test(u.protocol) || isPrivate(u.hostname) || !(any || hostOk(u.hostname))) return json({ error: "host not allowed" }, 403);
   const referer = url.searchParams.get("r") ?? "";
   const up = await fetch(u, { headers: {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    // the MovieBox MP4 CDN answers 428 to browser user agents, so it gets an app-like one
+    "User-Agent": u.hostname.endsWith("hakunaymatata.com") ? "okhttp/4.12.0" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
     ...(referer ? { Referer: referer } : {}), ...(req.headers.get("range") ? { Range: req.headers.get("range")! } : {}),
   } });
   const ct = up.headers.get("content-type") ?? "";
