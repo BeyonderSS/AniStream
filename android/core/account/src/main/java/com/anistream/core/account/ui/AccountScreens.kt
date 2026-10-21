@@ -2,7 +2,9 @@ package com.anistream.core.account.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,7 +38,9 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -53,14 +57,20 @@ import com.anistream.core.ui.theme.Space
 
 /** Round Fluent Emoji avatar; [contentDescription] null when a parent already labels it. */
 @Composable
-fun AvatarImage(avatarId: String, size: Dp, modifier: Modifier = Modifier, ring: Boolean = false, contentDescription: String? = null) {
-    AsyncImage(
-        model = FluentEmojis.urlFor(avatarId),
-        contentDescription = contentDescription,
-        contentScale = ContentScale.Fit,
-        modifier = modifier.size(size).clip(CircleShape).background(Bg.overlay)
-            .then(if (ring) Modifier.border(2.dp, Accent.main, CircleShape) else Modifier).padding(size / 8)
-    )
+fun AvatarImage(avatarId: String, size: Dp, modifier: Modifier = Modifier, ring: Boolean = false, contentDescription: String? = null, kids: Boolean = false) {
+    Box(modifier.size(size)) {
+        AsyncImage(
+            model = FluentEmojis.urlFor(avatarId),
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize().clip(CircleShape).background(Bg.overlay)
+                .then(if (ring) Modifier.border(2.dp, Accent.main, CircleShape) else Modifier).padding(size / 8)
+        )
+        if (kids) Text(
+            "Kids", color = Ink.high, fontSize = if (size < 48.dp) 8.sp else 10.sp, fontWeight = FontWeight.Bold,
+            modifier = Modifier.align(Alignment.BottomCenter).offset(y = 3.dp).clip(CircleShape).background(Accent.main).padding(horizontal = 5.dp)
+        )
+    }
 }
 
 /**
@@ -96,7 +106,7 @@ fun AccountScreen(onBack: () -> Unit, pairCode: String? = null, vm: AccountViewM
             Modifier.fillMaxWidth().clip(Radius.lg).background(Bg.raised).padding(Space.lg),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (p != null) AvatarImage(p.avatar, 56.dp, ring = true)
+            if (p != null) AvatarImage(p.avatar, 56.dp, ring = true, kids = p.kids)
             Column(Modifier.weight(1f).padding(horizontal = Space.md)) {
                 Text(p?.name ?: "No profile picked", style = AppType.bodyStrong)
                 Text("@${s.user.username}", style = AppType.caption)

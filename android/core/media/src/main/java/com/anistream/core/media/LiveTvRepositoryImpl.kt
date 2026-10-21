@@ -4,6 +4,7 @@ import com.anistream.core.common.Result
 import com.anistream.core.common.safeApiCall
 import com.anistream.core.database.dao.PlaylistDao
 import com.anistream.core.database.entity.PlaylistEntity
+import com.anistream.domain.KidsPolicy
 import com.anistream.domain.model.Channel
 import com.anistream.domain.model.Playlist
 import com.anistream.domain.repository.LiveTvRepository
@@ -40,7 +41,10 @@ class LiveTvRepositoryImpl @Inject constructor(
         cache = null
     }
 
-    override suspend fun channels(refresh: Boolean): Result<List<Channel>> = safeApiCall {
+    override suspend fun channels(refresh: Boolean): Result<List<Channel>> =
+        allChannels(refresh).map { list -> if (KidsPolicy.active) list.filter { KidsPolicy.channel(it.group) } else list }
+
+    private suspend fun allChannels(refresh: Boolean): Result<List<Channel>> = safeApiCall {
         cache?.takeIf { !refresh }?.let { return@safeApiCall it }
         val playlists = dao.getAll()
         val results = coroutineScope {

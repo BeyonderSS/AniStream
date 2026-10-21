@@ -2,6 +2,7 @@ package com.anistream.core.account
 
 import android.content.Context
 import com.anistream.core.database.ActiveProfile
+import com.anistream.domain.KidsPolicy
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -69,6 +70,7 @@ class AccountRepository @Inject constructor(
         val active = _profiles.value.firstOrNull { it.id == activeId }
         _session.value = Session(token, user, active)
         ActiveProfile.id = active?.id ?: ""
+        KidsPolicy.active = active?.kids == true
     }
 
     suspend fun login(username: String, password: String) = auth("login", username, password)
@@ -98,6 +100,7 @@ class AccountRepository @Inject constructor(
         _profiles.value = emptyList()
         _session.value = null
         ActiveProfile.id = ""
+        KidsPolicy.active = false
         _gate.value = true
     }
 

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.anistream.core.common.Result
+import com.anistream.domain.KidsPolicy
 import com.anistream.domain.model.AnimeSearchResult
 import com.anistream.domain.model.MediaItem
 import com.anistream.domain.model.MediaType
@@ -57,7 +58,7 @@ class SearchViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val popular = repository.browseCategory("most-popular").getOrNull().orEmpty().distinctBy { it.slug }
+            val popular = repository.browseCategory("most-popular").getOrNull().orEmpty().filter { !KidsPolicy.active || KidsPolicy.animeCard(it) }.distinctBy { it.slug }
             _uiState.update { it.copy(popular = popular, isPopularLoading = false) }
         }
     }
@@ -84,9 +85,11 @@ class SearchViewModel @Inject constructor(
     }
 
     /** Both scopes land in the same poster grid; movie ids ride in [AnimeSearchResult.slug]. */
-    private suspend fun search(query: String, page: Int): Result<List<AnimeSearchResult>> =
-        if (_uiState.value.scope == 1) movies.search(query, page).map { list -> list.map { it.asCard() } }
-        else repository.searchAnime(query, page)
+    /** Returns the page's items and the last page read (a kids profile may skip pages that filter to nothing). */
+    private suspend fun search(query: String, page: Int): Pair<Result<List<AnimeSearchResult>>, Int> =
+        if (_uiState.value.scope == 1) KidsPolicy.loadKept(page, { m: MediaItem -> KidsPolicy.media(m.genres) }) { movies.search(query, it) }
+            .let { (r, p) -> r.map { list -> list.map { it.asCard() } } to p }
+        else KidsPolicy.loadKept(page, KidsPolicy::animeCard) { repository.searchAnime(query, it) }
 
     fun onQueryChange(query: String) {
         _uiState.update { it.copy(query = query) }
@@ -98,7 +101,7 @@ class SearchViewModel @Inject constructor(
         searchJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             delay(400)
-            when (val result = search(query.trim(), 1)) {
+            when (val result = search(query.trim(), 1).first) {
                 is Result.Success -> _uiState.update { s ->
                     s.copy(
                         results = result.data.distinctBy { it.slug },
@@ -120,7 +123,8 @@ class SearchViewModel @Inject constructor(
         val next = s.page + 1
         searchJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoadingMore = true) }
-            val more = search(s.query.trim(), next).getOrNull()
+            val (moreResult, readTo) = search(s.query.trim(), next)
+            val more = moreResult.getOrNull()
             _uiState.update { st ->
                 if (more == null) {
                     st.copy(isLoadingMore = false, endReached = true)
@@ -128,7 +132,7 @@ class SearchViewModel @Inject constructor(
                     val merged = (st.results + more).distinctBy { it.slug }
                     st.copy(
                         results = merged,
-                        page = next,
+                        page = readTo,
                         isLoadingMore = false,
                         // a page that adds nothing new means we're past the end
                         endReached = merged.size == st.results.size

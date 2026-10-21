@@ -44,7 +44,8 @@ object HianimeParser {
             AnimeSearchResult(
                 slug = slugFromUrl(a.attr("href")),
                 title = a.attr("title").ifBlank { item.selectFirst(".film-title")?.text().orEmpty() },
-                posterUrl = a.selectFirst("img")?.attr("src")?.ifBlank { null }
+                posterUrl = a.selectFirst("img")?.attr("src")?.ifBlank { null },
+                rating = item.selectFirst(".tick-rate, .tick-pg")?.text()?.ifBlank { null }
             )
         }
         fun block(header: String): List<AnimeSearchResult> =
@@ -233,7 +234,8 @@ object HianimeParser {
             slug = slug,
             title = a.attr("title").ifBlank { a.text() }.ifBlank { return null },
             posterUrl = el.selectFirst("img.film-poster-img")?.let { it.attr("data-src").ifBlank { it.attr("src") } }?.ifBlank { null },
-            type = el.selectFirst(".fd-infor .fdi-item")?.text()?.ifBlank { null }
+            type = el.selectFirst(".fd-infor .fdi-item")?.text()?.ifBlank { null },
+            rating = el.selectFirst(".tick-rate, .tick-pg")?.text()?.ifBlank { null }
         )
     }
 

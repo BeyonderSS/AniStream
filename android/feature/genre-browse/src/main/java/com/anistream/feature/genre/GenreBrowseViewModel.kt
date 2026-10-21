@@ -3,6 +3,7 @@ package com.anistream.feature.genre
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.anistream.domain.KidsPolicy
 import com.anistream.domain.model.AnimeSearchResult
 import com.anistream.domain.model.Genre
 import com.anistream.domain.repository.AnidbRepository
@@ -91,7 +92,7 @@ class GenreBrowseViewModel @Inject constructor(
         val first = next == 1
         pageJob = viewModelScope.launch {
             _uiState.update { it.copy(isResultsLoading = first, isLoadingMore = !first, resultsError = null) }
-            val result = repository.browseCategory(path, next)
+            val (result, readTo) = KidsPolicy.loadKept(next, KidsPolicy::animeCard) { repository.browseCategory(path, it) }
             val items = result.getOrNull()
             _uiState.update { st ->
                 if (items == null) {
@@ -104,7 +105,7 @@ class GenreBrowseViewModel @Inject constructor(
                 } else {
                     val merged = (st.results + items).distinctBy { it.slug }
                     st.copy(
-                        results = merged, page = next,
+                        results = merged, page = readTo,
                         isResultsLoading = false, isLoadingMore = false,
                         endReached = merged.size == st.results.size
                     )

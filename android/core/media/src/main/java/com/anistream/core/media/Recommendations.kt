@@ -4,6 +4,7 @@ import com.anistream.core.common.Result
 import com.anistream.core.common.safeApiCall
 import com.anistream.core.database.dao.RecommendationDao
 import com.anistream.core.database.entity.RecommendationEntity
+import com.anistream.domain.KidsPolicy
 import com.anistream.domain.model.AnimeDetail
 import com.anistream.domain.model.AnimeSearchResult
 import com.anistream.domain.model.FavoriteAnime
@@ -131,7 +132,9 @@ class RecommendationsRepositoryImpl @Inject constructor(
 
     private val tmdbKey = BuildConfig.TMDB_API_KEY
 
+    // The cache stores no genres or ratings, so a kids profile gets no personalised picks rather than unchecked ones.
     override fun observe(kind: String): Flow<List<Recommendation>> = dao.observe(kind).map { rows ->
+        if (KidsPolicy.active) return@map emptyList()
         rows.map {
             Recommendation(it.id, it.kind, it.title, it.posterUrl, it.year, it.rating, it.mediaType?.let(MediaType::valueOf), it.because)
         }

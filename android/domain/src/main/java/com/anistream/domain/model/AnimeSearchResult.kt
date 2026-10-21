@@ -9,5 +9,7 @@ data class AnimeSearchResult(
     val status: String? = null,
     val year: Int? = null,
     val season: String? = null,
-    val malId: Long? = null
+    val malId: Long? = null,
+    /** adult badge hianime puts on some cards ("18+"); null = unknown */
+    val rating: String? = null
 )

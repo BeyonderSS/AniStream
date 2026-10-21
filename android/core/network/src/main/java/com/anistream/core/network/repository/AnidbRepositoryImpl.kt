@@ -4,6 +4,8 @@ import com.anistream.core.common.Result
 import com.anistream.core.network.AnidbHttpClient
 import com.anistream.core.network.AnidbHttpClient.Companion.BASE_URL
 import com.anistream.core.parser.HianimeParser
+import com.anistream.domain.KidsBlockedException
+import com.anistream.domain.KidsPolicy
 import com.anistream.domain.model.AnimeDetail
 import com.anistream.domain.model.AnimeSearchResult
 import com.anistream.domain.model.Episode
@@ -15,6 +17,9 @@ import com.anistream.domain.repository.HomeContent
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import java.util.concurrent.ConcurrentHashMap
 import java.net.URI
 import java.net.URLEncoder
 import java.time.LocalDate
@@ -40,7 +45,13 @@ class AnidbRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getAnimeDetail(slug: String): Result<AnimeDetail> = fetch {
-        HianimeParser.parseDetail(httpClient.getHtml("$BASE_URL/$slug"), slug)
+        val r = HianimeParser.parseDetail(httpClient.getHtml("$BASE_URL/$slug"), slug)
+        val d = (r as? Result.Success)?.data
+        when {
+            !KidsPolicy.active || d == null -> r
+            !KidsPolicy.anime(d.rating, d.genres.map { it.name }) -> Result.error(KidsBlockedException())
+            else -> Result.success(d.copy(recommendations = d.recommendations.filter(KidsPolicy::animeCard)))
+        }
     }
 
     override suspend fun getEpisodes(slug: String): Result<List<Episode>> = fetch {
@@ -68,16 +79,29 @@ class AnidbRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getHomeContent(): Result<HomeContent> = fetch {
-        HianimeParser.parseHome(httpClient.getHtml("$BASE_URL/home"))
+        HianimeParser.parseHome(httpClient.getHtml("$BASE_URL/home")).map { h ->
+            if (!KidsPolicy.active) h else with(KidsPolicy) {
+                h.copy(
+                    trending = h.trending.filter(::animeCard), topAiring = h.topAiring.filter(::animeCard),
+                    popular = h.popular.filter(::animeCard), favorites = h.favorites.filter(::animeCard),
+                    completed = h.completed.filter(::animeCard), recentEpisodes = h.recentEpisodes.filter(::animeCard)
+                )
+            }
+        }
     }
 
     override suspend fun browseCategory(path: String, page: Int): Result<List<AnimeSearchResult>> = fetch {
+        if (KidsPolicy.active && path.startsWith("genres/") && KidsPolicy.animeGenreBlocked(path.substringAfter('/').replace('-', ' '))) {
+            return Result.error(KidsBlockedException())
+        }
         HianimeParser.parseCards(httpClient.getHtml("$BASE_URL/${path.trim('/')}?page=$page"))
     }
 
     // ponytail: refetches /home each call; cache if the genre screen reloads often
     override suspend fun getGenres(): Result<List<Genre>> = fetch {
-        HianimeParser.parseGenres(httpClient.getHtml("$BASE_URL/home"))
+        HianimeParser.parseGenres(httpClient.getHtml("$BASE_URL/home")).map { list ->
+            if (KidsPolicy.active) list.filterNot { KidsPolicy.animeGenreBlocked(it.name) } else list
+        }
     }
 
     override suspend fun getSchedule(): Result<List<ScheduleEntry>> = fetch {
@@ -93,7 +117,20 @@ class AnidbRepositoryImpl @Inject constructor(
             }.awaitAll()
         }
         days.firstOrNull { it !is Result.Success }?.let { return it.asError() }
-        Result.success(days.flatMap { (it as Result.Success).data })
+        val all = days.flatMap { (it as Result.Success).data }
+        Result.success(
+            if (!KidsPolicy.active) all
+            else coroutineScope { all.map { e -> async { e to allowedForKids(e.animeSlug) } }.awaitAll() }.filter { it.second }.map { it.first }
+        )
+    }
+
+    // ponytail: schedule rows carry no rating, so a kids profile checks each show's detail page once (6 at a time,
+    // remembered for the process). Unreachable detail = hidden. Swap for a cached rating index if the first load drags.
+    private val kidsOk = ConcurrentHashMap<String, Boolean>()
+    private val kidsGate = Semaphore(6)
+
+    private suspend fun allowedForKids(slug: String): Boolean = kidsOk[slug] ?: kidsGate.withPermit {
+        kidsOk.getOrPut(slug) { getAnimeDetail(slug).isSuccess() }
     }
 
     private companion object {

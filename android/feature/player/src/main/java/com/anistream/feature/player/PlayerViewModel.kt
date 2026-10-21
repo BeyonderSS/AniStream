@@ -17,6 +17,8 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.anistream.core.common.Result
+import com.anistream.domain.KidsBlockedException
+import com.anistream.domain.KidsPolicy
 import com.anistream.domain.model.AnimeDetail
 import com.anistream.domain.model.Episode
 import com.anistream.domain.model.SkipInterval
@@ -142,7 +144,9 @@ class PlayerViewModel @Inject constructor(
                     is Result.Error -> return@launch fail(r.message ?: "Couldn't load episodes")
                     is Result.Loading -> {}
                 }
-                val d = detailCall.await().getOrNull()
+                val detailResult = detailCall.await()
+                if (detailResult.exceptionOrNull() is KidsBlockedException) return@launch fail(KidsPolicy.BLOCKED)
+                val d = detailResult.getOrNull()
                 detail = d
                 _uiState.update {
                     it.copy(

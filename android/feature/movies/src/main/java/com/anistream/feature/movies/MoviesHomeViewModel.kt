@@ -3,6 +3,7 @@ package com.anistream.feature.movies
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.anistream.core.common.Result
+import com.anistream.domain.KidsPolicy
 import com.anistream.domain.model.AnimeSearchResult
 import com.anistream.domain.model.MediaItem
 import com.anistream.domain.model.MediaRow
@@ -100,6 +101,8 @@ class MoviesCatalogViewModel @Inject constructor(
     val key: String = savedStateHandle.get<String>("key").orEmpty()
     val title: String = savedStateHandle.get<String>("title").orEmpty()
     private var job: kotlinx.coroutines.Job? = null
+    /** Cinemeta's skip counts raw items, so it can't be derived from the (possibly filtered) list size. */
+    private var rawSkip = 0
 
     private val _uiState = MutableStateFlow(CatalogUiState())
     val uiState: StateFlow<CatalogUiState> = _uiState.asStateFlow()
@@ -109,6 +112,7 @@ class MoviesCatalogViewModel @Inject constructor(
     fun reload() {
         job?.cancel()
         _uiState.value = CatalogUiState()
+        rawSkip = 0
         loadMore()
     }
 
@@ -117,7 +121,17 @@ class MoviesCatalogViewModel @Inject constructor(
         if (job?.isActive == true || s.endReached) return
         job = viewModelScope.launch {
             _uiState.update { it.copy(isLoadingMore = it.items.isNotEmpty()) }
-            when (val r = movies.catalog(key, s.items.size)) {
+            var r = movies.catalog(key, rawSkip)
+            var tries = 0
+            while (r is Result.Success) {
+                rawSkip += r.data.size
+                if (!KidsPolicy.active) break
+                val kept = r.data.filter { KidsPolicy.media(it.genres) }
+                // a page that filters to nothing must not look like the end; read on (up to 5 pages)
+                if (kept.isNotEmpty() || r.data.isEmpty() || ++tries >= 5) { r = Result.success(kept); break }
+                r = movies.catalog(key, rawSkip)
+            }
+            when (r) {
                 is Result.Success -> _uiState.update { st ->
                     val merged = (st.items + r.data).distinctBy { it.id }
                     st.copy(items = merged, isLoading = false, isLoadingMore = false, endReached = merged.size == st.items.size)

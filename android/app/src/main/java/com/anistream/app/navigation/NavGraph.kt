@@ -414,7 +414,7 @@ private fun LibraryScreen(onOpen: (String) -> Unit, onDiscoverClick: () -> Unit)
             // accounts are optional and hidden when REELM_API_URL is blank; the avatar reopens "Who's watching?"
             if (account.repo.enabled) IconButton(onClick = account.repo::openGate) {
                 val p = session?.activeProfile
-                if (p != null) AvatarImage(p.avatar, 32.dp, ring = true, contentDescription = "Switch profile, watching as ${p.name}")
+                if (p != null) AvatarImage(p.avatar, 32.dp, ring = true, contentDescription = "Switch profile, watching as ${p.name}${if (p.kids) ", kids profile" else ""}", kids = p.kids)
                 else Icon(Icons.Outlined.AccountCircle, contentDescription = "Sign in or switch profile", tint = Ink.high)
             }
         }

@@ -231,7 +231,7 @@ private fun TvApp() {
                             )
                             else Icon(r.icon, contentDescription = r.label, tint = if (selected) Accent.main else LocalContentColor.current)
                         }
-                    ) { Text(profile?.name ?: r.label) }
+                    ) { Text((profile?.name ?: r.label) + if (profile?.kids == true) " · Kids" else "") }
                 }
             } }
         }

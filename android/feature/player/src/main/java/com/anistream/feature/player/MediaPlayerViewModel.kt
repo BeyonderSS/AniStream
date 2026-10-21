@@ -16,6 +16,8 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.anistream.core.common.Result
+import com.anistream.domain.KidsBlockedException
+import com.anistream.domain.KidsPolicy
 import com.anistream.domain.model.MediaStream
 import com.anistream.domain.model.PlaybackRequest
 import com.anistream.domain.model.WatchHistory
@@ -141,6 +143,10 @@ class MediaPlayerViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = false, error = "Nothing to play") }
         } else {
             viewModelScope.launch {
+                // kids: deep links, party joins and history can all land here, so check the title again
+                val blocked = KidsPolicy.active && if (request.isLive) !KidsPolicy.channel(request.subtitle)
+                    else request.mediaId?.let { movies.detail(it).exceptionOrNull() is KidsBlockedException } == true
+                if (blocked) return@launch _uiState.update { it.copy(request = null, isLoading = false, error = KidsPolicy.BLOCKED) }
                 recordStart(request)
                 play(0, null)
             }

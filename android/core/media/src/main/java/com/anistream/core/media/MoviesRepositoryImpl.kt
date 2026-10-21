@@ -6,6 +6,8 @@ import com.anistream.core.database.dao.AddonDao
 import com.anistream.core.media.dramachi.DramachiSource
 import com.anistream.core.media.fourkhdhub.FourKHdHubSource
 import com.anistream.core.media.moviebox.MovieBoxSource
+import com.anistream.domain.KidsBlockedException
+import com.anistream.domain.KidsPolicy
 import com.anistream.domain.model.MediaDetail
 import com.anistream.domain.model.MediaItem
 import com.anistream.domain.model.MediaRow
@@ -49,10 +51,11 @@ class MoviesRepositoryImpl @Inject constructor(
             "Popular series" to "series/top",
             "Top rated movies" to "movie/imdbRating",
             "Top rated series" to "series/imdbRating"
-        ) + listOf("Action", "Comedy", "Sci-Fi", "Horror", "Animation").map { "$it movies" to "movie/top/genre=$it" }
+        ) + (if (KidsPolicy.active) listOf("Animation", "Family", "Comedy", "Adventure") else listOf("Action", "Comedy", "Sci-Fi", "Horror", "Animation"))
+            .map { "$it movies" to "movie/top/genre=$it" }
         val loaded = coroutineScope {
             rows.map { (title, key) ->
-                async { runCatching { MediaRow(title, fetchCatalog(key, 0), key) }.getOrNull() }
+                async { runCatching { MediaRow(title, fetchCatalog(key, 0).filter { !KidsPolicy.active || KidsPolicy.media(it.genres) }, key) }.getOrNull() }
             }.awaitAll()
         }.filterNotNull().filter { it.items.isNotEmpty() }
         if (loaded.isEmpty()) error("Couldn't load Movies & TV (Cinemeta unreachable)")
@@ -88,7 +91,11 @@ class MoviesRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun detail(id: String): Result<MediaDetail> = safeApiCall {
+    override suspend fun detail(id: String): Result<MediaDetail> = rawDetail(id).let { r ->
+        if (KidsPolicy.active && r is Result.Success && !KidsPolicy.media(r.data.genres)) Result.error(KidsBlockedException()) else r
+    }
+
+    private suspend fun rawDetail(id: String): Result<MediaDetail> = safeApiCall {
         if (id.startsWith("mb:")) return@safeApiCall movieBox.detail(id.removePrefix("mb:"))
         val meta = cinemetaMeta(id)
         val cine = meta.detail
