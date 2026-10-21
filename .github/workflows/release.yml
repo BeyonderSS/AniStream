@@ -21,15 +21,22 @@ defaults:
 
 jobs:
   release:
+    # stable releases come from main only; feature branches must not cut them
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # v1.0.0 was the first manual release (versionCode 1); CI builds count up from there
+      # Next number = latest stable release + 1. GITHUB_RUN_NUMBER also counted feature-branch runs and made the
+      # numbers jump (v1.0.17 -> v1.0.26); stable tags only move on main. versionCode stays 100 + N for the in-app updater.
       - name: Version
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "VERSION_NAME=1.0.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
-          echo "VERSION_CODE=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          last=$(gh release list --exclude-pre-releases --limit 50 --json tagName -q '[.[].tagName | select(test("^v1\\.0\\.[0-9]+$")) | ltrimstr("v1.0.") | tonumber] | max // 0')
+          n=$((last + 1))
+          echo "VERSION_NAME=1.0.$n" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$((100 + n))" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v4
         with:
