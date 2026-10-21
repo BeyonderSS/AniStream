@@ -41,6 +41,11 @@ class MainActivity : ComponentActivity() {
 
     private fun consumeDeepLink(intent: Intent?) {
         intent?.getStringExtra(EXTRA_ROUTE)?.let { PendingDeepLink.route = it }
+        // reelm://pair/<code> or https://<api host>/pair/<code> -> the account screen with the code ready to approve
+        intent?.data?.let { uri ->
+            val code = if (uri.scheme == "reelm") uri.lastPathSegment else uri.pathSegments.getOrNull(1)?.takeIf { uri.pathSegments.firstOrNull() == "pair" }
+            code?.takeIf { it.matches(Regex("[A-Za-z0-9]{4,12}")) }?.let { PendingDeepLink.route = "account?code=${it.uppercase()}" }
+        }
     }
 
     /** Android 13+: ask once on first launch; a denial just means no notifications. */

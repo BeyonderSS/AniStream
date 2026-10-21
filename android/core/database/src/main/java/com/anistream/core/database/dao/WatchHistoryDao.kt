@@ -7,27 +7,39 @@ import androidx.room.Query
 import com.anistream.core.database.entity.WatchHistoryEntity
 import kotlinx.coroutines.flow.Flow
 
+/** Every query is scoped to a profile ("" = local-only). Deletes are tombstones so they can sync. */
 @Dao
 interface WatchHistoryDao {
-    @Query("SELECT * FROM watch_history ORDER BY lastWatchedTimestamp DESC")
-    fun getAll(): Flow<List<WatchHistoryEntity>>
+    @Query("SELECT * FROM watch_history WHERE profileId = :profileId AND deleted = 0 ORDER BY lastWatchedTimestamp DESC")
+    fun getAll(profileId: String): Flow<List<WatchHistoryEntity>>
 
     /** movies (media rows with lastEpisodeWatched = 0) qualify until they're 95% watched */
-    @Query("SELECT * FROM watch_history WHERE (lastEpisodeWatched > 0 OR (kind = 'media' AND watchProgress < 0.95)) AND (:kind IS NULL OR kind = :kind) ORDER BY lastWatchedTimestamp DESC")
-    fun getContinueWatching(kind: String? = null): Flow<List<WatchHistoryEntity>>
+    @Query("SELECT * FROM watch_history WHERE profileId = :profileId AND deleted = 0 AND (lastEpisodeWatched > 0 OR (kind = 'media' AND watchProgress < 0.95)) AND (:kind IS NULL OR kind = :kind) ORDER BY lastWatchedTimestamp DESC")
+    fun getContinueWatching(profileId: String, kind: String? = null): Flow<List<WatchHistoryEntity>>
 
-    @Query("SELECT * FROM watch_history WHERE animeSlug = :slug")
-    suspend fun getBySlug(slug: String): WatchHistoryEntity?
+    @Query("SELECT * FROM watch_history WHERE animeSlug = :slug AND profileId = :profileId AND deleted = 0")
+    suspend fun getBySlug(slug: String, profileId: String): WatchHistoryEntity?
+
+    /** tombstones included: what the sync merge compares against */
+    @Query("SELECT * FROM watch_history WHERE animeSlug = :slug AND profileId = :profileId")
+    suspend fun getRaw(slug: String, profileId: String): WatchHistoryEntity?
+
+    @Query("SELECT * FROM watch_history WHERE profileId = :profileId AND lastWatchedTimestamp > :since")
+    suspend fun changedSince(profileId: String, since: Long): List<WatchHistoryEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: WatchHistoryEntity)
 
-    @Query("UPDATE watch_history SET lastEpisodeWatched = :episode, watchProgress = :progress, lastWatchedTimestamp = :timestamp WHERE animeSlug = :slug")
-    suspend fun updateProgress(slug: String, episode: Int, progress: Float, timestamp: Long = System.currentTimeMillis()): Int
+    @Query("UPDATE watch_history SET lastEpisodeWatched = :episode, watchProgress = :progress, lastWatchedTimestamp = :timestamp WHERE animeSlug = :slug AND profileId = :profileId AND deleted = 0")
+    suspend fun updateProgress(slug: String, episode: Int, progress: Float, profileId: String, timestamp: Long = System.currentTimeMillis()): Int
 
-    @Query("DELETE FROM watch_history WHERE animeSlug = :slug")
-    suspend fun delete(slug: String)
+    @Query("UPDATE watch_history SET deleted = 1, lastWatchedTimestamp = :timestamp WHERE animeSlug = :slug AND profileId = :profileId")
+    suspend fun delete(slug: String, profileId: String, timestamp: Long = System.currentTimeMillis())
 
-    @Query("DELETE FROM watch_history")
-    suspend fun clear()
+    @Query("UPDATE watch_history SET deleted = 1, lastWatchedTimestamp = :timestamp WHERE profileId = :profileId")
+    suspend fun clear(profileId: String, timestamp: Long = System.currentTimeMillis())
+
+    /** first sign-in: the offline history becomes the profile's (rows it already has win) */
+    @Query("UPDATE OR IGNORE watch_history SET profileId = :profileId WHERE profileId = ''")
+    suspend fun adoptLocal(profileId: String)
 }

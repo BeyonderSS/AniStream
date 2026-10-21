@@ -29,6 +29,7 @@ dependencies {
     implementation(project(":domain"))
     implementation(project(":core:common"))
     implementation(project(":core:ui"))
+    implementation(project(":core:account"))
     implementation(project(":player"))
     implementation(project(":feature:party"))
 

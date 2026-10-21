@@ -31,7 +31,7 @@ import com.anistream.core.database.entity.WatchHistoryEntity
         PlaylistEntity::class,
         RecommendationEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AniStreamDatabase : RoomDatabase() {
@@ -63,6 +63,16 @@ abstract class AniStreamDatabase : RoomDatabase() {
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `recommendations` (`kind` TEXT NOT NULL, `id` TEXT NOT NULL, `title` TEXT NOT NULL, `posterUrl` TEXT, `year` INTEGER, `rating` REAL, `mediaType` TEXT, `because` TEXT, `position` INTEGER NOT NULL, PRIMARY KEY(`kind`, `id`))")
+            }
+        }
+
+        /** v4: history is per profile (PK animeSlug+profileId, local-only rows keep profileId '') and keeps tombstones for sync. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `watch_history_new` (`animeSlug` TEXT NOT NULL, `animeTitle` TEXT NOT NULL, `malId` INTEGER, `posterUrl` TEXT, `totalEpisodes` INTEGER NOT NULL, `lastEpisodeWatched` INTEGER NOT NULL, `watchProgress` REAL NOT NULL, `lastWatchedTimestamp` INTEGER NOT NULL, `isFavorite` INTEGER NOT NULL, `anidbSlug` TEXT, `kind` TEXT NOT NULL DEFAULT 'anime', `season` INTEGER NOT NULL DEFAULT 0, `mediaId` TEXT, `subtitle` TEXT, `profileId` TEXT NOT NULL DEFAULT '', `deleted` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`animeSlug`, `profileId`))")
+                db.execSQL("INSERT INTO watch_history_new (animeSlug, animeTitle, malId, posterUrl, totalEpisodes, lastEpisodeWatched, watchProgress, lastWatchedTimestamp, isFavorite, anidbSlug, kind, season, mediaId, subtitle) SELECT animeSlug, animeTitle, malId, posterUrl, totalEpisodes, lastEpisodeWatched, watchProgress, lastWatchedTimestamp, isFavorite, anidbSlug, kind, season, mediaId, subtitle FROM watch_history")
+                db.execSQL("DROP TABLE watch_history")
+                db.execSQL("ALTER TABLE watch_history_new RENAME TO watch_history")
             }
         }
     }

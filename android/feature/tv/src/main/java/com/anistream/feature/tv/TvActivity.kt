@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LiveTv
@@ -29,6 +30,8 @@ import com.anistream.core.ui.theme.Accent
 import com.anistream.core.ui.theme.Bg
 import com.anistream.core.ui.theme.Ink
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -58,7 +61,7 @@ import dagger.hilt.android.AndroidEntryPoint
 class TvActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { ReelmTvTheme { TvApp() } }
+        setContent { ReelmTvTheme { TvProfileGate { TvApp() } } }
     }
 }
 
@@ -71,6 +74,7 @@ internal object TvRoutes {
     const val LIBRARY = "library"
     const val MORE = "more"
     const val MEDIA_PLAYER = "media_player"
+    const val ACCOUNT = "account"
 
     fun anime(slug: String) = "anime/${Uri.encode(slug)}"
     fun movie(id: String) = "movie/${Uri.encode(id)}"
@@ -90,6 +94,7 @@ private val rail = listOf(
     RailEntry(TvRoutes.LIBRARY, "Library", Icons.Outlined.VideoLibrary),
     RailEntry(TvRoutes.MORE, "More", Icons.Outlined.MoreHoriz)
 )
+private val accountEntry = RailEntry(TvRoutes.ACCOUNT, "Account", Icons.Outlined.AccountCircle)
 
 @Composable
 private fun TvApp() {
@@ -99,7 +104,24 @@ private fun TvApp() {
     val moviesVm: MoviesHomeViewModel = hiltViewModel()
     val entry by nav.currentBackStackEntryAsState()
     val current = entry?.destination?.route
-    val showRail = rail.any { it.route == current }
+    val acct: TvAccountViewModel = hiltViewModel()
+    // accounts are hidden entirely when REELM_API_URL is blank
+    val entries = if (acct.repo.enabled) rail + accountEntry else rail
+    val showRail = entries.any { it.route == current }
+    val session by acct.session.collectAsStateWithLifecycle()
+    val profileId = session?.activeProfile?.id
+
+    // Continue on TV: same destination a Continue Watching tap opens, resuming at the phone's progress
+    LaunchedEffect(Unit) {
+        acct.hub.handoffs.collect { h ->
+            val row = acct.applyHandoff(h) ?: return@collect
+            if (row.kind == "media") nav.navigate(TvRoutes.movie(row.mediaId ?: row.animeSlug.substringBefore(":s")))
+            else nav.navigate(TvRoutes.player(row.animeSlug, row.lastEpisodeWatched.coerceAtLeast(1)))
+        }
+    }
+    // a profile switch or a history pull changes Continue Watching
+    LaunchedEffect(profileId) { homeVm.refreshContinueWatching(); moviesVm.refreshContinueWatching() }
+    LaunchedEffect(Unit) { acct.sync.pulled.collect { homeVm.refreshContinueWatching(); moviesVm.refreshContinueWatching() } }
 
     TvUpdateHost()
     val host = @Composable {
@@ -109,6 +131,7 @@ private fun TvApp() {
             composable(TvRoutes.ANIME) { TvHomeScreen(HomeFilter.ANIME, homeVm, moviesVm, nav) }
             composable(TvRoutes.SEARCH) { TvSearchScreen(onOpen = { nav.navigate(TvRoutes.detail(it)) }) }
             composable(TvRoutes.LIVE) { TvLiveScreen(onPlay = { nav.navigate(TvRoutes.MEDIA_PLAYER) }) }
+            composable(TvRoutes.ACCOUNT) { TvAccountScreen() }
             composable(TvRoutes.LIBRARY) { TvLibraryScreen(onOpen = { nav.navigate(TvRoutes.detail(it)) }) }
             composable(TvRoutes.MORE) {
                 TvMoreScreen(onOpen = { dest ->
@@ -163,7 +186,7 @@ private fun TvApp() {
                     .padding(horizontal = 8.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp, androidx.compose.ui.Alignment.CenterVertically)
             ) {
-                rail.forEach { r ->
+                entries.forEach { r ->
                     val selected = current == r.route
                     // focused = amber ring + lighter surface; selected (current screen) = soft amber fill + amber icon
                     NavigationDrawerItem(
