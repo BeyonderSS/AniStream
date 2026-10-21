@@ -2,6 +2,7 @@ package com.anistream.core.network
 
 import android.content.Context
 import android.util.Base64
+import android.util.Log
 import com.anistream.core.common.ScraperConfig
 import com.anistream.core.common.ScraperSignature
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -38,25 +39,33 @@ class ScraperConfigUpdater @Inject constructor(@ApplicationContext private val c
     /** Applies the last verified copy right away, then refreshes from GitHub in the background. */
     fun start() {
         scope.launch {
-            runCatching { if (cache.exists() && cacheSig.exists()) accept(cache.readBytes(), cacheSig.readText()) }
+            runCatching { if (cache.exists() && cacheSig.exists()) accept("cache", cache.readBytes(), cacheSig.readText()) }
+                .onFailure { Log.w(TAG, "cached config unreadable: ${it.message}") }
             runCatching {
-                val body = fetch(URL) ?: return@launch
-                val sig = fetch("$URL.sig")?.decodeToString() ?: return@launch
-                if (accept(body, sig)) { cache.writeBytes(body); cacheSig.writeText(sig) }
-            }
+                val body = fetch(URL)
+                val sig = fetch("$URL.sig")?.decodeToString()
+                if (body == null || sig == null) { Log.i(TAG, "no remote config (keeping ${summary()})"); return@launch }
+                if (accept("remote", body, sig)) { cache.writeBytes(body); cacheSig.writeText(sig) }
+            }.onFailure { Log.w(TAG, "remote config check failed: ${it.message}") }
         }
     }
 
     private fun fetch(url: String): ByteArray? =
         http.newCall(Request.Builder().url(url).build()).execute().use { if (it.isSuccessful) it.body?.bytes() else null }
 
-    private fun accept(body: ByteArray, sig: String): Boolean {
+    private fun accept(origin: String, body: ByteArray, sig: String): Boolean {
         val ok = ScraperSignature.verify(body, Base64.decode(sig.trim(), Base64.DEFAULT), Base64.decode(PUBLIC_KEY, Base64.DEFAULT))
-        if (ok) applyConfig(Json.parseToJsonElement(body.decodeToString()).jsonObject)
+        if (ok) { applyConfig(Json.parseToJsonElement(body.decodeToString()).jsonObject); Log.i(TAG, "applied $origin config: ${summary()}") }
+        else Log.w(TAG, "rejected $origin config: bad signature (keeping ${summary()})")
         return ok
     }
 
+    /** Non-secret values only, so a log shows which config is live. */
+    private fun summary() = "hianime=${ScraperConfig.hianimeBase} dramachi=${ScraperConfig.dramachiBase} 4khdhub=${ScraperConfig.fourKHdHubBase} " +
+        "moviebox=${ScraperConfig.movieBoxHosts.size} hosts v${ScraperConfig.movieBoxVersionName}"
+
     companion object {
+        private const val TAG = "ScraperConfig"
         private const val URL = "https://raw.githubusercontent.com/BeyonderSS/Reelm/main/scrapers/scrapers.json"
         private const val PUBLIC_KEY = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEw0hwDabVPIDxew9Agk+tBkl1eSu9an4/527zHo7NI7Nj0x/RygIf6cqh0VSTNLvVjuQCy3qQ9KZu3T34IxycWw=="
 
