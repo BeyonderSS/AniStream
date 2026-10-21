@@ -26,7 +26,8 @@ object ScraperSignature {
 
     internal fun p1363ToDer(sig: ByteArray): ByteArray {
         fun int(bytes: ByteArray): ByteArray {
-            val trimmed = bytes.dropWhile { it == 0.toByte() }.toByteArray().ifEmpty { byteArrayOf(0) }
+            val stripped = bytes.dropWhile { it == 0.toByte() }.toByteArray()
+            val trimmed = if (stripped.isEmpty()) byteArrayOf(0) else stripped
             return if (trimmed[0] < 0) byteArrayOf(0) + trimmed else trimmed // keep it a positive INTEGER
         }
         val r = int(sig.copyOfRange(0, 32))
