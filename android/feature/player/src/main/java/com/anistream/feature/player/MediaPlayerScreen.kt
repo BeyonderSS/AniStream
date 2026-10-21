@@ -51,6 +51,9 @@ import com.anistream.core.ui.theme.Bg
 import com.anistream.core.ui.theme.Ink
 import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Space
+import com.anistream.feature.party.PartyOverlay
+import com.anistream.feature.party.WatchTogetherSection
+import com.anistream.feature.party.mediaPayload
 
 /**
  * Movies & TV / addon streams / Live TV player (route "media_player").
@@ -177,6 +180,7 @@ fun MediaPlayerScreen(
             }
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
+        PartyOverlay(viewModel.player, Modifier.align(Alignment.TopEnd))
     }
 
     if (showSettings && request != null) {
@@ -218,6 +222,7 @@ fun MediaPlayerScreen(
                     }
                 }
                 PlayerTweaksSection(viewModel.player, tweaks, live = ui.isLive)
+                if (!ui.isLive) WatchTogetherSection(mediaPayload(request))
             }
         }
     }

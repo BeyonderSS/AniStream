@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LiveTv
 import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +49,7 @@ import androidx.tv.material3.Text
 import com.anistream.feature.home.HomeViewModel
 import com.anistream.feature.movies.MoviesHomeViewModel
 import com.anistream.feature.movies.isMediaKey
+import com.anistream.feature.party.PartyDestination
 import com.anistream.feature.player.WebEmbedPlayer
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -67,6 +69,7 @@ internal object TvRoutes {
     const val SEARCH = "search"
     const val LIVE = "live"
     const val LIBRARY = "library"
+    const val MORE = "more"
     const val MEDIA_PLAYER = "media_player"
 
     fun anime(slug: String) = "anime/${Uri.encode(slug)}"
@@ -84,7 +87,8 @@ private val rail = listOf(
     RailEntry(TvRoutes.MOVIES, "Movies & TV", Icons.Outlined.Movie),
     RailEntry(TvRoutes.ANIME, "Anime", Icons.Outlined.AutoAwesome),
     RailEntry(TvRoutes.LIVE, "Live TV", Icons.Outlined.LiveTv),
-    RailEntry(TvRoutes.LIBRARY, "Library", Icons.Outlined.VideoLibrary)
+    RailEntry(TvRoutes.LIBRARY, "Library", Icons.Outlined.VideoLibrary),
+    RailEntry(TvRoutes.MORE, "More", Icons.Outlined.MoreHoriz)
 )
 
 @Composable
@@ -97,6 +101,7 @@ private fun TvApp() {
     val current = entry?.destination?.route
     val showRail = rail.any { it.route == current }
 
+    TvUpdateHost()
     val host = @Composable {
         NavHost(nav, startDestination = TvRoutes.HOME) {
             composable(TvRoutes.HOME) { TvHomeScreen(HomeFilter.ALL, homeVm, moviesVm, nav) }
@@ -105,6 +110,16 @@ private fun TvApp() {
             composable(TvRoutes.SEARCH) { TvSearchScreen(onOpen = { nav.navigate(TvRoutes.detail(it)) }) }
             composable(TvRoutes.LIVE) { TvLiveScreen(onPlay = { nav.navigate(TvRoutes.MEDIA_PLAYER) }) }
             composable(TvRoutes.LIBRARY) { TvLibraryScreen(onOpen = { nav.navigate(TvRoutes.detail(it)) }) }
+            composable(TvRoutes.MORE) {
+                TvMoreScreen(onOpen = { dest ->
+                    nav.navigate(
+                        when (dest) {
+                            is PartyDestination.Anime -> TvRoutes.player(dest.slug, dest.episode)
+                            PartyDestination.Media -> TvRoutes.MEDIA_PLAYER
+                        }
+                    )
+                })
+            }
             composable("anime/{slug}") {
                 TvAnimeDetailScreen(
                     onPlay = { slug, ep -> nav.navigate(TvRoutes.player(slug, ep)) },

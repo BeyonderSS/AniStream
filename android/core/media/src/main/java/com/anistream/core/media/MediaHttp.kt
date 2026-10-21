@@ -21,7 +21,8 @@ import kotlin.coroutines.resumeWithException
 /** Plain OkHttp GETs for Cinemeta, Stremio addons and M3U playlists. Cancellable, so withTimeout really aborts the call. */
 @Singleton
 class MediaHttp @Inject constructor() {
-    private val client = OkHttpClient.Builder()
+    /** shared with update downloads and the party socket */
+    val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .followRedirects(true)

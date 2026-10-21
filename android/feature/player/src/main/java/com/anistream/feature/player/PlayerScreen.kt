@@ -130,6 +130,9 @@ import com.anistream.core.ui.theme.Bg
 import com.anistream.core.ui.theme.Ink
 import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Space
+import com.anistream.feature.party.PartyOverlay
+import com.anistream.feature.party.WatchTogetherSection
+import com.anistream.feature.party.animePayload
 import kotlinx.coroutines.delay
 import com.anistream.domain.model.SkipInterval
 
@@ -201,6 +204,7 @@ fun PlayerScreen(
             }
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
+        PartyOverlay(viewModel.player, Modifier.align(Alignment.TopEnd))
     }
 
     if (showSettings) {
@@ -220,6 +224,7 @@ fun PlayerScreen(
                 Spacer(Modifier.height(Space.md))
                 SubDubToggle(ui.language, viewModel::setLanguage)
                 PlayerTweaksSection(viewModel.player, tweaks, live = false, autoSkipToggle = true)
+                WatchTogetherSection(animePayload(ui.animeSlug, ui.animeTitle, ui.episodeNumber, ui.posterUrl))
             }
         }
     }

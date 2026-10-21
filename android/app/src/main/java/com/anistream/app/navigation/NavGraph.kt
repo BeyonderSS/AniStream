@@ -17,6 +17,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import com.anistream.feature.party.PartyDestination
+import com.anistream.feature.party.ReelmMenu
+import com.anistream.feature.party.UpdateHost
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.anistream.core.ui.components.SegmentedControl
@@ -95,6 +99,20 @@ fun AniStreamNavGraph() {
     val currentRoute = navBackStackEntry?.destination?.route
 
     val showBottomBar = currentRoute in bottomBarRoutes
+    var showMenu by rememberSaveable { mutableStateOf(false) }
+    UpdateHost()
+    if (showMenu) ReelmMenu(
+        onDismiss = { showMenu = false },
+        onOpen = { dest ->
+            navController.navigate(
+                when (dest) {
+                    is PartyDestination.Anime -> Routes.player(dest.slug, dest.episode)
+                    PartyDestination.Media -> Routes.MEDIA_PLAYER
+                }
+            )
+        }
+        // ponytail: pass the profile display name as `name =` once accounts land
+    )
 
     val navigateToTab: (String) -> Unit = { route ->
         navController.navigate(route) {
@@ -160,6 +178,7 @@ fun AniStreamNavGraph() {
                     },
                     onSearchClick = { navigateToTab(Routes.SEARCH) },
                     onScheduleClick = { navController.navigate(Routes.SCHEDULE) },
+                    onMenuClick = { showMenu = true },
                     onPlayEpisode = { slug, episode ->
                         navController.navigate(Routes.player(slug, episode))
                     }
