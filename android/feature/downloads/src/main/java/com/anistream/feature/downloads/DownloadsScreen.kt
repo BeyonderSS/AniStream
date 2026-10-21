@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
@@ -280,12 +279,19 @@ private fun DownloadRow(
         }
 
         when (state) {
-            DownloadState.COMPLETED -> Icon(
-                Icons.Rounded.CheckCircle,
-                contentDescription = "Downloaded",
-                tint = Accent.live,
-                modifier = Modifier.padding(end = Space.md).size(20.dp)
-            )
+            DownloadState.COMPLETED -> {
+                var confirm by remember { mutableStateOf(false) }
+                IconButton(onClick = { confirm = true }) {
+                    Icon(Icons.Rounded.Delete, contentDescription = "Delete download", tint = Ink.muted)
+                }
+                if (confirm) androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { confirm = false },
+                    title = { Text("Delete download?") },
+                    text = { Text("${download.subtitle ?: download.animeTitle} will be removed from this device.") },
+                    confirmButton = { TextButton(onClick = { confirm = false; onDelete() }) { Text("Delete", color = Accent.danger) } },
+                    dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } }
+                )
+            }
             DownloadState.FAILED -> TextButton(onClick = onDelete) {
                 Text("Failed, remove", style = AppType.label, color = Accent.danger)
             }
