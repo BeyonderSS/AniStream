@@ -1,0 +1,106 @@
+name: web preview
+
+# Every push to a feature/** branch deploys the web app and the API Worker under separate preview names, so it can be
+# tested without merging into main. Production (web.yml, server.yml) is never touched: different Worker names, and the
+# preview API has its own D1 database. The links go into this branch's pre-release notes.
+on:
+  push:
+    branches: ['feature/**']
+    paths: ['web/**', 'server/**', 'scrapers/**', '.github/workflows/preview.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# one shared preview pair: a newer push replaces the older preview rather than racing it
+concurrency:
+  group: web-preview
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check Cloudflare token
+        id: cf
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else echo "::notice::CLOUDFLARE_API_TOKEN is empty, skipping the preview deploy"; fi
+
+      - uses: actions/checkout@v4
+        if: steps.cf.outputs.enabled == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.cf.outputs.enabled == 'true'
+        with:
+          node-version: 22
+
+      # ---- API: same code as server/, deployed as reelm-api-preview with its own database ----
+      - name: Deploy preview API
+        id: api
+        if: steps.cf.outputs.enabled == 'true'
+        working-directory: server
+        run: |
+          npm ci
+          npm test
+          npx wrangler d1 create reelm-preview || true # already exists on every run after the first
+          id=$(npx wrangler d1 list --json | jq -r '.[] | select(.name == "reelm-preview") | (.uuid // .database_id // .id)')
+          [ -n "$id" ] || { echo "::error::could not find the reelm-preview database"; exit 1; }
+          sed -e 's/^name = "reelm-api"/name = "reelm-api-preview"/' \
+              -e 's/^database_name = "reelm"/database_name = "reelm-preview"/' \
+              -e "s/^database_id = .*/database_id = \"$id\"/" wrangler.toml > wrangler.preview.toml
+          npx wrangler d1 migrations apply reelm-preview --remote --config wrangler.preview.toml
+          npx wrangler deploy --config wrangler.preview.toml 2>&1 | tee deploy.log
+          url=$(grep -oE 'https://[A-Za-z0-9.-]+\.workers\.dev' deploy.log | head -1)
+          [ -n "$url" ] || { echo "::error::no workers.dev url in the deploy output"; exit 1; }
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      # ---- web: built against the preview API, deployed as reelm-web-preview ----
+      - name: Deploy preview web
+        id: web
+        if: steps.cf.outputs.enabled == 'true'
+        working-directory: web
+        env:
+          NEXT_PUBLIC_REELM_API_URL: ${{ steps.api.outputs.url }}
+          NEXT_PUBLIC_HELPER_CHROME: ${{ vars.HELPER_CHROME_URL }}
+          NEXT_PUBLIC_HELPER_FIREFOX: ${{ vars.HELPER_FIREFOX_URL }}
+        run: |
+          npm ci
+          npx opennextjs-cloudflare build
+          npx wrangler deploy --name reelm-web-preview 2>&1 | tee deploy.log
+          url=$(grep -oE 'https://[A-Za-z0-9.-]+\.workers\.dev' deploy.log | head -1)
+          [ -n "$url" ] || { echo "::error::no workers.dev url in the deploy output"; exit 1; }
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      # ---- put the link in this branch's pre-release notes (never in a main release) ----
+      - name: Publish the preview link
+        if: steps.cf.outputs.enabled == 'true'
+        env:
+          WEB_URL: ${{ steps.web.outputs.url }}
+          API_URL: ${{ steps.api.outputs.url }}
+        run: |
+          slug=$(echo "${GITHUB_REF_NAME#feature/}" | tr -c 'A-Za-z0-9\n' '-' | sed 's/-*$//' | cut -c1-30)
+          {
+            echo "<!-- web-preview-start -->"
+            echo "**Web preview:** $WEB_URL"
+            echo
+            echo "Built from \`${GITHUB_SHA::7}\` ($(git log -1 --pretty=%s)). Separate from production: its own Worker, API and database, so accounts made here do not exist on the real site."
+            echo "<!-- web-preview-end -->"
+          } > block.md
+
+          # rolling pre-release that always carries the latest link for this branch (web-only pushes build no APK)
+          tag="web-preview-$slug"
+          if gh release view "$tag" >/dev/null 2>&1; then gh release edit "$tag" --notes-file block.md --target "$GITHUB_SHA"
+          else gh release create "$tag" --prerelease --latest=false --title "Web preview ($slug)" --notes-file block.md --target "$GITHUB_SHA"; fi
+
+          # and into the newest APK pre-release of this branch, replacing an older link if there is one
+          apk=$(gh release list --limit 40 --json tagName,isPrerelease --jq ".[] | select(.isPrerelease and (.tagName | test(\"^v1\\\\.0\\\\.[0-9]+-$slug\$\"))) | .tagName" | head -1)
+          if [ -n "$apk" ]; then
+            { gh release view "$apk" --json body --jq .body | sed '/<!-- web-preview-start -->/,/<!-- web-preview-end -->/d'; echo; cat block.md; } > notes.md
+            gh release edit "$apk" --notes-file notes.md
+          fi
+          echo "### Web preview" >> "$GITHUB_STEP_SUMMARY"
+          echo "$WEB_URL" >> "$GITHUB_STEP_SUMMARY"
