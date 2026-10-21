@@ -252,6 +252,8 @@ private fun TvPlayerChrome(
                 // the up-next card's buttons take the D-pad
                 if (panel != Panel.NONE || partyOpen || error != null || upNextShown) { poke++; return@onPreviewKeyEvent false }
                 if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                // Back must not re-show the controls: it did, and BackHandler then hid them, so Back toggled forever
+                if (e.key == Key.Back || e.key == Key.Escape) return@onPreviewKeyEvent false
                 // the skip-intro chip (reached with ↓) takes OK; ↑ backs out; anything else acts as usual
                 val fromIntro = introFocused
                 if (fromIntro) {

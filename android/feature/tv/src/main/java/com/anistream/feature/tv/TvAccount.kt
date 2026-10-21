@@ -250,6 +250,10 @@ private fun TvWhosWatching(
     onSignOut: () -> Unit,
     onClearHistory: () -> Unit
 ) {
+    // the gate replaces the app (and its update host) while it shows, so it hosts the update dialog itself
+    val updates: com.anistream.feature.party.UpdateViewModel = hiltViewModel()
+    val updateUi by updates.updates.ui.collectAsStateWithLifecycle()
+    TvUpdateHost(updates)
     var confirm by remember { mutableStateOf(false) }
     if (confirm) TvConfirm("Clear watch history for this profile? It empties on all your devices.", "Clear all", { confirm = false; onClearHistory() }, { confirm = false })
     if (profiles.isEmpty()) { TvMessage("Loading profiles"); return }
@@ -275,6 +279,7 @@ private fun TvWhosWatching(
                 TvPill("Manage profiles", onManage, icon = Icons.Rounded.Edit)
                 TvPill("Clear history", { confirm = true })
                 TvPill("Sign out", onSignOut)
+                TvPill(if (updateUi.checking) "Checking…" else "Check for updates", updates.updates::checkNow, enabled = !updateUi.checking)
             }
         }
     }
