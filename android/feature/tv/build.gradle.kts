@@ -38,6 +38,7 @@ dependencies {
     implementation(project(":feature:favorites"))
     implementation(project(":feature:downloads"))
     implementation(project(":feature:player"))
+    implementation(project(":feature:party"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

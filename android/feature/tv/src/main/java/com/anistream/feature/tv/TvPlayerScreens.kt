@@ -288,6 +288,7 @@ private fun TvPlayerChrome(
             },
             modifier = Modifier.fillMaxSize()
         )
+        com.anistream.feature.party.PartyOverlay(player, Modifier.align(Alignment.TopEnd))
 
         if (loading && error == null) {
             Text("Loading…", style = TvType.title, modifier = Modifier.align(Alignment.Center).background(Bg.badge, Radius.pill).padding(horizontal = 24.dp, vertical = 10.dp))

@@ -35,6 +35,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.rounded.LiveTv
@@ -102,6 +103,7 @@ fun HomeScreen(
     onGenresClick: () -> Unit = {},
     onSearchClick: () -> Unit = {},
     onScheduleClick: () -> Unit = {},
+    onMenuClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -256,13 +258,14 @@ fun HomeScreen(
             solid = solid || mode != HomeMode.Content,
             onSearchClick = onSearchClick,
             onGenresClick = onGenresClick,
-            onScheduleClick = onScheduleClick
+            onScheduleClick = onScheduleClick,
+            onMenuClick = onMenuClick
         )
     }
 }
 
 @Composable
-private fun HomeTopBar(solid: Boolean, onSearchClick: () -> Unit, onGenresClick: () -> Unit, onScheduleClick: () -> Unit) {
+private fun HomeTopBar(solid: Boolean, onSearchClick: () -> Unit, onGenresClick: () -> Unit, onScheduleClick: () -> Unit, onMenuClick: () -> Unit) {
     val bg by animateColorAsState(if (solid) Bg.bar else Color.Transparent, Motion.standard(), label = "topBarBg")
     Row(
         modifier = Modifier
@@ -287,6 +290,9 @@ private fun HomeTopBar(solid: Boolean, onSearchClick: () -> Unit, onGenresClick:
         }
         IconButton(onClick = onGenresClick) {
             Icon(Icons.Outlined.Category, contentDescription = "Browse genres", tint = Ink.high)
+        }
+        IconButton(onClick = onMenuClick) {
+            Icon(Icons.Outlined.MoreVert, contentDescription = "More", tint = Ink.high)
         }
     }
 }

@@ -90,6 +90,7 @@ dependencies {
     implementation(project(":feature:search"))
     implementation(project(":feature:anime-detail"))
     implementation(project(":feature:player"))
+    implementation(project(":feature:party"))
     implementation(project(":feature:favorites"))
     implementation(project(":feature:downloads"))
     implementation(project(":feature:schedule"))
