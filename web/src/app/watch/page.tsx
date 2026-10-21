@@ -84,7 +84,6 @@ function Player() {
         if (r.malId) get(`aniskip?mal=${r.malId}&ep=${p.ep}`).then((d) => live && setSkips((d.results ?? []).map((x: any) => ({ s: x.interval.startTime, e: x.interval.endTime, type: x.skipType })))).catch(() => {});
         return [[{ src: proxied(r.master, r.referer), hls: true, label: "Auto" }], r.subtitles.map((x: Sub) => ({ ...x, url: proxied(x.url, r.referer) }))] as const;
       }
-      if (!document.documentElement.dataset.reelmHelper) throw new Error("helper");
       const list = await get<any[]>(`movies/stream?id=${encodeURIComponent(p.id)}&type=${p.type}&title=${encodeURIComponent(p.title)}&year=${p.year ?? ""}&s=${p.season ?? 0}&e=${p.episode ?? 0}`);
       if (!list.length) throw new Error("No streams found for this title.");
       return [list.map((x) => ({ src: x.url, hls: /\.m3u8(\?|$)/.test(x.url), label: x.label, codec: x.codec })), (list.find((x) => x.subtitles?.length)?.subtitles ?? []).map((x: Sub) => ({ ...x, url: `/api/sub?u=${encodeURIComponent(x.url)}` }))] as const;

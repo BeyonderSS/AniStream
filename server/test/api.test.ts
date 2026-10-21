@@ -175,4 +175,24 @@ describe("proxy", () => {
     expect(out).toContain("u=https%3A%2F%2Fx.zokoanime.video%2Fa%2Fseg%2F1.ts&r=");
     expect((await call("/v1/proxy?u=" + encodeURIComponent("https://example.com/a.m3u8"))).status).toBe(403);
   });
+
+  it("serves the hosts the web player used the extension for, with the headers they need", async () => {
+    const { hostOk, upstreamHeaders } = await import("../src/index");
+    for (const h of ["bcdn.hakunaymatata.com", "pixeldrain.com", "pixeldrain.dev", "4khdhub.one", "hubcloud.ist", "pixel.hubcloud.cx", "hubdrive.bar", "greenmountmotors.cc"]) expect(hostOk(h)).toBe(true);
+    for (const h of ["example.com", "evilhubcloud.ist", "hubcloud.ist.evil.com"]) expect(hostOk(h)).toBe(false);
+    // MovieBox's CDN: app user agent and never a Referer; everything else keeps a browser user agent and the Referer
+    expect(upstreamHeaders("bcdn.hakunaymatata.com", "https://reelm/", "bytes=0-9")).toEqual({ "User-Agent": "okhttp/4.12.0", Range: "bytes=0-9" });
+    const other = upstreamHeaders("pixeldrain.com", "https://reelm/", null);
+    expect(other["User-Agent"]).toMatch(/Mozilla/);
+    expect(other.Referer).toBe("https://reelm/");
+  });
+
+  it("probe refuses private, plain-http and malformed targets", async () => {
+    const q = (u: string) => call("/v1/probe?u=" + encodeURIComponent(u));
+    expect((await q("not a url")).status).toBe(400);
+    expect((await q("http://example.com/a.mkv")).status).toBe(403);
+    expect((await q("https://127.0.0.1/a.mkv")).status).toBe(403);
+    expect((await q("https://localhost/a.mkv")).status).toBe(403);
+    expect((await q("https://8.8.8.8/a.mkv")).status).toBe(403);
+  });
 });

@@ -256,6 +256,7 @@ const routes: [string, RegExp, (c: Ctx) => Response | Promise<Response>][] = [
   ["GET", /^\/v1\/pair\/([^/]+)$/, pairPoll],
   ["GET", /^\/pair\/([^/]+)$/, pairPage],
   ["GET", /^\/v1\/proxy$/, proxy],
+  ["GET", /^\/v1\/probe$/, probe],
   ["GET", /^\/v1\/hub$/, hub],
   ["POST", /^\/v1\/rooms$/, createRoom],
   ["GET", /^\/v1\/rooms\/([^/]+)$/, joinRoom],
@@ -264,10 +265,25 @@ const routes: [string, RegExp, (c: Ctx) => Response | Promise<Response>][] = [
 ];
 
 // ---- stream proxy (web player) ----------------------------------------------
-// Anime HLS needs a Referer and no CORS headers; the browser can't send either. Hosts the parsers return only.
-const PROXY_HOSTS = ["dramahot.top", "drama1.cfd", "zokoanime.video", "zokoanime.com", "zokoanime.net", "hianime.at"];
-const hostOk = (h: string) => PROXY_HOSTS.some((p) => h === p || h.endsWith("." + p));
+// Replaces what the Reelm Helper extension did, so the web player needs no install: the browser can't send a Referer or an
+// app User-Agent, can't drop Sec-Fetch-*, and can't read hosts without CORS. Hosts the parsers return only.
+const PROXY_HOSTS = [
+  "dramahot.top", "drama1.cfd", "zokoanime.video", "zokoanime.com", "zokoanime.net", "hianime.at",
+  "hakunaymatata.com", "pixeldrain.com", "pixeldrain.dev", // MovieBox CDN, Pixeldrain (4KHDHub)
+  "4khdhub.one", "cryptonewz.online", "gamerxyt.com", // 4KHDHub pages and its resolver chain
+];
+// the 4KHDHub mirrors change TLD often (hubcloud.ist, .cx, .fans ...), so match on the name
+const MIRROR = /(^|\.)(hubcloud|hubdrive|greenmotors|greenmountmotors)\.[a-z]{2,}$/;
+export const hostOk = (h: string) => MIRROR.test(h) || PROXY_HOSTS.some((p) => h === p || h.endsWith("." + p));
 const isPrivate = (h: string) => h === "localhost" || h.endsWith(".local") || h.startsWith("[") || /^(0|10|127)\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\.|^169\.254\./.test(h);
+const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+// MovieBox's CDN answers 428/429 to browser user agents and wants no Referer at all
+const APP_UA_HOSTS = ["hakunaymatata.com"];
+
+export function upstreamHeaders(host: string, referer: string, range: string | null): Record<string, string> {
+  const app = APP_UA_HOSTS.some((p) => host === p || host.endsWith("." + p));
+  return { "User-Agent": app ? "okhttp/4.12.0" : BROWSER_UA, ...(referer && !app ? { Referer: referer } : {}), ...(range ? { Range: range } : {}) };
+}
 
 /** Point every segment/key/variant URL of a playlist back at the proxy. */
 export function rewritePlaylist(text: string, base: string, proxyBase: string, referer: string, any: boolean) {
@@ -285,10 +301,7 @@ async function proxy({ req, url }: Ctx) {
   const any = url.searchParams.get("any") === "1"; // live TV: channels live on arbitrary hosts
   if (!/^https?:$/.test(u.protocol) || isPrivate(u.hostname) || !(any || hostOk(u.hostname))) return json({ error: "host not allowed" }, 403);
   const referer = url.searchParams.get("r") ?? "";
-  const up = await fetch(u, { headers: {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-    ...(referer ? { Referer: referer } : {}), ...(req.headers.get("range") ? { Range: req.headers.get("range")! } : {}),
-  } });
+  const up = await fetch(u, { headers: upstreamHeaders(u.hostname, referer, req.headers.get("range")) });
   const ct = up.headers.get("content-type") ?? "";
   if (up.ok && (u.pathname.endsWith(".m3u8") || /mpegurl/i.test(ct))) {
     const body = rewritePlaylist(await up.text(), u.href, `${url.origin}/v1/proxy`, referer, any);
@@ -296,14 +309,27 @@ async function proxy({ req, url }: Ctx) {
   }
   const h = new Headers();
   for (const k of ["content-type", "content-length", "content-range", "accept-ranges"]) if (up.headers.has(k)) h.set(k, up.headers.get(k)!);
+  h.set("x-final-url", up.url); // after redirects; the 4KHDHub chain unwraps resolver urls from it
   return new Response(up.body, { status: up.status, headers: h });
+}
+
+/** First kilobyte of any public https file: status, final url, content type. Lets the player pick a working 4KHDHub mirror. */
+async function probe({ url }: Ctx) {
+  let u: URL;
+  try { u = new URL(url.searchParams.get("u") ?? ""); } catch { return json({ error: "bad url" }, 400); }
+  if (u.protocol !== "https:" || isPrivate(u.hostname) || /^[\d.]+$/.test(u.hostname)) return json({ error: "host not allowed" }, 403);
+  try {
+    const up = await fetch(u, { headers: upstreamHeaders(u.hostname, "", "bytes=0-1023"), signal: AbortSignal.timeout(10000) });
+    up.body?.cancel();
+    return json({ status: up.status, url: up.url, type: (up.headers.get("content-type") ?? "").toLowerCase() });
+  } catch { return json({ status: 0, url: u.href, type: "" }); }
 }
 
 const CORS = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
   "access-control-allow-headers": "authorization,content-type,range",
-  "access-control-expose-headers": "content-length,content-range",
+  "access-control-expose-headers": "content-length,content-range,accept-ranges,x-final-url",
 };
 
 async function route(req: Request, env: Env): Promise<Response> {
