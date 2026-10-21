@@ -4,6 +4,8 @@ name: Build & release APK
 on:
   push:
     branches: [main]
+    # server/ deploys separately; only app changes cut an APK release
+    paths: ['android/**', '.github/workflows/release.yml']
   workflow_dispatch:
 
 permissions:
@@ -12,6 +14,10 @@ permissions:
 concurrency:
   group: release
   cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: android
 
 jobs:
   release:
