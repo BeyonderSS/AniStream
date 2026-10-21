@@ -42,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,10 +73,11 @@ private fun formatSize(bytes: Long): String {
 
 @Composable
 fun DownloadsScreen(
+    initialPlay: String? = null,
     viewModel: DownloadsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var playing by remember { mutableStateOf<String?>(null) }
+    var playing by rememberSaveable { mutableStateOf(initialPlay) }
     playing?.let { LocalPlayerDialog(filePath = it, onDismiss = { playing = null }) }
 
     val downloads = uiState.downloads

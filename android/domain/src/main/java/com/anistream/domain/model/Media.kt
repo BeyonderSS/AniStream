@@ -102,6 +102,17 @@ data class Channel(
     val headers: Map<String, String> = emptyMap()
 )
 
+/** What the media player needs to tune in to this channel. */
+fun Channel.liveRequest() = PlaybackRequest(
+    historyKey = null,
+    mediaId = null,
+    title = name,
+    subtitle = group,
+    posterUrl = logoUrl,
+    streams = listOf(MediaStream(url = url, qualityLabel = "LIVE", headers = headers, sourceName = "Live", isDirectFile = false)),
+    isLive = true
+)
+
 /**
  * Everything the generic media player needs. The caller fills it, hands it to
  * [com.anistream.domain.repository.NowPlaying] and navigates to the media player route.

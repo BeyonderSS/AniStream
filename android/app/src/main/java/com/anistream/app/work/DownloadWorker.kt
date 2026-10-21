@@ -57,6 +57,7 @@ class DownloadWorker @AssistedInject constructor(
                 .setProgress(100, (p * 100).toInt(), false)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
+                .setContentIntent(openAppIntent(applicationContext, Routes.downloads(), nid))
                 .addAction(0, "Cancel", actionIntent(applicationContext, ACTION_CANCEL, input, nid))
                 .build()
             try {
@@ -69,12 +70,14 @@ class DownloadWorker @AssistedInject constructor(
         showProgress(row.progress)
         return try {
             repo.transfer(inputData) { showProgress(it) }
+            val file = dao.getById(id)?.filePath
             postNotification(
                 applicationContext, nid + 1,
                 notificationBuilder(applicationContext, CH_DOWNLOADS)
                     .setContentTitle("Download finished")
                     .setContentText(listOfNotNull(row.animeTitle, label).joinToString(" · "))
-                    .setContentIntent(openAppIntent(applicationContext, Routes.DOWNLOADS, nid))
+                    .setContentIntent(openAppIntent(applicationContext, Routes.downloads(), nid))
+                    .apply { if (file != null) addAction(0, "Play", openAppIntent(applicationContext, Routes.downloads(file), nid + 2)) }
                     .setAutoCancel(true)
                     .build()
             )
@@ -95,7 +98,7 @@ class DownloadWorker @AssistedInject constructor(
             notificationBuilder(applicationContext, CH_DOWNLOADS)
                 .setContentTitle("Download failed")
                 .setContentText(listOfNotNull(title, label).joinToString(" · "))
-                .setContentIntent(openAppIntent(applicationContext, Routes.DOWNLOADS, nid))
+                .setContentIntent(openAppIntent(applicationContext, Routes.downloads(), nid))
                 .addAction(0, "Retry", actionIntent(applicationContext, ACTION_RETRY, input, nid))
                 .setAutoCancel(true)
                 .build()
