@@ -64,7 +64,8 @@ export function Nav() {
         </nav>
         <div className="flex-1 md:hidden" />
         <form role="search" onSubmit={search} className={cn("relative hidden h-10 items-center rounded-full transition-[width,background-color] duration-300 ease-dusk md:flex", open ? "w-72 bg-white/10" : "w-10")}>
-          <button type={open ? "submit" : "button"} aria-label="Search" onClick={() => { if (!open) { setOpen(true); setTimeout(() => input.current?.focus(), 50); } }}
+          {/* always type=button: switching to submit mid-click submitted the empty form and closed it again */}
+          <button type="button" aria-label="Search" onClick={(e) => { if (open) e.currentTarget.form?.requestSubmit(); else { setOpen(true); setTimeout(() => input.current?.focus(), 50); } }}
             className={cn("beam grid size-10 shrink-0 place-items-center rounded-full", !open && "hover:bg-white/8", active(path, "/search") && !open && "text-primary")}><Search className="size-5" /></button>
           <input ref={input} aria-label="Search titles" value={q} onChange={(e) => setQ(e.target.value)} onBlur={() => !q && setOpen(false)} onKeyDown={(e) => e.key === "Escape" && (setQ(""), setOpen(false))}
             placeholder="Search anime, movies, series" tabIndex={open ? 0 : -1} className={cn("h-full min-w-0 flex-1 bg-transparent pr-4 text-sm outline-none placeholder:text-foreground/40", !open && "pointer-events-none w-0 opacity-0")} />
