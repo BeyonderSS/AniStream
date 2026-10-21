@@ -1,0 +1,163 @@
+{
+  "schema": 1,
+  "hianime": {
+    "config": {
+      "base": "https://hianime.at",
+      "key": "otaku-embed-v1",
+      "server": "ZokoAnime",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "search": "/search?keyword=%s",
+      "episodes": "/api/theme/episode/list/%s",
+      "servers": "/api/theme/episode/servers?episodeId=%s"
+    },
+    "upstream": {
+      "commit": "21ed4a0a6354688622b5a967d93ba96d851d0ef2",
+      "logic": {
+        "hianime_search": "a3f9ef46d8812db6",
+        "hianime_episodes": "5574e384dc86715a",
+        "hianime_m3u8": "6561723cf2b85571",
+        "deobfuscate_blob": "d2322bfff16e367b",
+        "select_quality": "d0b4302a8f64c621"
+      }
+    }
+  },
+  "moviebox": {
+    "config": {
+      "hosts": [
+        "https://api6.aoneroom.com",
+        "https://api5.aoneroom.com",
+        "https://api4.aoneroom.com",
+        "https://api4sg.aoneroom.com",
+        "https://api3.aoneroom.com",
+        "https://api6sg.aoneroom.com",
+        "https://api.inmoviebox.com"
+      ],
+      "retryStatus": [
+        403,
+        406,
+        407,
+        429,
+        500,
+        502,
+        503,
+        504
+      ],
+      "secret": [
+        239,
+        168,
+        145,
+        151,
+        78,
+        236,
+        211,
+        20,
+        141,
+        246,
+        58,
+        166,
+        17,
+        96,
+        45,
+        239,
+        209,
+        1,
+        37,
+        155,
+        165,
+        33,
+        2,
+        44,
+        87,
+        174,
+        5,
+        102,
+        189,
+        142
+      ],
+      "versionCodes": [
+        50020117,
+        50020118,
+        50020119,
+        50020120,
+        50020121
+      ],
+      "androidVersions": [
+        [
+          "9",
+          "PQ3A.190605.03081104"
+        ],
+        [
+          "10",
+          "QP1A.191005.007.A3"
+        ],
+        [
+          "11",
+          "RP1A.200720.011"
+        ],
+        [
+          "12",
+          "S1B.220414.015"
+        ],
+        [
+          "13",
+          "TQ2A.230405.003"
+        ]
+      ],
+      "devices": [
+        [
+          "23078RKD5C",
+          "Redmi"
+        ],
+        [
+          "2201117TY",
+          "Redmi"
+        ],
+        [
+          "2201117TG",
+          "Redmi"
+        ],
+        [
+          "22101316G",
+          "Redmi"
+        ],
+        [
+          "21121210G",
+          "Redmi"
+        ],
+        [
+          "M2012K11AG",
+          "Redmi"
+        ],
+        [
+          "M2007J20CG",
+          "Redmi"
+        ]
+      ],
+      "timezones": [
+        "Asia/Kolkata",
+        "Asia/Shanghai",
+        "Asia/Tokyo",
+        "America/New_York",
+        "Europe/London"
+      ],
+      "networks": [
+        "NETWORK_WIFI",
+        "NETWORK_MOBILE"
+      ],
+      "packageName": "com.community.oneroom",
+      "versionName": "4.0.01.0813.03",
+      "spCode": "40401",
+      "cronet": "135.0.7012.3"
+    },
+    "upstream": {
+      "commit": "431ab051cfdf34953b11b602b46618380d2a653d",
+      "logic": {
+        "sign_headers": "f81a3ef792a0d482",
+        "sorted_query": "bef51f1621df0d8d",
+        "client_token": "2e42b38cc8bbeb14",
+        "endpoints": "7e1874e1e624e705"
+      }
+    }
+  },
+  "updatedAt": "2026-10-21T11:32:08.835Z"
+}

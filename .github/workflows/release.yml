@@ -1,9 +1,10 @@
 name: Build & release APK
 
 # Every push to main builds a signed release APK and publishes it as a GitHub release.
+# Every push to a feature/** branch publishes the same build as a pre-release (never marked latest).
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**']
     # server/ deploys separately; only app changes cut an APK release
     paths: ['android/**', '.github/workflows/release.yml']
   workflow_dispatch:
@@ -28,7 +29,13 @@ jobs:
       # v1.0.0 was the first manual release (versionCode 1); CI builds count up from there
       - name: Version
         run: |
-          echo "VERSION_NAME=1.0.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          if [ "$GITHUB_REF_NAME" = main ]; then
+            echo "VERSION_NAME=1.0.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          else
+            slug=$(echo "${GITHUB_REF_NAME#feature/}" | tr -c 'A-Za-z0-9\n' '-' | sed 's/-*$//' | cut -c1-30)
+            echo "VERSION_NAME=1.0.$GITHUB_RUN_NUMBER-$slug" >> "$GITHUB_ENV"
+            echo "PRERELEASE=true" >> "$GITHUB_ENV"
+          fi
           echo "VERSION_CODE=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v4
@@ -80,7 +87,7 @@ jobs:
             echo '```'
           } > notes.md
           gh release create "v$VERSION_NAME" Reelm-*.apk \
-            --title "Reelm v$VERSION_NAME" \
+            --title "Reelm v$VERSION_NAME${PRERELEASE:+ (pre-release)}" \
             --notes-file notes.md \
             --target "$GITHUB_SHA" \
-            --latest
+            ${PRERELEASE:+--prerelease} ${PRERELEASE:---latest}

@@ -1,0 +1,75 @@
+name: scraper-sync
+
+# Pulls ani-cli and MovieBox-Tui, smoke tests their current constants against the live sites and publishes
+# scrapers/scrapers.json (signed when SCRAPER_SIGNING_KEY is set). Anything it cannot handle becomes one issue.
+on:
+  schedule:
+    - cron: "30 3 * * *" # 09:00 IST (cron is UTC)
+  workflow_dispatch:
+    inputs:
+      accept:
+        description: Re-baseline logic fingerprints (after porting an upstream logic change)
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency: scraper-sync
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SCRAPER_SIGNING_KEY: ${{ secrets.SCRAPER_SIGNING_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: Reelm }
+      - uses: actions/checkout@v4
+        with: { repository: pystardust/ani-cli, path: ani-cli }
+      - uses: actions/checkout@v4
+        with: { repository: mesamirh/MovieBox-Tui, path: MovieBox-Tui }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+
+      - name: Unit checks
+        working-directory: Reelm
+        run: node --test scraper-sync/
+
+      - name: Sync
+        id: sync
+        working-directory: Reelm
+        run: node scraper-sync/sync.mjs --ani ../ani-cli --mb ../MovieBox-Tui --report "$RUNNER_TEMP/report.md" ${{ inputs.accept && '--accept' || '' }}
+
+      - name: Sign
+        if: steps.sync.outputs.changed == 'true' && env.SCRAPER_SIGNING_KEY != ''
+        working-directory: Reelm
+        run: node scraper-sync/sign.mjs sign scrapers/scrapers.json
+
+      - name: Publish
+        if: steps.sync.outputs.changed == 'true'
+        working-directory: Reelm
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scrapers
+          git commit -m "chore(scrapers): sync upstream constants"
+          git push
+
+      - name: Open or update the attention issue
+        if: steps.sync.outputs.report == 'true'
+        working-directory: Reelm
+        run: |
+          title="Scraper sync needs attention"
+          n=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
+          if [ -n "$n" ]; then gh issue edit "$n" --body-file "$RUNNER_TEMP/report.md"
+          else gh issue create --title "$title" --body-file "$RUNNER_TEMP/report.md"; fi
+
+      - name: Close the issue once clean
+        if: steps.sync.outputs.report == 'false'
+        working-directory: Reelm
+        run: |
+          n=$(gh issue list --state open --search "\"Scraper sync needs attention\" in:title" --json number --jq '.[0].number')
+          [ -z "$n" ] || gh issue close "$n" --comment "Clean run, closing."
