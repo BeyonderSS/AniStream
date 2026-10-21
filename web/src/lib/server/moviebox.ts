@@ -44,12 +44,9 @@ export const clientToken = (ts: number) => `${ts},${md5([...String(ts)].reverse(
 
 class AuthError extends Error {}
 
-/** MovieBox answers HTTP 440 to Cloudflare Workers (CF-Worker header), so when MOVIEBOX_RELAY is set the signed request
- *  goes through the relay in /relay, which replays it byte for byte from a plain Node host. */
+/** MovieBox answers HTTP 440 to datacenter IPs (Cloudflare, Vercel), so in the web app this runs in the browser (lib/movies.ts). */
 function send(method: string, host: string, path: string, headers: Record<string, string>, body?: BodyInit) {
-  const relay = process.env.MOVIEBOX_RELAY;
-  if (!relay) return fetch(`https://${host}${path}`, { method, headers, body });
-  return fetch(`${relay}?host=${host}&path=${encodeURIComponent(path)}`, { method, headers: { ...headers, "x-relay-key": process.env.RELAY_KEY ?? "" }, body });
+  return fetch(`https://${host}${path}`, { method, headers, body });
 }
 
 async function request(method: string, path: string, body: string | null, tok?: string): Promise<any> {

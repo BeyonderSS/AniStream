@@ -12,7 +12,7 @@ import { deviceId, get, getHistory, playKey, proxied, reelm, saveProgress, toPla
 import { useApi, useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
-type Source = { src: string; hls: boolean; label: string };
+type Source = { src: string; hls: boolean; label: string; codec?: string };
 type Sub = { url: string; label: string; lang: string; default?: boolean };
 type Member = { id: string; name: string; avatar: string };
 type Device = { deviceId: string; deviceName: string; kind: string };
@@ -27,7 +27,8 @@ const clock = (t: number) => {
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 /** Raw errors from the stream hosts are not for people; say what happened and what to try. */
 const friendly = (m: string) =>
-  /isn't available|not available|no stream|no streams|release/i.test(m) ? { t: "This one isn't streaming yet", b: "No source has it right now. Try again later, or pick another episode." }
+  m === "hevc" ? { t: "Your browser can't play this format", b: "This title is only available in HEVC (H.265). Open it in Edge or Safari, or in the Reelm phone or TV app." }
+  : /isn't available|not available|no stream|no streams|release/i.test(m) ? { t: "This one isn't streaming yet", b: "No source has it right now. Try again later, or pick another episode." }
   : /network|fetch|manifest|frag|level|load/i.test(m) ? { t: "The stream stopped loading", b: "The video host didn't answer. Retry, or switch quality in settings." }
   : /4\d\d|5\d\d|440/.test(m) ? { t: "The video host turned us away", b: "This usually clears up in a minute. Retry to ask again." }
   : { t: "This video didn't start", b: "Something went wrong while starting playback. Retry, or go back and pick it again." };
@@ -80,7 +81,7 @@ function Player() {
       }
       const list = await get<any[]>(`movies/stream?id=${encodeURIComponent(p.id)}&type=${p.type}&title=${encodeURIComponent(p.title)}&year=${p.year ?? ""}&s=${p.season ?? 0}&e=${p.episode ?? 0}`);
       if (!list.length) throw new Error("No streams found for this title.");
-      return [list.map((x) => ({ src: x.url, hls: /\.m3u8(\?|$)/.test(x.url), label: x.label })), list[0].subtitles.map((x: Sub) => ({ ...x, url: `/api/sub?u=${encodeURIComponent(x.url)}` }))] as const;
+      return [list.map((x) => ({ src: x.url, hls: /\.m3u8(\?|$)/.test(x.url), label: x.label, codec: x.codec })), list[0].subtitles.map((x: Sub) => ({ ...x, url: `/api/sub?u=${encodeURIComponent(x.url)}` }))] as const;
     })().then((r) => {
       if (!live || !r) return;
       const [a, b] = r;
@@ -106,7 +107,9 @@ function Player() {
       if (at > 5) v.currentTime = at;
     };
     v.addEventListener("loadedmetadata", onMeta, { once: true });
-    const fail = (m: string) => (si + 1 < sources.length ? setSi(si + 1) : setErr(m));
+    // MovieBox often ships HEVC only; browsers without HEVC decode (most Chrome/Firefox on Linux) can't play it
+    const hevcBlocked = /hevc|h265/i.test(src.codec ?? "") && !v.canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"');
+    const fail = (m: string) => (si + 1 < sources.length ? setSi(si + 1) : setErr(hevcBlocked ? "hevc" : m));
     if (src.hls && Hls.isSupported()) {
       const h = new Hls();
       hls.current = h;

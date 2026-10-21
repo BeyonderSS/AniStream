@@ -7,6 +7,12 @@ const memo = new Map<string, Promise<any>>();
 export function get<T = any>(path: string): Promise<T> {
   const hit = memo.get(path);
   if (hit) return hit;
+  const [key, qs = ""] = path.split("?");
+  if (typeof window !== "undefined" && /^movies\/(search|detail|stream)$/.test(key)) {
+    const p = import("./movies").then((m) => m.movieRoutes[key](new URLSearchParams(qs))) as Promise<T>;
+    if (key !== "movies/stream") { memo.set(path, p); p.catch(() => memo.delete(path)); }
+    return p;
+  }
   const p = fetch(`/api/${path}`).then(async (r) => {
     const d = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
     if (!r.ok) throw new Error(d.error ?? `HTTP ${r.status}`);

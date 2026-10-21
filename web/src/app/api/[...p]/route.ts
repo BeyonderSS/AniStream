@@ -1,18 +1,10 @@
 import * as hi from "@/lib/server/hianime";
-import * as mb from "@/lib/server/moviebox";
+import { movieRoutes } from "@/lib/movies";
 import * as misc from "@/lib/server/misc";
 
 // One catch-all so the server side of every feature is a flat table.
 const num = (v: string | null, d = 0) => Number(v) || d;
 const KIDS_CH = ["kids", "animation", "family", "education", "cartoon", "children"];
-
-async function findMb(q: URLSearchParams) {
-  const type = q.get("type") === "series" ? "series" : "movie", year = num(q.get("year"));
-  const hits = (await mb.search(q.get("title") ?? "")).filter((h) => h.type === type);
-  const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const same = hits.filter((h) => norm(h.title) === norm(q.get("title") ?? ""));
-  return (same.find((h) => !year || Math.abs((h.year ?? year) - year) <= 1) ?? same[0] ?? hits[0])?.id.slice(3);
-}
 
 const routes: Record<string, (q: URLSearchParams) => Promise<unknown>> = {
   "anime/home": () => hi.home(),
@@ -24,21 +16,7 @@ const routes: Record<string, (q: URLSearchParams) => Promise<unknown>> = {
   "anime/schedule": () => hi.schedule(),
   "aniskip": (q) => misc.aniskip(q.get("mal")!, q.get("ep")!),
   "movies/catalog": (q) => misc.catalog(q.get("key") ?? "movie/top", num(q.get("skip"))),
-  "movies/search": async (q) => {
-    const t = q.get("q") ?? "";
-    const m = await mb.search(t).catch(() => []);
-    return m.length ? m : misc.cinemetaSearch(t);
-  },
-  "movies/detail": (q) => {
-    const id = q.get("id")!;
-    return id.startsWith("mb:") ? mb.detail(id.slice(3)) : misc.cinemetaDetail(id, q.get("type") === "series" ? "series" : "movie");
-  },
-  "movies/stream": async (q) => {
-    const id = q.get("id")!;
-    const sid = id.startsWith("mb:") ? id.slice(3) : await findMb(q);
-    if (!sid) throw new Error("No stream source found for this title");
-    return mb.streams(sid, num(q.get("s")), num(q.get("e")));
-  },
+  ...movieRoutes,
   "live": async (q) => {
     const kids = q.get("kids") === "1", g = (q.get("group") ?? "").toLowerCase(), s = (q.get("q") ?? "").toLowerCase();
     const all = await misc.channels(q.get("url") ?? undefined);
