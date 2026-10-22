@@ -7,7 +7,9 @@
 // "decoder-flac","zlib","filter-aformat","filter-anull"]', then make dist/libav-6.10.9.0-reelm{,.wasm}.js.
 // In: {type:"open",url} | {type:"seek",t,id} | {type:"want",until}. Out: {type:"info",codec} | {type:"pcm",id,t,sr,l,r} | {type:"error",message}
 declare const LibAV: any;
-const BLOCK = 8 << 20, AHEAD_BLOCKS = 2; // bytes per Range request (libav asks for 32 KB at a time), blocks fetched ahead
+// ponytail: 2 MB blocks, 6 in flight: startup needs 3 serial reads (header, cues at the end, seek target), which took
+// ~45 s with 8 MB blocks on Pixeldrain; more parallel requests keep the sequential rate. Tune if a host throttles connections.
+const BLOCK = 2 << 20, AHEAD_BLOCKS = 6; // bytes per Range request (libav asks for 32 KB at a time), blocks fetched ahead
 let want = 0, seek: { t: number; id: number } | null = null, id = 0, wake = () => {};
 
 onmessage = ({ data: m }) => {
@@ -34,7 +36,7 @@ async function run(url: string) {
       blocks.set(i, fetch(url, { headers: { Range: `bytes=${i * BLOCK}-${Math.min(size, (i + 1) * BLOCK) - 1}` } })
         .then(async (r) => { if (r.status !== 206) throw new Error(`HTTP ${r.status}`); return new Uint8Array(await r.arrayBuffer()); }));
       blocks.get(i)!.catch(() => blocks.delete(i));
-      if (blocks.size > 4) blocks.delete(blocks.keys().next().value!);
+      if (blocks.size > AHEAD_BLOCKS + 2) blocks.delete(blocks.keys().next().value!);
     }
     return blocks.get(i)!;
   };
@@ -69,7 +71,7 @@ async function run(url: string) {
       base = NaN; done = 0; eof = false;
     }
     if (eof || (!isNaN(base) && base + done / sr >= want)) { await new Promise<void>((r) => (wake = r)); continue; }
-    const [res, pk] = await av.ff_read_multi(fmt, pkt, null, { limit: 32 * 1024 } /* small, so a seek is picked up quickly */);
+    const [res, pk] = await av.ff_read_frame_multi(fmt, pkt, { limit: 32 * 1024 } /* small, so a seek is picked up quickly */);
     eof = res === av.AVERROR_EOF;
     const frames = await av.ff_decode_multi(c, pkt, frame, pk[s.index] ?? [], { fin: eof, ignoreErrors: true });
     if (!frames.length || seek) continue;
