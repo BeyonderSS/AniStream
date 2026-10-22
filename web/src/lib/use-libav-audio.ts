@@ -85,17 +85,10 @@ export function useLibavAudio(video: RefObject<HTMLVideoElement | null>, url: st
       for (const [e, f] of events) v!.removeEventListener(e, f);
     }
 
-    // Not flagged: start only if the browser plays the file but decodes no audio (Chromium's counter stays 0).
-    let probe = 0, t0 = -1;
+    // Only flagged Dolby/DTS streams. An auto-detect on webkitAudioDecodedByteCount === 0 also fired on normal
+    // cross-origin (non-CORS) files, where Chrome hides that counter, and doubled their audio.
     if (dolby) start();
-    else probe = window.setInterval(() => {
-      if (v.paused || v.readyState < 3) return;
-      if (t0 < 0) t0 = v.currentTime;
-      if (v.currentTime - t0 < 2) return;
-      clearInterval(probe);
-      if ((v as any).webkitAudioDecodedByteCount === 0) start();
-    }, 500);
-    return () => { clearInterval(probe); if (w && !dead) stop(); };
+    return () => { if (w && !dead) stop(); };
   }, [url, dolby, key]); // eslint-disable-line react-hooks/exhaustive-deps
   return note;
 }
