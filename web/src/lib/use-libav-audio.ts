@@ -15,7 +15,7 @@ export function useLibavAudio(video: RefObject<HTMLVideoElement | null>, url: st
     const v = video.current;
     if (!v || !url) return;
     let w: Worker | undefined, ctx: AudioContext | undefined, gain: GainNode, seekId = 0, queue: Chunk[] = [];
-    let anchor: { ctx: number; media: number } | null = null, timer = 0, dead = false;
+    let anchor: { ctx: number; media: number } | null = null, timer = 0, dead = false, got = false; // got: current seek delivered audio
     const stats = { codec: "", samples: 0, drift: 0, reanchors: 0, scheduled: 0, startMs: 0 }; // startMs: seek/open → first sound
     let asked = performance.now(), head = v.currentTime; // head: end of the newest decoded audio
     const say = (m: string) => { setNote(m); setTimeout(() => setNote(""), 5000); };
@@ -35,7 +35,9 @@ export function useLibavAudio(video: RefObject<HTMLVideoElement | null>, url: st
       if (v.paused || v.seeking || v.readyState < 3) return stopAll(); // stall/pause: silence until the video moves again
       if (ctx.state !== "running") ctx.resume();
       // decoding fell behind the video (slow host, or it started at 0 after a resume): skip ahead instead of trailing
-      if (head < now - 2 && performance.now() - asked > 4000) return jump(now + 3);
+      // only once the current seek has delivered (re-seeking every 4 s on a slow host cancelled each seek before its
+      // first chunk, so audio never started until a pause); 30 s safety net in case a seek truly hangs
+      if (head < now - 2 && (got ? performance.now() - asked > 4000 : performance.now() - asked > 30000)) return jump(now + 3);
       const lat = ctx.baseLatency + (ctx.outputLatency || 0);
       if (anchor) {
         stats.drift = now - (anchor.media + ctx.currentTime - anchor.ctx); // video clock vs audio clock
@@ -51,7 +53,7 @@ export function useLibavAudio(video: RefObject<HTMLVideoElement | null>, url: st
         if (asked) { stats.startMs = Math.round(performance.now() - asked); asked = 0; }
       }
     };
-    const jump = (t: number) => { asked = performance.now(); head = t; stopAll(); queue = []; w?.postMessage({ type: "seek", t, id: ++seekId }); };
+    const jump = (t: number) => { asked = performance.now(); got = false; head = t; stopAll(); queue = []; w?.postMessage({ type: "seek", t, id: ++seekId }); };
     const onSeek = () => jump(v.currentTime);
     const onRate = () => { if (v.playbackRate !== 1) { v.playbackRate = 1; say("Speed changes aren't available with this audio"); } };
     const events: [string, () => void][] = [["seeking", onSeek], ["volumechange", volume], ["ratechange", onRate], ["play", pump], ["pause", pump], ["waiting", pump], ["playing", pump]];
@@ -70,7 +72,7 @@ export function useLibavAudio(video: RefObject<HTMLVideoElement | null>, url: st
         if (m.type !== "pcm" || m.id !== seekId) return;
         const buf = ctx!.createBuffer(2, m.l.length, m.sr);
         buf.copyToChannel(m.l, 0); buf.copyToChannel(m.r, 1);
-        queue.push({ t: m.t, buf }); stats.samples += m.l.length; head = m.t + buf.duration;
+        queue.push({ t: m.t, buf }); got = true; stats.samples += m.l.length; head = m.t + buf.duration;
         pump();
       };
       (v as any).reelmAudio = stats; // read by devtools / tests
