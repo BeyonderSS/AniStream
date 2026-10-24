@@ -52,6 +52,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -219,6 +221,13 @@ private fun TvApp() {
         }
     ) {
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().focusRequester(contentReq).focusGroup()) { host() }
+        // left-edge fade under the open rail, so content it overlaps (hero titles) recedes instead of clashing; a flat
+        // gradient, cheap on the Fire Stick's GPU
+        androidx.compose.animation.AnimatedVisibility(showRail && railOpen, enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(ms)),
+            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(ms))) {
+            androidx.compose.foundation.layout.Box(Modifier.fillMaxHeight().width(420.dp).background(
+                androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(androidx.compose.ui.graphics.Color(0xF015171F), androidx.compose.ui.graphics.Color(0x0015171F)))))
+        }
         androidx.compose.animation.AnimatedVisibility(
             visible = showRail && railOpen,
             modifier = Modifier.align(androidx.compose.ui.Alignment.CenterStart),
