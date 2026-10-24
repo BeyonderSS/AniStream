@@ -23,3 +23,30 @@ export async function episodes(id: string, season: number, title: string, year: 
     })),
   };
 }
+
+// Anime: Kitsu (free, no key) has per-episode titles, synopses, air dates and thumbnails. Matched by title, then the
+// Japanese title, preferring the hianime premiere year.
+const kitsu = async (path: string) => {
+  const r = await fetch(`https://kitsu.io/api/edge${path}`, { headers: { Accept: "application/vnd.api+json" } });
+  if (!r.ok) throw new Error(`Kitsu HTTP ${r.status}`);
+  return r.json() as Promise<any>;
+};
+
+/** ponytail: first 200 episodes (10 pages of 20); long runners fall back to plain tiles past that. */
+export async function animeEpisodes(title: string, japanese: string, year: number) {
+  let hit: any;
+  for (const q of [title, japanese].filter(Boolean)) {
+    const res = (await kitsu(`/anime?filter[text]=${encodeURIComponent(q)}&page[limit]=5&fields[anime]=startDate,canonicalTitle`)).data ?? [];
+    hit = res.find((a: any) => year && a.attributes.startDate?.startsWith(String(year))) ?? res[0];
+    if (hit) break;
+  }
+  if (!hit) return null;
+  const pages = await Promise.all([...Array(10)].map((_, i) =>
+    kitsu(`/anime/${hit.id}/episodes?page[limit]=20&page[offset]=${i * 20}&sort=number`).then((r) => r.data ?? []).catch(() => [])));
+  const episodes = pages.flat().filter((e: any) => e.attributes.number).map((e: any) => {
+    const a = e.attributes;
+    return { n: a.number, title: a.canonicalTitle || `Episode ${a.number}`, overview: a.synopsis || undefined,
+      still: a.thumbnail?.original || undefined, air: a.airdate || undefined, runtime: a.length || undefined };
+  });
+  return episodes.length ? { episodes } : null;
+}

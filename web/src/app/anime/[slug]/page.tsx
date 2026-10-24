@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Play } from "lucide-react";
 import { animeCard, Chips, FavButton, Notice, pill, Rail } from "@/components/app";
 import { Backdrop, DetailSkeleton, EpisodeGrid } from "@/components/detail";
+import { EpisodeCards, EpisodeCardsSkeleton } from "@/components/episode-cards";
 import { frac } from "@/lib/eps";
 import { getHistory, kids, KIDS_BLOCKED, epProgress, syncHistory, watchHref, type Play as P } from "@/lib/core";
 import { useApi, useSession } from "@/lib/session";
@@ -12,6 +13,7 @@ import { cn } from "@/lib/utils";
 export default function Anime({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params), { s } = useSession();
   const d = useApi(`anime/detail?slug=${slug}`), e = useApi(`anime/episodes?slug=${slug}`);
+  const info = useApi(d.data ? `anime/episodes-info?title=${encodeURIComponent(d.data.title)}&jp=${encodeURIComponent(d.data.japanese ?? "")}&year=${d.data.year ?? ""}` : null);
   const [lang, setLang] = useState("sub");
   const [resume, setResume] = useState<{ p: P; f: number } | null>(null), [prog, setProg] = useState<Record<string, number>>({});
   useEffect(() => {
@@ -72,7 +74,10 @@ export default function Anime({ params }: { params: Promise<{ slug: string }> })
             </div>
           </div>
           {e.error ? <p className="text-sm text-foreground/60">Episodes didn't load. Reload the page to try again.</p>
-            : <EpisodeGrid loading={e.loading} items={eps.map((x) => ({ n: x.number, title: x.title, href: watchHref(play(x)), progress: prog[`e${x.number}`], current: resume?.p.ep === x.number }))} />}
+            : e.loading || info.loading ? <EpisodeCardsSkeleton />
+            : info.data?.episodes?.length ? <EpisodeCards season={{ episodes: info.data.episodes.filter((k: any) => eps.some((x) => x.number === k.n)) }}
+                rows={(n) => { const x = eps.find((y) => y.number === n)!; return { href: watchHref(play(x)), progress: prog[`e${n}`], current: resume?.p.ep === n }; }} />
+            : <EpisodeGrid items={eps.map((x) => ({ n: x.number, title: x.title, href: watchHref(play(x)), progress: prog[`e${x.number}`], current: resume?.p.ep === x.number }))} />}
         </section>
       </div>
       <Rail title="More like this" items={a.recommendations.map(animeCard).filter((c: any) => !s.profile?.kids || kids.animeCard(c))} />
