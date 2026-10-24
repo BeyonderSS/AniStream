@@ -111,6 +111,13 @@ fun subtitleScaleLabel(v: Float) = when (v) { 0.75f -> "Small"; 1f -> "Normal"; 
 val SubtitleDelays = listOf(0L, 250L, 500L, 1000L, 2000L, 3000L, 5000L)
 fun delayLabel(ms: Long) = if (ms == 0L) "None" else "+%.2g s".format(Locale.US, ms / 1000f)
 
+/** Where captions sit; [bottomFraction] feeds SubtitleView.setBottomPaddingFraction (TV overscan eats the bottom edge). */
+enum class SubPosition(val label: String, val bottomFraction: Float) {
+    BOTTOM("Bottom", 0.08f), RAISED("Raised", 0.12f), HIGHER("Higher", 0.2f), TOP("Top", 0.78f)
+}
+
+fun isTvDevice(ctx: Context) = ctx.packageManager.run { hasSystemFeature(PackageManager.FEATURE_LEANBACK) || hasSystemFeature("amazon.hardware.fire_tv") }
+
 const val SLEEP_END_OF_EPISODE = -1
 val SleepOptions = listOf(0, 15, 30, 60, SLEEP_END_OF_EPISODE)
 fun sleepLabel(m: Int) = when (m) { 0 -> "Off"; SLEEP_END_OF_EPISODE -> "End of episode"; else -> "$m min" }
@@ -155,7 +162,15 @@ fun CountdownRing(onDone: () -> Unit, modifier: Modifier = Modifier, durationMs:
 }
 
 /** Per-title player settings. Speed, picture mode and subtitle size persist per [key]; the rest lasts the session. */
-class PlayerTweaks(private val prefs: SharedPreferences, private val key: String) {
+class PlayerTweaks(private val prefs: SharedPreferences, private val key: String, tv: Boolean = false) {
+    /** caption position; global, TV defaults to Raised, phone to Bottom */
+    var subPosition by mutableStateOf(SubPosition.entries.getOrElse(prefs.getInt("subPos", -1)) { if (tv) SubPosition.RAISED else SubPosition.BOTTOM }); private set
+
+    fun updateSubPosition(p: SubPosition) {
+        subPosition = p
+        prefs.edit().putInt("subPos", p.ordinal).apply()
+    }
+
     var speed by mutableFloatStateOf(prefs.getFloat("$key.speed", 1f)); private set
     var resize by mutableStateOf(Resize.entries.getOrElse(prefs.getInt("$key.resize", 0)) { Resize.FIT }); private set
     var subScale by mutableFloatStateOf(prefs.getFloat("$key.sub", 1f)); private set
@@ -198,7 +213,7 @@ class PlayerTweaks(private val prefs: SharedPreferences, private val key: String
 @Composable
 fun rememberPlayerTweaks(key: String): PlayerTweaks {
     val ctx = LocalContext.current.applicationContext
-    return remember(key) { PlayerTweaks(ctx.getSharedPreferences("player_prefs", Context.MODE_PRIVATE), key.ifBlank { "default" }) }
+    return remember(key) { PlayerTweaks(ctx.getSharedPreferences("player_prefs", Context.MODE_PRIVATE), key.ifBlank { "default" }, isTvDevice(ctx)) }
 }
 
 /** Current tracks, updated as the stream changes. */
@@ -321,16 +336,15 @@ private fun Subtitles(player: Player, tweaks: PlayerTweaks, modifier: Modifier) 
             handler.removeCallbacksAndMessages(null)
         }
     }
-    val isTv = remember { ctx.packageManager.run { hasSystemFeature(PackageManager.FEATURE_LEANBACK) || hasSystemFeature("amazon.hardware.fire_tv") } }
+    val bottom = tweaks.subPosition.bottomFraction
     val scale = tweaks.subScale
     val bg = tweaks.subBackground
     AndroidView(
         factory = { view },
         update = {
             it.setFractionalTextSize(SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * scale)
-            // TVs overscan (crop the edges), which cut the bottom line of captions on the Fire TV; lift them on TV only.
-            // ponytail: fixed 12% on TV, the default 8% elsewhere; a user "caption position" setting can replace this
-            it.setBottomPaddingFraction(if (isTv) 0.12f else SubtitleView.DEFAULT_BOTTOM_PADDING_FRACTION)
+            // TVs overscan the bottom edge, so TV defaults to Raised (12%); the Position setting overrides
+            it.setBottomPaddingFraction(bottom)
             it.setStyle(
                 CaptionStyleCompat(
                     AColor.WHITE,
