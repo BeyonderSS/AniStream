@@ -3,23 +3,30 @@ import { Suspense, use, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Play } from "lucide-react";
-import { Chips, FavButton, mediaCard, Notice, pill } from "@/components/app";
-import { EpisodeCards, EpisodeCardsSkeleton } from "@/components/episode-cards";
-import { Backdrop, DetailSkeleton, EpisodeGrid } from "@/components/detail";
+import { Chips, FavButton, mediaCard, Notice, pill, timeLeft } from "@/components/app";
+import { EpisodeStrip, EpisodeStripSkeleton, type EpInfo } from "@/components/episode-cards";
+import { DetailHero, DetailSkeleton, SeasonNumerals } from "@/components/detail";
 import { getHistory, playKey, kids, KIDS_BLOCKED, epProgress, syncHistory, watchHref, type Entry, type Play as P } from "@/lib/core";
 import { useApi, useSession } from "@/lib/session";
-import { cn } from "@/lib/utils";
 
-/** Rich TMDB cards when TMDB knows the season; the numbered tiles otherwise (no key, no match, still loading is a skeleton). */
-function Episodes({ m, id, cur, play, prog, last }: { m: any; id: string; cur: any; play: (se?: number, ep?: number) => P; prog: Record<string, number>; last: Entry | null }) {
+/** Seasons and the episode strip. TMDB stills and names when TMDB knows the season; numbered stubs otherwise. */
+function Episodes({ m, id, cur, seasons, play, prog, last }: { m: any; id: string; cur: any; seasons: React.ReactNode; play: (se?: number, ep?: number) => P; prog: Record<string, number>; last: Entry | null }) {
   const { data, loading } = useApi(`movies/episodes?id=${encodeURIComponent(id)}&season=${cur.season}&title=${encodeURIComponent(m.title)}&year=${m.year ?? ""}`);
-  const row = (n: number) => ({
-    href: watchHref(play(cur.season, n)), progress: prog[`s${cur.season}e${n}`],
-    current: last?.payload.season === cur.season && last?.payload.episode === n,
+  const info: EpInfo[] = data?.episodes ?? [];
+  const n = info.length || cur.episodes;
+  const items = Array.from({ length: n }, (_, i) => {
+    const e = info[i], k = e?.n ?? i + 1;
+    return { n: k, info: e, href: watchHref(play(cur.season, k)), progress: prog[`s${cur.season}e${k}`], current: last?.payload.season === cur.season && last?.payload.episode === k };
   });
-  if (loading) return <EpisodeCardsSkeleton />;
-  if (data?.episodes?.length) return <EpisodeCards season={data} rows={row} />;
-  return <EpisodeGrid items={[...Array(cur.episodes)].map((_, i) => ({ n: i + 1, ...row(i + 1) }))} />;
+  return (
+    <section aria-label="Episodes" className="space-y-3">
+      <div className="mx-auto max-w-[1500px] space-y-2 px-4 md:px-10">
+        {seasons}
+        {data?.overview && <p className="line-clamp-2 max-w-prose text-sm leading-relaxed text-foreground/60">{data.overview}</p>}
+      </div>
+      {loading ? <EpisodeStripSkeleton /> : <EpisodeStrip items={items} />}
+    </section>
+  );
 }
 
 function Title({ id }: { id: string }) {
@@ -46,43 +53,27 @@ function Title({ id }: { id: string }) {
   const lf = last?.duration ? last.position / last.duration : 0;
   const resume = last && (series ? !!last.payload.season : true);
   const primary = resume ? watchHref({ ...play(last!.payload.season, last!.payload.episode) }, lf) : series ? (cur ? watchHref(play(cur.season, 1)) : null) : watchHref(play());
+  const left = resume && timeLeft(last!.position, last!.duration);
   return (
     <main className="pb-16">
-      <Backdrop src={m.backdrop} blur={!m.backdrop || m.backdrop === m.poster}>
-        <div className="flex flex-col gap-6 md:flex-row md:items-end">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {m.poster && <img src={m.poster} alt="" referrerPolicy="no-referrer" className="page-in hidden w-52 self-start rounded-xl shadow-[0_30px_80px_rgb(10_12_18/0.7)] ring-1 ring-white/10 md:block" />}
-          <div className="max-w-2xl space-y-4">
-            <h1 className="font-display text-4xl leading-[1.05] font-bold tracking-tight text-balance md:text-5xl">{m.title}</h1>
-            <Chips items={[series ? "Series" : "Movie", m.year, m.runtime, m.rating && `IMDb ${m.rating}`, m.certification, series && m.seasons.length && `${m.seasons.length} season${m.seasons.length > 1 ? "s" : ""}`]} />
-            {m.description && <p className="line-clamp-4 max-w-prose leading-relaxed text-foreground/72">{m.description}</p>}
-            {m.genres.length > 0 && <p className="text-sm text-foreground/52">{m.genres.join(", ")}</p>}
-            {m.cast.length > 0 && <p className="text-sm text-foreground/52">Starring {m.cast.slice(0, 5).join(", ")}</p>}
-            <div className="flex flex-wrap gap-2 pt-1">
-              {primary && m.playable !== false && (
-                <Link href={primary} className={pill.primary}><Play className="fill-current" />
-                  {resume ? (series ? `Resume S${last!.payload.season} E${last!.payload.episode}` : "Resume") : series ? `Play S${cur?.season ?? 1} E1` : "Play"}
-                </Link>
-              )}
-              <FavButton c={mediaCard(m)} />
-            </div>
-          </div>
+      <DetailHero wash={m.backdrop || m.poster} poster={m.poster} title={m.title}>
+        <Chips items={[series ? "Series" : "Movie", m.year, m.runtime, m.rating && `★ ${m.rating}`, m.certification, m.genres.slice(0, 3).join(", ")]} />
+        {m.description && <p className="line-clamp-3 max-w-2xl leading-relaxed text-[#cfccd9]">{m.description}</p>}
+        {m.cast.length > 0 && <p className="text-sm text-foreground/52">Starring {m.cast.slice(0, 5).join(", ")}</p>}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {primary && m.playable !== false && (
+            <Link href={primary} className={`${pill.primary} whitespace-nowrap ring-2 ring-primary ring-offset-2 ring-offset-dusk`}><Play className="fill-current" />
+              {resume ? (series ? `Resume S${last!.payload.season} E${last!.payload.episode}` : "Resume") : series ? `Play S${cur?.season ?? 1} E1` : "Play"}
+              {left && <small className="text-xs font-medium opacity-75">{left.join(" ")}</small>}
+            </Link>
+          )}
+          <FavButton c={mediaCard(m)} />
         </div>
-      </Backdrop>
+      </DetailHero>
       {series && cur && (
-        <section className="space-y-4 px-4 md:px-10">
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="font-display text-2xl font-semibold tracking-tight">Episodes</h2>
-            <div className="flex-1" />
-            <nav aria-label="Seasons" className="no-scrollbar flex max-w-full gap-1 overflow-x-auto rounded-full bg-white/8 p-1">
-              {m.seasons.map((x: any) => (
-                <button key={x.season} aria-pressed={x.season === cur.season} onClick={() => setSeason(x.season)}
-                  className={cn("beam shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors", x.season === cur.season ? "bg-primary text-primary-foreground" : "text-foreground/72 hover:text-foreground")}>Season {x.season}</button>
-              ))}
-            </nav>
-          </div>
-          <Episodes m={m} id={id} cur={cur} play={play} prog={prog} last={last} />
-        </section>
+        <Episodes m={m} id={id} cur={cur} play={play} prog={prog} last={last}
+          seasons={<SeasonNumerals onPick={(k) => setSeason(Number(k))} cur={`Season ${cur.season}, ${cur.episodes} episode${cur.episodes === 1 ? "" : "s"}`}
+            items={m.seasons.map((x: any) => ({ key: x.season, label: x.season, name: `Season ${x.season}`, on: x.season === cur.season }))} />} />
       )}
     </main>
   );
