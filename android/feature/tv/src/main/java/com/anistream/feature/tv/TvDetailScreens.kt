@@ -38,6 +38,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Text
 import com.anistream.core.ui.theme.Accent
+import com.anistream.domain.model.Eps
 import com.anistream.domain.model.MediaType
 import com.anistream.feature.anime.AnimeDetailViewModel
 import com.anistream.feature.movies.DetailEvent
@@ -173,8 +174,11 @@ fun TvAnimeDetailScreen(onPlay: (slug: String, episode: Int) -> Unit, onOpen: (s
             val watched = h?.lastEpisodeWatched ?: 0
             PillRow(
                 "Episodes", episodes,
-                label = { e -> if (e.filler) "${e.number} (filler)" else e.number.toString() },
-                selected = { e -> e.number <= watched },
+                label = { e ->
+                    val p = h?.eps?.get("e${e.number}")?.p ?: 0f
+                    (if (e.filler) "${e.number} (filler)" else e.number.toString()) + if (p in 0.02f..<Eps.DONE) " - ${(p * 100).toInt()}%" else ""
+                },
+                selected = { e -> e.number <= watched || (h?.eps?.get("e${e.number}")?.p ?: 0f) >= Eps.DONE },
                 onClick = { e -> onPlay(vm.slug, e.number) },
                 initial = episodes.indexOfFirst { it.number == resumeEp }.coerceAtLeast(0)
             )
@@ -261,7 +265,9 @@ fun TvMovieDetailScreen(
             if (count > 0) item(key = "eps${s.selectedSeason}") {
                 val resumeHere = r?.takeIf { it.season == s.selectedSeason }?.episode ?: 0
                 PillRow(
-                    "Episodes", (1..count).toList(), { "Episode $it" }, { it < resumeHere },
+                    "Episodes", (1..count).toList(),
+                    { n -> val p = s.eps["s${s.selectedSeason}e$n"]?.p ?: 0f; "Episode $n" + if (p in 0.02f..<Eps.DONE) " - ${(p * 100).toInt()}%" else "" },
+                    { it < resumeHere || (s.eps["s${s.selectedSeason}e$it"]?.p ?: 0f) >= Eps.DONE },
                     { if (d.playable) vm.play(s.selectedSeason, it) else vm.openWebPlayer(Resume(s.selectedSeason, it)) },
                     initial = (resumeHere - 1).coerceAtLeast(0)
                 )

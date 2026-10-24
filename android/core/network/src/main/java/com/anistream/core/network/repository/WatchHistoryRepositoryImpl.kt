@@ -4,6 +4,8 @@ import com.anistream.core.common.Result
 import com.anistream.core.database.ActiveProfile
 import com.anistream.core.database.dao.WatchHistoryDao
 import com.anistream.core.database.entity.WatchHistoryEntity
+import com.anistream.domain.model.EpProgress
+import com.anistream.domain.model.Eps
 import com.anistream.domain.model.WatchHistory
 import com.anistream.domain.repository.WatchHistoryRepository
 import kotlinx.coroutines.flow.first
@@ -44,7 +46,7 @@ class WatchHistoryRepositoryImpl @Inject constructor(
 
     override suspend fun save(history: WatchHistory): Result<Unit> {
         return try {
-            dao.upsert(history.toEntity())
+            dao.upsert(withEps(history).toEntity())
             ActiveProfile.changes.tryEmit(Unit)
             Result.success(Unit)
         } catch (e: Exception) {
@@ -55,9 +57,8 @@ class WatchHistoryRepositoryImpl @Inject constructor(
     override suspend fun updateProgress(slug: String, episode: Int, progress: Float): Result<Unit> {
         return try {
             // no row yet (player didn't save metadata first) -> insert a minimal one so history is never lost
-            if (dao.updateProgress(slug, episode, progress, ActiveProfile.id) == 0) {
-                dao.upsert(WatchHistoryEntity(animeSlug = slug, animeTitle = slug, lastEpisodeWatched = episode, watchProgress = progress, profileId = ActiveProfile.id))
-            }
+            val row = dao.getBySlug(slug, ActiveProfile.id)?.toDomain() ?: WatchHistory(animeSlug = slug, animeTitle = slug)
+            dao.upsert(withEps(row.copy(lastEpisodeWatched = episode, watchProgress = progress, lastWatchedTimestamp = System.currentTimeMillis())).toEntity())
             ActiveProfile.changes.tryEmit(Unit)
             Result.success(Unit)
         } catch (e: Exception) {
@@ -85,6 +86,14 @@ class WatchHistoryRepositoryImpl @Inject constructor(
         }
     }
 
+    /** Keep the stored per-episode map and stamp this episode's progress into it (0 = just opened, not recorded). */
+    private suspend fun withEps(h: WatchHistory): WatchHistory {
+        val old = dao.getRaw(h.animeSlug, ActiveProfile.id)?.eps?.let(Eps::parse).orEmpty()
+        val k = Eps.key(h.kind, h.season, h.lastEpisodeWatched)
+        val mine = if (k != null && h.watchProgress > 0f) mapOf(k to EpProgress(h.watchProgress, h.lastWatchedTimestamp)) else emptyMap()
+        return h.copy(eps = Eps.merge(Eps.merge(old, h.eps), mine))
+    }
+
     private fun WatchHistoryEntity.toDomain() = WatchHistory(
         animeSlug = animeSlug,
         animeTitle = animeTitle,
@@ -99,7 +108,8 @@ class WatchHistoryRepositoryImpl @Inject constructor(
         kind = kind,
         season = season,
         mediaId = mediaId,
-        subtitle = subtitle
+        subtitle = subtitle,
+        eps = Eps.parse(eps)
     )
 
     private fun WatchHistory.toEntity() = WatchHistoryEntity(
@@ -117,6 +127,7 @@ class WatchHistoryRepositoryImpl @Inject constructor(
         season = season,
         mediaId = mediaId,
         subtitle = subtitle,
-        profileId = ActiveProfile.id
+        profileId = ActiveProfile.id,
+        eps = Eps.format(eps)
     )
 }

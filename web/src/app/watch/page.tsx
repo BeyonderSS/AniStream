@@ -10,7 +10,8 @@ import { ArrowLeft, Check, Copy, MonitorPlay, RotateCcw, SkipForward, Users, X, 
 import { Avatar, pill } from "@/components/app";
 import { ReelMark } from "@/components/reel";
 import { SeekPreview } from "@/components/seek-preview";
-import { deviceId, get, getHistory, epKey, playKey, proxied, reelm, saveProgress, toPlay, WS, type Play as P } from "@/lib/core";
+import { frac } from "@/lib/eps";
+import { deviceId, get, getHistory, epKey, playKey, proxied, reelm, saveProgress, syncHistory, toPlay, WS, type Play as P } from "@/lib/core";
 import { helperOld } from "@/lib/bridge";
 import { useApi, useSession } from "@/lib/session";
 import { useLibavAudio } from "@/lib/use-libav-audio";
@@ -112,10 +113,12 @@ function Player() {
   const onMeta = (v: HTMLVideoElement) => {
     if (p?.kind === "live") return;
     const hist = p && epKey(getHistory(pid)[playKey(p)]?.payload ?? p) === epKey(p) ? getHistory(pid)[playKey(p)] : undefined;
-    const at = keep.current || t0 || (f0 && v.duration ? f0 * v.duration : 0) || (hist && hist.duration && hist.position / hist.duration < 0.95 ? hist.position : 0);
+    const at = keep.current || t0 || (f0 && v.duration ? f0 * v.duration : 0) || (hist && frac(hist.position, hist.duration) < 0.95 ? frac(hist.position, hist.duration) * v.duration : 0); // entry units differ (apps: permille, web: seconds), the ratio is what is shared
     if (at > 5) v.currentTime = at;
   };
 
+  // pull what other devices watched so a later save compares against it
+  useEffect(() => { if (s.token) syncHistory(pid, s.token).catch(() => {}); }, [pid, s.token]);
   // progress: every 10 s and on leave
   const save = useCallback(() => { const v = video.current; if (p && v && v.currentTime > 5 && isFinite(v.duration)) saveProgress(pid, s.token, p, v.currentTime, v.duration); }, [p, pid, s.token]);
   useEffect(() => { const i = setInterval(save, 10000); return () => { clearInterval(i); save(); }; }, [save]);

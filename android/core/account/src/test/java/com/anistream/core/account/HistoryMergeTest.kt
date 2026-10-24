@@ -30,3 +30,15 @@ class MediaSlugTest {
         assertEquals("movie:fastandfurious", mediaSlug(false, "Fast & Furious"))
     }
 }
+
+class HistoryEpsPayloadTest {
+    @Test fun epsRoundTripThroughPayload() {
+        val h = com.anistream.domain.model.WatchHistory("a", "A", eps = mapOf("e1" to com.anistream.domain.model.EpProgress(0.97f, 5)))
+        assertEquals(h.eps, HistoryPayload.decode(HistoryPayload.encode(h), 1).eps)
+    }
+
+    @Test fun webShapedEpsDecode() {
+        val p = kotlinx.serialization.json.Json.parseToJsonElement("""{"slug":"a","kind":"anime","eps":{"e2":{"p":0.4,"at":9},"bad":1}}""") as JsonObject
+        assertEquals(mapOf("e2" to com.anistream.domain.model.EpProgress(0.4f, 9)), HistoryPayload.decodeEps(p))
+    }
+}

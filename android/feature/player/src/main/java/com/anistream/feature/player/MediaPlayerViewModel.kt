@@ -105,6 +105,7 @@ class MediaPlayerViewModel @Inject constructor(
     @ApplicationContext context: Context,
     private val movies: MoviesRepository,
     private val history: WatchHistoryRepository,
+    private val sync: com.anistream.core.account.HistorySync,
     private val downloads: DownloadRepository
 ) : ViewModel() {
 
@@ -127,7 +128,7 @@ class MediaPlayerViewModel @Inject constructor(
                         applyResume()
                     }
                     Player.STATE_ENDED -> if (!_uiState.value.isLive) {
-                        persist(1f)
+                        persist(1f, push = true)
                         _uiState.update { it.copy(ended = true) }
                     }
                 }
@@ -333,24 +334,25 @@ class MediaPlayerViewModel @Inject constructor(
 
     fun onStop() {
         player.pause()
-        saveProgress()
+        saveProgress(push = true)
     }
 
-    private fun saveProgress() {
+    private fun saveProgress(push: Boolean = false) {
         val duration = player.duration
         if (_uiState.value.isLoading || duration == C.TIME_UNSET || duration <= 0) return
-        persist((player.currentPosition.toFloat() / duration).coerceIn(0f, 1f))
+        persist((player.currentPosition.toFloat() / duration).coerceIn(0f, 1f), push)
     }
 
     // outlives viewModelScope so the final save in onCleared still lands
-    private fun persist(fraction: Float) {
+    // push = leaving/finishing: sync right after the write instead of waiting for the 5 s debounce a dying process never reaches
+    private fun persist(fraction: Float, push: Boolean = false) {
         val r = _uiState.value.request ?: return
         if (r.isLive || r.historyKey == null) return
-        CoroutineScope(Dispatchers.IO).launch { history.save(historyRow(r, fraction)) }
+        CoroutineScope(Dispatchers.IO).launch { history.save(historyRow(r, fraction)); if (push) runCatching { sync.push() } }
     }
 
     override fun onCleared() {
-        saveProgress()
+        saveProgress(push = true)
         player.release()
     }
 }

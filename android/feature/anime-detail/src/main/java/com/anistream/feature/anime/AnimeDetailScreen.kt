@@ -92,6 +92,7 @@ import com.anistream.core.ui.theme.Space
 import com.anistream.core.ui.theme.Motion
 import com.anistream.domain.model.AnimeDetail
 import com.anistream.domain.model.Episode
+import com.anistream.domain.model.Eps
 import com.anistream.domain.model.WatchHistory
 import kotlinx.coroutines.launch
 
@@ -213,7 +214,9 @@ private fun DetailContent(
 ) {
     val lastWatched = history?.lastEpisodeWatched ?: 0
     val nextUp = history?.takeIf { lastWatched > 0 }?.resumeEpisode()
-    fun watched(n: Int) = n < lastWatched || (n == lastWatched && (history?.watchProgress ?: 0f) >= 0.9f)
+    // per-episode progress when synced; older rows without it fall back to "everything before the latest episode"
+    fun progress(n: Int) = history?.eps?.get("e$n")?.p ?: if (n == lastWatched) history?.watchProgress ?: 0f else 0f
+    fun watched(n: Int) = n < lastWatched || progress(n) >= Eps.DONE
 
     val ranges = remember(episodes) { episodes.chunked(RANGE_SIZE) }
     var range by rememberSaveable(ranges.size, nextUp) {
@@ -343,6 +346,7 @@ private fun DetailContent(
                         EpisodeTile(
                             number = ep.number,
                             watched = watched(ep.number),
+                            progress = progress(ep.number),
                             next = ep.number == nextUp,
                             onClick = { onPlay(ep.number) },
                             modifier = Modifier.weight(1f)
@@ -506,7 +510,7 @@ private fun Chip(text: String, selected: Boolean = false, numeric: Boolean = fal
 }
 
 @Composable
-private fun EpisodeTile(number: Int, watched: Boolean, next: Boolean, onClick: () -> Unit, modifier: Modifier) {
+private fun EpisodeTile(number: Int, watched: Boolean, progress: Float, next: Boolean, onClick: () -> Unit, modifier: Modifier) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -531,6 +535,9 @@ private fun EpisodeTile(number: Int, watched: Boolean, next: Boolean, onClick: (
                 tint = Ink.faint,
                 modifier = Modifier.align(Alignment.TopEnd).padding(Space.xs).size(12.dp)
             )
+        }
+        if (progress > 0.02f && progress < Eps.DONE && !watched) {
+            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(progress).height(3.dp).background(Accent.main))
         }
     }
 }

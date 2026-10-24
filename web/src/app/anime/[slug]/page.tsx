@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Play } from "lucide-react";
 import { animeCard, Chips, FavButton, Notice, pill, Rail } from "@/components/app";
 import { Backdrop, DetailSkeleton, EpisodeGrid } from "@/components/detail";
-import { getHistory, kids, KIDS_BLOCKED, progressOf, watchHref, type Play as P } from "@/lib/core";
+import { frac } from "@/lib/eps";
+import { getHistory, kids, KIDS_BLOCKED, epProgress, syncHistory, watchHref, type Play as P } from "@/lib/core";
 import { useApi, useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -15,10 +16,14 @@ export default function Anime({ params }: { params: Promise<{ slug: string }> })
   const [resume, setResume] = useState<{ p: P; f: number } | null>(null), [prog, setProg] = useState<Record<string, number>>({});
   useEffect(() => {
     const pid = s.profile?.id ?? "guest";
-    const h = Object.values(getHistory(pid)).filter((x) => !x.deleted && x.payload.kind === "anime" && x.payload.id === slug).sort((a, b) => b.updatedAt - a.updatedAt)[0];
-    setResume(h ? { p: h.payload, f: h.duration ? h.position / h.duration : 0 } : null);
-    setProg(progressOf(pid));
-  }, [s.profile, slug]);
+    const read = () => {
+      const h = Object.values(getHistory(pid)).filter((x) => !x.deleted && x.payload.kind === "anime" && x.payload.id === slug).sort((a, b) => b.updatedAt - a.updatedAt)[0];
+      setResume(h ? { p: h.payload, f: frac(h.position, h.duration) } : null);
+      setProg(epProgress(pid, { kind: "anime", id: slug, title: "" }));
+    };
+    read();
+    if (s.token) syncHistory(pid, s.token).then(read).catch(() => {});
+  }, [s.profile, s.token, slug]);
   const a = d.data;
   if (d.error) return <Notice title="This title didn't load" body={d.error}><Link href="/" className={pill.secondary}>Go home</Link></Notice>;
   if (!a) return <DetailSkeleton />;
@@ -67,7 +72,7 @@ export default function Anime({ params }: { params: Promise<{ slug: string }> })
             </div>
           </div>
           {e.error ? <p className="text-sm text-foreground/60">Episodes didn't load. Reload the page to try again.</p>
-            : <EpisodeGrid loading={e.loading} items={eps.map((x) => ({ n: x.number, title: x.title, href: watchHref(play(x)), progress: prog[`anime:${slug}:${x.number}`], current: resume?.p.ep === x.number }))} />}
+            : <EpisodeGrid loading={e.loading} items={eps.map((x) => ({ n: x.number, title: x.title, href: watchHref(play(x)), progress: prog[`e${x.number}`], current: resume?.p.ep === x.number }))} />}
         </section>
       </div>
       <Rail title="More like this" items={a.recommendations.map(animeCard).filter((c: any) => !s.profile?.kids || kids.animeCard(c))} />
