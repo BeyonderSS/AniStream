@@ -9,6 +9,7 @@ import "@videojs/react/video/skin.css";
 import { ArrowLeft, Check, Copy, MonitorPlay, RotateCcw, SkipForward, Users, X, Menu as MenuIcon } from "lucide-react";
 import { Avatar, pill } from "@/components/app";
 import { ReelMark } from "@/components/reel";
+import { SeekPreview } from "@/components/seek-preview";
 import { deviceId, get, getHistory, epKey, playKey, proxied, reelm, saveProgress, toPlay, WS, type Play as P } from "@/lib/core";
 import { helperOld } from "@/lib/bridge";
 import { useApi, useSession } from "@/lib/session";
@@ -221,6 +222,7 @@ function Player() {
       <VideoPlayer>
         <VideoSkin className="reelm-skin size-full" style={{ "--media-accent-color": "#F2B45A", "--media-accent-text-color": "#15171F", "--media-border-radius": "0", "--media-border-color": "transparent", "--media-object-fit": "contain" } as React.CSSProperties}>
           {src && <Media key={si + pkey + nonce} src={src.src} crossOrigin={src.hls ? "anonymous" : undefined} {...(common as object)} />}
+          {src && !src.dolby && p?.kind !== "live" && <SeekPreview key={si + pkey + nonce} src={src.src} hls={src.hls} duration={() => video.current?.duration ?? 0} />}
           {!src && !err && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className="flex flex-col items-center gap-4"><ReelMark className="size-14 animate-spin [animation-duration:1.6s]" /><p className="text-sm text-foreground/72">{p ? "Finding a stream" : "Joining the room"}</p></div></div>}
 
           {audioNote && <p role="status" className="pointer-events-none absolute bottom-28 left-1/2 z-10 -translate-x-1/2 rounded-full bg-dusk/80 px-4 py-2 text-sm ring-1 ring-white/15 backdrop-blur">{audioNote}</p>}

@@ -1,6 +1,7 @@
 import * as hi from "@/lib/server/hianime";
 import { movieRoutes } from "@/lib/movies";
 import * as misc from "@/lib/server/misc";
+import { episodes } from "@/lib/server/episodes";
 
 // One catch-all so the server side of every feature is a flat table.
 const num = (v: string | null, d = 0) => Number(v) || d;
@@ -16,6 +17,7 @@ const routes: Record<string, (q: URLSearchParams) => Promise<unknown>> = {
   "anime/schedule": () => hi.schedule(),
   "aniskip": (q) => misc.aniskip(q.get("mal")!, q.get("ep")!),
   "movies/catalog": (q) => misc.catalog(q.get("key") ?? "movie/top", num(q.get("skip"))),
+  "movies/episodes": (q) => episodes(q.get("id")!, num(q.get("season"), 1), q.get("title") ?? "", num(q.get("year"))),
   ...movieRoutes,
   "live": async (q) => {
     const kids = q.get("kids") === "1", g = (q.get("group") ?? "").toLowerCase(), s = (q.get("q") ?? "").toLowerCase();
@@ -39,7 +41,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ p: string[] }> 
   const fn = routes[key];
   if (!fn) return Response.json({ error: "not found" }, { status: 404 });
   try {
-    return Response.json(await fn(new URL(req.url).searchParams), { headers: { "cache-control": "no-store" } });
+    return Response.json(await fn(new URL(req.url).searchParams), { headers: { "cache-control": key === "movies/episodes" ? "public, max-age=3600, s-maxage=86400" : "no-store" } });
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 502 });
   }

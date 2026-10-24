@@ -4,10 +4,23 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Play } from "lucide-react";
 import { Chips, FavButton, mediaCard, Notice, pill } from "@/components/app";
+import { EpisodeCards, EpisodeCardsSkeleton } from "@/components/episode-cards";
 import { Backdrop, DetailSkeleton, EpisodeGrid } from "@/components/detail";
 import { getHistory, playKey, kids, KIDS_BLOCKED, progressOf, watchHref, type Entry, type Play as P } from "@/lib/core";
 import { useApi, useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
+
+/** Rich TMDB cards when TMDB knows the season; the numbered tiles otherwise (no key, no match, still loading is a skeleton). */
+function Episodes({ m, id, cur, play, prog, last }: { m: any; id: string; cur: any; play: (se?: number, ep?: number) => P; prog: Record<string, number>; last: Entry | null }) {
+  const { data, loading } = useApi(`movies/episodes?id=${encodeURIComponent(id)}&season=${cur.season}&title=${encodeURIComponent(m.title)}&year=${m.year ?? ""}`);
+  const row = (n: number) => ({
+    href: watchHref(play(cur.season, n)), progress: prog[`movie:${id}:${cur.season}:${n}`],
+    current: last?.payload.season === cur.season && last?.payload.episode === n,
+  });
+  if (loading) return <EpisodeCardsSkeleton />;
+  if (data?.episodes?.length) return <EpisodeCards season={data} rows={row} />;
+  return <EpisodeGrid items={[...Array(cur.episodes)].map((_, i) => ({ n: i + 1, ...row(i + 1) }))} />;
+}
 
 function Title({ id }: { id: string }) {
   const type = useSearchParams().get("type") ?? "movie", { s } = useSession();
@@ -64,10 +77,7 @@ function Title({ id }: { id: string }) {
               ))}
             </nav>
           </div>
-          <EpisodeGrid items={[...Array(cur.episodes)].map((_, i) => ({
-            n: i + 1, href: watchHref(play(cur.season, i + 1)), progress: prog[`movie:${id}:${cur.season}:${i + 1}`],
-            current: last?.payload.season === cur.season && last?.payload.episode === i + 1,
-          }))} />
+          <Episodes m={m} id={id} cur={cur} play={play} prog={prog} last={last} />
         </section>
       )}
     </main>
