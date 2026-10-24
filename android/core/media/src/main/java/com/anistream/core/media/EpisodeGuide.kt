@@ -9,8 +9,8 @@ import java.net.URLEncoder
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Episode art and names for the TV detail strip. [runtime] minutes. */
-data class GuideEp(val n: Int, val title: String?, val overview: String?, val still: String?, val runtime: Int?)
+/** Episode art and names for the TV detail strip. [runtime] minutes; [airDate] "2012-10-07". */
+data class GuideEp(val n: Int, val title: String?, val overview: String?, val still: String?, val runtime: Int?, val airDate: String? = null)
 
 /**
  * TMDB (series seasons) and Kitsu (anime) episode metadata, cached in memory. Every failure is an empty list
@@ -36,7 +36,7 @@ class EpisodeGuide @Inject constructor(private val http: MediaHttp) {
                 val o = e as? JsonObject ?: return@mapNotNull null
                 GuideEp(
                     n = o.int("episode_number") ?: return@mapNotNull null, title = o.str("name"), overview = o.str("overview"),
-                    still = o.str("still_path")?.let { "https://image.tmdb.org/t/p/w300$it" }, runtime = o.int("runtime")
+                    still = o.str("still_path")?.let { "https://image.tmdb.org/t/p/w300$it" }, runtime = o.int("runtime"), airDate = o.str("air_date")
                 )
             }
         }.getOrDefault(emptyList())
@@ -72,7 +72,7 @@ class EpisodeGuide @Inject constructor(private val http: MediaHttp) {
                         val a = (e as? JsonObject)?.get("attributes") as? JsonObject ?: return@mapNotNull null
                         GuideEp(
                             n = a.int("number") ?: return@mapNotNull null, title = a.str("canonicalTitle"), overview = a.str("synopsis"),
-                            still = ((a["thumbnail"] as? JsonObject)?.str("original")), runtime = a.int("length")
+                            still = ((a["thumbnail"] as? JsonObject)?.str("original")), runtime = a.int("length"), airDate = a.str("airdate")
                         )
                     }
                 }.getOrDefault(emptyList())

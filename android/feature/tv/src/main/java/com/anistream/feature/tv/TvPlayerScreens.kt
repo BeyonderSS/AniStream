@@ -23,6 +23,10 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.unit.em
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Surface
 import com.anistream.core.ui.theme.DisplayHeavy
@@ -98,14 +102,12 @@ import com.anistream.feature.player.SubtitleDelays
 import com.anistream.feature.player.SubtitleScales
 import com.anistream.feature.player.VideoSurface
 import com.anistream.feature.player.audioOptions
-import com.anistream.feature.player.delayLabel
 import com.anistream.feature.player.hasSubtitles
 import com.anistream.feature.player.rememberPlayerTweaks
 import com.anistream.feature.player.rememberTracks
 import com.anistream.feature.player.selectAudio
 import com.anistream.feature.player.sleepLabel
 import com.anistream.feature.player.speedLabel
-import com.anistream.feature.player.subtitleScaleLabel
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -152,6 +154,8 @@ internal class EpisodeMeta(
     val name: String? = null,
     val synopsis: String? = null,
     val runtimeMin: Int? = null,
+    /** "2012-10-07" from TMDB / Kitsu */
+    val airDate: String? = null,
     val nextName: String? = null,
     val nextStill: String? = null
 )
@@ -243,9 +247,9 @@ private fun TvPlayerChrome(
         SettingGroup("Picture", Resize.entries, { it.label }, { it == tweaks.resize }, tweaks::updateResize),
         SettingGroup("Speed", if (isLive) emptyList() else PlaybackSpeeds, ::speedLabel, { it == tweaks.speed }) { tweaks.updateSpeed(player, it) },
         SettingGroup("Audio track", if (audio.size > 1) audio else emptyList(), { it.label }, { it.selected }) { selectAudio(player, it) },
-        SettingGroup("Subtitle size", if (subs) SubtitleScales else emptyList(), ::subtitleScaleLabel, { it == tweaks.subScale }, tweaks::updateSubScale),
-        SettingGroup("Subtitle delay", if (subs) SubtitleDelays else emptyList(), ::delayLabel, { it == tweaks.subDelayMs }) { tweaks.subDelayMs = it },
+        SettingGroup("Subtitle size", if (subs) SubtitleScales else emptyList(), { listOf("S", "M", "L", "XL").getOrElse(SubtitleScales.indexOf(it)) { "M" } }, { it == tweaks.subScale }, tweaks::updateSubScale),
         SettingGroup("Position", if (subs) SubPosition.entries else emptyList(), { it.label }, { it == tweaks.subPosition }, tweaks::updateSubPosition),
+        SettingGroup("Subtitle delay", if (subs) SubtitleDelays else emptyList(), { if (it == 0L) "0" else "+${(it / 1000f).toString().removeSuffix(".0")} s" }, { it == tweaks.subDelayMs }) { tweaks.subDelayMs = it },
         SettingGroup("Sleep timer", SleepOptions, ::sleepLabel, { it == tweaks.sleep }, tweaks::updateSleep),
         SettingGroup("Auto-skip intro and recap", if (skipSetting) listOf(true, false) else emptyList(), { if (it) "On" else "Off" }, { it == tweaks.autoSkip }, tweaks::updateAutoSkip),
         SettingGroup("Watch together", if (partyPayload != null && party.client.enabled) listOf(true) else emptyList(), { "Start or manage a party" }, { room != null }) { partyOpen = true },
@@ -352,7 +356,7 @@ private fun TvPlayerChrome(
                     Key.DirectionRight, Key.MediaFastForward -> seek(step)
                     Key.DirectionUp -> if (hasSettings) panel = Panel.SETTINGS
                     Key.DirectionDown -> when {
-                        showIntro && !fromIntro -> runCatching { introFocus.requestFocus() }
+                        showIntro && !marquee && !fromIntro -> runCatching { introFocus.requestFocus() }
                         nextCard && !fromIntro -> runCatching { nextFocus.requestFocus() }
                         strip != null && strip.numbers.isNotEmpty() -> panel = Panel.STRIP
                     }
@@ -375,23 +379,28 @@ private fun TvPlayerChrome(
                     isFocusable = false
                 }
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            // captions would run over the pause marquee's next-episode card
+            showCaptions = !marquee
         )
         com.anistream.feature.party.PartyOverlay(player, Modifier.align(Alignment.TopEnd), payload = partyPayload)
         val cq = maxWidth / 100
         if (marquee) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)))
+            Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to Color(0xD106060A), 0.55f to Color(0x9906060A), 1f to Color(0xCC06060A))))
             PauseMarquee(
                 cq, meta.show, meta.name ?: title, meta.synopsis,
                 listOfNotNull(
                     (meta.runtimeMin ?: (duration / 60_000).toInt().takeIf { it > 0 })?.let { "$it min" },
+                    airLabel(meta.airDate),
                     ((duration - position) / 60_000).toInt().takeIf { duration > 0 && it > 0 }?.let { "$it min left" }
                 ),
-                room?.members?.map { it.name }.orEmpty(),
-                Modifier.align(Alignment.TopStart).padding(start = cq * 5, top = cq * 4)
+                Modifier.align(Alignment.TopStart).padding(start = cq * 5, top = cq * 6)
             )
+            room?.members?.takeIf { it.isNotEmpty() }?.let { m ->
+                PartyChip(cq, m.map { it.name }, Modifier.align(Alignment.BottomStart).padding(start = cq * 5, bottom = cq * 16))
+            }
             if (nextCard) NextCard(cq, upNext.orEmpty(), meta.nextName, meta.nextStill ?: upNextImage, onUpNext, nextFocus,
-                { nextFocused = it }, Modifier.align(Alignment.BottomStart).padding(start = cq * 5, bottom = if (visible) 96.dp else 40.dp))
+                { nextFocused = it }, Modifier.align(Alignment.BottomStart).padding(start = cq * 5, bottom = cq * 8.5f))
         }
 
         if (loading && error == null) {
@@ -423,20 +432,23 @@ private fun TvPlayerChrome(
                     }
                     if (partyOpen && partyPayload != null) TvPartyPanel(partyPayload, partyFocus, onClose = { partyOpen = false; closePanel() })
                     if (panel == Panel.STRIP) Spacer(Modifier.height(20.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = null, tint = Ink.high)
+                    // scrub line: play state, the bar with its knob, "14:12 / 42:53"
+                    val timeStyle = TvType.body.copy(color = Color(0xFFDAD6E4), fontSize = (cq.value * 1.4f).sp, lineHeight = (cq.value * 2f).sp, fontFeatureSettings = "tnum")
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(cq * 1.6f)) {
+                        Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = null, tint = Ink.high, modifier = Modifier.size(cq * 2.2f))
                         if (isLive) {
                             Text("Live", style = TvType.body.copy(color = Accent.onLive), modifier = Modifier.background(Accent.live, Radius.pill).padding(horizontal = 12.dp, vertical = 2.dp))
                         } else {
-                            Text(formatTime(position), style = TvType.body.copy(fontFeatureSettings = "tnum"))
-                            Box(Modifier.weight(1f).height(6.dp).background(Ink.faint, Radius.pill)) {
-                                val f = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
-                                Box(Modifier.fillMaxWidth(f).height(6.dp).background(Accent.main, Radius.pill))
+                            val f = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
+                            BoxWithConstraints(Modifier.weight(1f).height(cq * 1.4f), contentAlignment = Alignment.CenterStart) {
+                                Box(Modifier.fillMaxWidth().height(cq * 0.45f).background(Color(0x38ECEAF2), Radius.pill))
+                                Box(Modifier.fillMaxWidth(f).height(cq * 0.45f).background(Accent.main, Radius.pill))
+                                Box(Modifier.offset(x = maxWidth * f - cq * 0.7f).size(cq * 1.4f).background(Accent.main, CircleShape))
                             }
-                            Text(formatTime(duration), style = TvType.body.copy(fontFeatureSettings = "tnum"))
+                            Text("${formatTime(position)} / ${formatTime(duration)}", style = timeStyle)
                         }
                     }
-                    if (panel == Panel.NONE) {
+                    if (panel == Panel.NONE && !marquee) {
                         Spacer(Modifier.height(10.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                             Text(
@@ -465,11 +477,14 @@ private fun TvPlayerChrome(
         if (panel == Panel.SETTINGS) {
             SettingsTicket(
                 allSettings, cq, room?.members?.size, { closePanel() },
-                Modifier.align(Alignment.TopEnd).padding(end = maxOf(cq * 2.5f, 40.dp), top = cq * 2.5f, bottom = maxOf(cq * 9, 110.dp)).width(cq * 40).fillMaxHeight()
+                Modifier.align(Alignment.TopEnd).padding(end = cq * 2.5f, top = cq * 2.5f, bottom = cq * 9).width(cq * 40).fillMaxHeight(),
+                // paused: Left from the tabs reaches the next-episode card
+                leftOut = if (nextCard) nextFocus else null
             )
         }
 
-        if (showIntro) {
+        // the pause marquee owns the screen; the chip returns with playback
+        if (showIntro && !marquee) {
             TvPill(
                 skipText,
                 onClick = {
@@ -584,21 +599,40 @@ private fun UpNextCard(imageUrl: String?, episodeLabel: String, title: String, o
     }
 }
 
-private val TicketBg = Color(0xF0101016)
+private val TicketBg = Color(0xF0101016)  // rgba(16,16,22,.94)
 private val Hairline = Color(0x2EECEAF2)
 
-/** Dashed vertical stub divider (cheap: one drawLine). */
-private fun Modifier.dashedRight() = drawBehind {
-    drawLine(Hairline, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 2f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)))
+/** Dashed vertical stub dividers (cheap: one drawLine). */
+private fun Modifier.dashedRight(cq: Dp) = drawBehind {
+    drawLine(Hairline, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = cq.toPx() * 0.16f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(cq.toPx() * 0.5f, cq.toPx() * 0.4f)))
+}
+private fun Modifier.dashedLeft(cq: Dp) = drawBehind {
+    drawLine(Color(0x40ECEAF2), Offset(0f, 0f), Offset(0f, size.height), strokeWidth = cq.toPx() * 0.32f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(cq.toPx() * 0.5f, cq.toPx() * 0.4f)))
+}
+
+/** A group's current value as the tab says it: "Auto-skip on", "Low-end off"; an unset sleep timer says nothing. */
+private fun tabValue(g: SettingGroup<*>): String? {
+    val v = g.current() ?: return null
+    return when {
+        g.title == "Auto-skip intro and recap" -> "Auto-skip ${v.lowercase()}"
+        g.title == "Sleep timer" -> if (v == "Off") null else "Sleep $v"
+        g.title.startsWith("Low-end") -> "Low-end ${v.lowercase()}"
+        else -> v
+    }
+}
+
+/** Sections whose name differs on the ticket from the setting's own title. */
+private fun heading(title: String) = when (title) {
+    "Subtitles" -> "Track"; "Subtitle size" -> "Size"; "Subtitle delay" -> "Delay"; else -> title
 }
 
 /**
- * The side ticket: a tab stub per group (name + current value), a dashed divider, then the group's options.
+ * The side ticket: a tab stub per group (name + current values), a dashed divider, then the group's options.
  * ↑/↓ moves between tabs, → enters the options, ← returns to the tabs.
  */
 @kotlin.OptIn(ExperimentalComposeUiApi::class, ExperimentalLayoutApi::class)
 @Composable
-private fun SettingsTicket(groups: List<SettingGroup<*>>, cq: Dp, partySize: Int?, close: () -> Unit, modifier: Modifier) {
+private fun SettingsTicket(groups: List<SettingGroup<*>>, cq: Dp, partySize: Int?, close: () -> Unit, modifier: Modifier, leftOut: FocusRequester? = null) {
     val byTab = TabNames.indices.map { i -> groups.filter { tabOf(it.title) == i && it.options.isNotEmpty() } }
     val shown = byTab.indices.filter { byTab[it].isNotEmpty() }
     if (shown.isEmpty()) return
@@ -607,30 +641,33 @@ private fun SettingsTicket(groups: List<SettingGroup<*>>, cq: Dp, partySize: Int
     val tabReq = remember { List(TabNames.size) { FocusRequester() } }
     val bodyReq = remember { FocusRequester() }
     LaunchedEffect(Unit) { withFrameNanos { }; runCatching { tabReq[shown.first()].requestFocus() } }
+    fun sp(n: Float) = (cq.value * n).sp
     Row(modifier.clip(RoundedCornerShape(cq * 1.4f)).background(TicketBg)) {
         Column(
-            Modifier.width(cq * 15).fillMaxHeight().dashedRight()
-                .focusProperties { exit = { if (it == FocusDirection.Right) bodyReq else FocusRequester.Default } }.focusGroup()
-                .verticalScroll(rememberScrollState()).padding(horizontal = cq * 0.7f, vertical = cq * 1),
-            verticalArrangement = Arrangement.spacedBy(cq * 0.25f)
+            Modifier.width(cq * 12).fillMaxHeight().background(Color(0x08FFFFFF)).dashedRight(cq)
+                .focusProperties { exit = { if (it == FocusDirection.Right) bodyReq else if (it == FocusDirection.Left && leftOut != null) leftOut else FocusRequester.Default } }.focusGroup()
+                .verticalScroll(rememberScrollState()).padding(horizontal = cq * 1f, vertical = cq * 1.8f),
+            verticalArrangement = Arrangement.spacedBy(cq * 0.5f)
         ) {
             shown.forEach { i ->
-                val value = if (i == 4) (partySize?.let { "$it watching" } ?: "Off") else byTab[i].firstNotNullOfOrNull { it.current() }.orEmpty()
+                // "English, M, 0": the tab's current values (Position is left to the body)
+                val value = if (i == 4) (partySize?.let { "$it watching" } ?: "Off")
+                else byTab[i].filter { it.title != "Position" }.mapNotNull(::tabValue).take(3).joinToString(", ")
                 val on = i == active
                 Surface(
                     onClick = { runCatching { bodyReq.requestFocus() } },
                     modifier = Modifier.fillMaxWidth().focusRequester(tabReq[i]).onFocusChanged { if (it.isFocused) active = i },
                     shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(cq * 0.7f)),
                     colors = ClickableSurfaceDefaults.colors(
-                        containerColor = if (on) Accent.main else Color.Transparent, contentColor = if (on) Accent.on else Ink.body,
+                        containerColor = if (on) Accent.main else Color.Transparent, contentColor = if (on) Accent.on else Color(0xFFCFCBD9),
                         focusedContainerColor = Accent.main, focusedContentColor = Accent.on
                     ),
-                    border = ClickableSurfaceDefaults.border(focusedBorder = androidx.tv.material3.Border(FocusRing)),
+                    border = ClickableSurfaceDefaults.border(focusedBorder = androidx.tv.material3.Border(BorderStroke(cq * 0.2f, Ink.high), inset = cq * 0.2f)),
                     scale = ClickableSurfaceDefaults.scale(focusedScale = 1f)
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = cq * 0.8f, vertical = cq * 0.45f)) {
-                        Text(TabNames[i], style = TvType.body.copy(color = Color.Unspecified, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold), maxLines = 1)
-                        if (value.isNotBlank()) Text(value, style = TvType.body.copy(color = Color.Unspecified, fontSize = 12.sp, lineHeight = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Column(Modifier.fillMaxWidth().padding(horizontal = cq * 1f, vertical = cq * 0.8f)) {
+                        Text(TabNames[i], style = TvType.body.copy(color = Color.Unspecified, fontSize = sp(1.15f), lineHeight = sp(1.78f), fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal), maxLines = 1)
+                        if (value.isNotBlank()) Text(value, style = TvType.body.copy(color = if (on) Color(0xFF4A3818) else Color(0xFFA3A1AE), fontSize = sp(0.9f), lineHeight = sp(1.4f)), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -638,111 +675,142 @@ private fun SettingsTicket(groups: List<SettingGroup<*>>, cq: Dp, partySize: Int
         Column(
             Modifier.weight(1f).fillMaxHeight()
                 .focusProperties { exit = { if (it == FocusDirection.Left) tabReq[active] else FocusRequester.Default } }.focusGroup()
-                .verticalScroll(rememberScrollState()).padding(cq * 1.3f),
+                .verticalScroll(rememberScrollState()).padding(horizontal = cq * 1.6f, vertical = cq * 1.8f),
             verticalArrangement = Arrangement.spacedBy(cq * 0.8f)
         ) {
-            Text(TabNames[active], style = TvType.headline.copy(fontFamily = DisplayHeavy, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, lineHeight = 30.sp))
+            Text(TabNames[active], modifier = Modifier.padding(bottom = cq * 0.4f), style = TvType.headline.copy(fontFamily = DisplayHeavy, fontWeight = FontWeight.ExtraBold, fontSize = sp(1.9f), lineHeight = sp(2.2f)))
             val gs = byTab[active]
-            gs.forEachIndexed { gi, g -> GroupBody(g, if (gs.size > 1 || g.title != TabNames[active]) g.title else null, if (gi == 0) bodyReq else null, cq) { if (active == 0 || active == 4) close() } }
+            gs.forEachIndexed { gi, g -> GroupBody(g, if (gs.size > 1 || g.title != TabNames[active] || g.stub != null) heading(g.title) else null, if (gi == 0) bodyReq else null, cq) { if (active == 0 || active == 4) close() } }
         }
+    }
+}
+
+/** A choice chip on the ticket: soft amber when chosen, solid amber under focus. */
+@Composable
+private fun OptChip(text: String, selected: Boolean, cq: Dp, onClick: () -> Unit, modifier: Modifier) {
+    Surface(
+        onClick = onClick, modifier = modifier,
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(percent = 50)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = if (selected) Color(0x38F2B45A) else Color(0x12FFFFFF), contentColor = if (selected) Accent.main else Ink.high,
+            focusedContainerColor = Accent.main, focusedContentColor = Accent.on
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f)
+    ) {
+        Text(text, maxLines = 1, modifier = Modifier.padding(horizontal = cq * 1f, vertical = cq * 0.5f),
+            style = TvType.body.copy(color = Color.Unspecified, fontSize = (cq.value * 1.05f).sp, lineHeight = (cq.value * 1.4f).sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal))
     }
 }
 
 @kotlin.OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun <T> GroupBody(g: SettingGroup<T>, heading: String?, focus: FocusRequester?, cq: Dp, done: () -> Unit) {
-    if (heading != null) Text(heading, style = TvType.body.copy(color = Ink.muted, fontSize = 16.sp))
+    if (heading != null) Text(heading, modifier = Modifier.padding(top = cq * 0.4f), style = TvType.body.copy(color = Color(0xFFA3A1AE), fontSize = (cq.value * 1.05f).sp, lineHeight = (cq.value * 1.4f).sp))
     val first = g.options.indexOfFirst(g.selected).coerceAtLeast(0)
     val stub = g.stub
     if (stub != null) {
-        Column(verticalArrangement = Arrangement.spacedBy(cq * 0.6f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(cq * 0.8f)) {
             g.options.forEachIndexed { i, o ->
                 val info = stub(o)
                 val mod = if (i == first && focus != null) Modifier.focusRequester(focus) else Modifier
-                if (info == null) TvPill(g.label(o), { g.pick(o); done() }, mod, selected = g.selected(o))
+                if (info == null) OptChip(g.label(o), g.selected(o), cq, { g.pick(o); done() }, mod)
                 else SourceStub(info, g.selected(o), { g.pick(o); done() }, cq, mod)
             }
         }
     } else {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(cq * 0.6f), verticalArrangement = Arrangement.spacedBy(cq * 0.6f)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(cq * 0.5f), verticalArrangement = Arrangement.spacedBy(cq * 0.5f)) {
             g.options.forEachIndexed { i, o ->
-                TvPill(g.label(o), { g.pick(o); done() }, if (i == first && focus != null) Modifier.focusRequester(focus) else Modifier, selected = g.selected(o))
+                OptChip(g.label(o), g.selected(o), cq, { g.pick(o); done() }, if (i == first && focus != null) Modifier.focusRequester(focus) else Modifier)
             }
         }
     }
 }
 
-/** A source on its stub: big quality, name (and "Playing"), then codec / size / Dolby / Atmos tags. */
+/** A source on its stub: big quality over its codec, then name (and "Playing"), then size / audio tags. */
+@kotlin.OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SourceStub(i: SrcInfo, playing: Boolean, onClick: () -> Unit, cq: Dp, modifier: Modifier) {
+    fun sp(n: Float) = (cq.value * n).sp
     Surface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(cq * 0.9f)),
-        colors = ClickableSurfaceDefaults.colors(
-            containerColor = Color(0xFF1E1D26), contentColor = Ink.high, focusedContainerColor = Color(0xFF2A2833), focusedContentColor = Ink.high
-        ),
+        colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = Ink.high, focusedContainerColor = Color.Transparent, focusedContentColor = Ink.high),
         border = ClickableSurfaceDefaults.border(
-            border = if (playing) androidx.tv.material3.Border(androidx.compose.foundation.BorderStroke(2.dp, Accent.main.copy(alpha = 0.6f))) else androidx.tv.material3.Border.None,
-            focusedBorder = androidx.tv.material3.Border(FocusRing)
+            border = if (playing) androidx.tv.material3.Border(BorderStroke(cq * 0.22f, Accent.main)) else androidx.tv.material3.Border.None,
+            focusedBorder = androidx.tv.material3.Border(BorderStroke(cq * 0.22f, Ink.high))
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f)
     ) {
-        Column(Modifier.padding(cq * 0.9f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(cq * 0.8f)) {
-                Text(i.quality.ifBlank { "?" }, style = TvType.headline.copy(fontFamily = DisplayHeavy, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, lineHeight = 28.sp), maxLines = 1)
-                Text(i.name, style = TvType.body.copy(color = Color.Unspecified, fontWeight = FontWeight.SemiBold, fontSize = 16.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                if (playing) Text("Playing", style = TvType.body.copy(color = Accent.main, fontSize = 13.sp, fontWeight = FontWeight.SemiBold))
+        Row(
+            Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF3A3029), Color(0xFF121219)))).dashedLeft(cq).padding(horizontal = cq * 1.2f, vertical = cq * 1f),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(cq * 1.2f)
+        ) {
+            Column(Modifier.widthIn(min = cq * 6.4f)) {
+                Text(i.quality.ifBlank { "?" }, style = TvType.headline.copy(fontFamily = DisplayHeavy, fontWeight = FontWeight.ExtraBold, fontSize = sp(2.2f), lineHeight = sp(2.3f)), maxLines = 1)
+                i.tags.firstOrNull()?.let { Text(it, style = TvType.body.copy(color = Color(0xFFA3A1AE), fontSize = sp(0.9f), lineHeight = sp(1.2f), fontWeight = FontWeight.Medium), maxLines = 1) }
             }
-            FlowRowTags(listOfNotNull(i.size) + i.tags, i.flags)
+            Column(verticalArrangement = Arrangement.spacedBy(cq * 0.3f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(cq * 0.8f)) {
+                    Text(i.name, style = TvType.body.copy(color = Ink.high, fontWeight = FontWeight.SemiBold, fontSize = sp(1.25f), lineHeight = sp(1.6f)), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    if (playing) Text("Playing", style = TvType.body.copy(color = Color(0xFF6FD39A), fontSize = sp(0.85f), fontWeight = FontWeight.SemiBold))
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(cq * 0.4f), verticalArrangement = Arrangement.spacedBy(cq * 0.3f)) {
+                    val tag = TvType.body.copy(fontSize = sp(0.9f), lineHeight = sp(1.2f))
+                    (listOfNotNull(i.size) + i.tags.drop(1)).forEach { Text(it, style = tag.copy(color = Color(0xFFCFCBD9)), modifier = Modifier.background(Color(0x14FFFFFF), Radius.pill).padding(horizontal = cq * 0.7f, vertical = cq * 0.15f)) }
+                    i.flags.forEach { Text(it, style = tag.copy(color = Accent.main), modifier = Modifier.background(Color(0x29F2B45A), Radius.pill).padding(horizontal = cq * 0.7f, vertical = cq * 0.15f)) }
+                }
+            }
         }
     }
 }
 
-@kotlin.OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun FlowRowTags(tags: List<String>, flags: List<String>) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        tags.forEach { Text(it, style = TvType.body.copy(fontSize = 12.sp, lineHeight = 16.sp), modifier = Modifier.background(Color(0x14FFFFFF), Radius.pill).padding(horizontal = 10.dp, vertical = 2.dp)) }
-        flags.forEach { Text(it, style = TvType.body.copy(fontSize = 12.sp, lineHeight = 16.sp, color = Accent.main), modifier = Modifier.background(Accent.soft, Radius.pill).padding(horizontal = 10.dp, vertical = 2.dp)) }
-    }
+/** "Oct 7, 2012" from "2012-10-07"; null when missing or unparseable. */
+internal fun airLabel(iso: String?): String? = iso?.let {
+    runCatching { java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM, Locale.US).format(java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(it)!!) }.getOrNull()
 }
 
-/** Pause marquee: show line, huge episode title (first word solid, rest outline), synopsis, chips, party. */
+/** Pause marquee: amber show line, huge episode title (first word solid, rest outline), synopsis, chips. */
 @Composable
-private fun PauseMarquee(cq: Dp, show: String?, name: String, synopsis: String?, chips: List<String>, members: List<String>, modifier: Modifier) {
-    val strokePx = with(LocalDensity.current) { (cq * 0.12f).toPx().coerceAtLeast(2f) }
+private fun PauseMarquee(cq: Dp, show: String?, name: String, synopsis: String?, chips: List<String>, modifier: Modifier) {
+    val strokePx = with(LocalDensity.current) { (cq * 0.12f).toPx().coerceAtLeast(1.5f) }
+    fun sp(n: Float) = (cq.value * n).sp
     val giant = buildAnnotatedString {
         append(name.substringBefore(' '))
         val rest = name.substringAfter(' ', "")
-        if (rest.isNotEmpty()) { append(' '); withStyle(SpanStyle(color = Ink.high.copy(alpha = 0.6f), drawStyle = Stroke(strokePx))) { append(rest) } }
+        if (rest.isNotEmpty()) { append(' '); withStyle(SpanStyle(color = Ink.high.copy(alpha = 0.55f), drawStyle = Stroke(strokePx))) { append(rest) } }
     }
     Column(modifier.width(cq * 46)) {
-        if (show != null) Text(show, style = TvType.title.copy(color = Accent.main), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(cq * 0.8f))
+        if (show != null) Text(show, style = TvType.title.copy(color = Accent.main, fontSize = sp(1.4f), lineHeight = sp(1.9f), fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(cq * 1f))
         Text(
             giant, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            style = TvType.display.copy(fontFamily = DisplayHeavy, fontWeight = FontWeight.ExtraBold, fontSize = (cq.value * 6.4f).sp, lineHeight = (cq.value * 5.8f).sp)
+            style = TvType.display.copy(fontFamily = DisplayHeavy, fontWeight = FontWeight.ExtraBold, fontSize = sp(6.4f), lineHeight = sp(6.4f * 0.88f), letterSpacing = (-0.015f).em)
         )
         if (!synopsis.isNullOrBlank()) {
             Spacer(Modifier.height(cq * 1.2f))
-            Text(synopsis, style = TvType.body.copy(color = Color(0xFFCFCBD9)), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = cq * 40))
+            Text(synopsis, style = TvType.body.copy(color = Color(0xFFCFCBD9), fontSize = sp(1.2f), lineHeight = sp(1.8f)), maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = cq * 40))
         }
         if (chips.isNotEmpty()) {
             Spacer(Modifier.height(cq * 1.4f))
             Row(horizontalArrangement = Arrangement.spacedBy(cq * 0.6f)) {
-                chips.forEach { Text(it, style = TvType.body.copy(fontSize = 16.sp), modifier = Modifier.background(Color(0x17FFFFFF), Radius.pill).padding(horizontal = 14.dp, vertical = 4.dp)) }
+                chips.forEach { Text(it, style = TvType.body.copy(color = Color(0xFFD9D6E2), fontSize = sp(1f), lineHeight = sp(1.4f)), modifier = Modifier.background(Color(0x17FFFFFF), Radius.pill).padding(horizontal = cq * 0.9f, vertical = cq * 0.3f)) }
             }
         }
-        if (members.isNotEmpty()) {
-            Spacer(Modifier.height(cq * 1.2f))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                members.take(6).forEach {
-                    Box(Modifier.size(32.dp).background(Bg.overlay, Radius.round), contentAlignment = Alignment.Center) { Text(it.take(1).uppercase(), style = TvType.body.copy(fontSize = 15.sp)) }
-                }
-                Text("${members.size} watching", style = TvType.body.copy(color = Ink.muted))
+    }
+}
+
+/** "2 watching" with overlapping initials, above the next-episode card. */
+@Composable
+private fun PartyChip(cq: Dp, members: List<String>, modifier: Modifier) {
+    Row(modifier.background(Color(0xCC101016), Radius.pill).padding(start = cq * 0.5f, end = cq * 0.9f, top = cq * 0.4f, bottom = cq * 0.4f), verticalAlignment = Alignment.CenterVertically) {
+        members.take(6).forEachIndexed { i, m ->
+            Box(Modifier.offset(x = -cq * 0.9f * i).size(cq * 2.2f).background(Color(0xFF101016), CircleShape).padding(cq * 0.15f).background(Color(0xFF2A2340), CircleShape), contentAlignment = Alignment.Center) {
+                Text(m.take(1).uppercase(), style = TvType.body.copy(fontSize = (cq.value * 1.1f).sp, lineHeight = (cq.value * 1.3f).sp))
             }
         }
+        Text("${members.size} watching", modifier = Modifier.offset(x = -cq * 0.9f * (members.take(6).size - 1)).padding(start = cq * 0.6f),
+            style = TvType.body.copy(color = Color(0xFFDAD6E4), fontSize = (cq.value * 1.05f).sp, lineHeight = (cq.value * 1.4f).sp))
     }
 }
 
@@ -756,14 +824,14 @@ private fun NextCard(cq: Dp, label: String, name: String?, image: String?, onCli
         colors = ClickableSurfaceDefaults.colors(
             containerColor = Color(0x12FFFFFF), contentColor = Ink.high, focusedContainerColor = Color(0x2EFFFFFF), focusedContentColor = Ink.high
         ),
-        border = ClickableSurfaceDefaults.border(focusedBorder = androidx.tv.material3.Border(FocusRing)),
+        border = ClickableSurfaceDefaults.border(focusedBorder = androidx.tv.material3.Border(BorderStroke(cq * 0.22f, Accent.main))),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f)
     ) {
         Row(Modifier.padding(cq * 0.9f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(cq)) {
             AsyncImage(model = image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.width(cq * 9).aspectRatio(16f / 9f).clip(RoundedCornerShape(cq * 0.5f)).background(Bg.overlay))
             Column(Modifier.weight(1f)) {
-                Text("Next, ${label.replaceFirstChar { it.lowercase() }}", style = TvType.body.copy(color = Ink.muted, fontSize = 15.sp), maxLines = 1)
-                if (!name.isNullOrBlank()) Text(name, style = TvType.title.copy(fontFamily = DisplayHeavy), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text("Next, ${label.replaceFirstChar { it.lowercase() }}", style = TvType.body.copy(color = Color(0xFFA3A1AE), fontSize = (cq.value * 0.95f).sp, lineHeight = (cq.value * 1.3f).sp), maxLines = 1)
+                if (!name.isNullOrBlank()) Text(name, style = TvType.title.copy(fontFamily = DisplayHeavy, fontWeight = FontWeight.ExtraBold, fontSize = (cq.value * 1.35f).sp, lineHeight = (cq.value * 1.6f).sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -819,7 +887,7 @@ fun TvAnimePlayerScreen(onExit: () -> Unit, vm: PlayerViewModel = hiltViewModel(
         meta = EpisodeMeta(
             show = "${s.animeTitle}, episode ${s.episodeNumber}",
             name = guide[s.episodeNumber]?.title?.takeIf { it.isNotBlank() } ?: "Episode ${s.episodeNumber}",
-            synopsis = guide[s.episodeNumber]?.overview, runtimeMin = guide[s.episodeNumber]?.runtime,
+            synopsis = guide[s.episodeNumber]?.overview, runtimeMin = guide[s.episodeNumber]?.runtime, airDate = guide[s.episodeNumber]?.airDate,
             nextName = nextEp?.title, nextStill = nextEp?.still
         )
     )
@@ -885,7 +953,7 @@ fun TvMediaPlayerScreen(
         meta = if (r == null) EpisodeMeta() else EpisodeMeta(
             show = if (r.season > 0 && r.episode > 0) "${r.title}, season ${r.season}, episode ${r.episode}" else null,
             name = if (r.episode > 0) ge?.title?.takeIf { it.isNotBlank() } ?: "Episode ${r.episode}" else r.title,
-            synopsis = ge?.overview, runtimeMin = ge?.runtime, nextName = nextEp?.title, nextStill = nextEp?.still
+            synopsis = ge?.overview, runtimeMin = ge?.runtime, airDate = ge?.airDate, nextName = nextEp?.title, nextStill = nextEp?.still
         )
     )
 }

@@ -264,7 +264,8 @@ fun VideoSurface(
     tweaks: PlayerTweaks,
     create: (Context) -> PlayerView,
     modifier: Modifier = Modifier,
-    onView: (PlayerView) -> Unit = {}
+    onView: (PlayerView) -> Unit = {},
+    showCaptions: Boolean = true
 ) {
     LaunchedEffect(player, tweaks) { player.setPlaybackSpeed(tweaks.speed) }
     LaunchedEffect(tweaks.sleepAt) {
@@ -312,7 +313,7 @@ fun VideoSurface(
                 else -> Modifier.align(Alignment.Center).aspectRatio(aspect)
             }
         )
-        Subtitles(player, tweaks, Modifier.fillMaxSize())
+        if (showCaptions) Subtitles(player, tweaks, Modifier.fillMaxSize())
     }
 }
 
