@@ -9,9 +9,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,6 +34,15 @@ class AccountRepository @Inject constructor(
     val baseUrl: String get() = api.baseUrl
 
     private val prefs = context.getSharedPreferences("account", Context.MODE_PRIVATE)
+
+    private val _isAdmin = MutableStateFlow(prefs.getBoolean("isAdmin", false))
+    /** `is_admin` from /v1/me, cached so the entry shows before the network answers. Never true for guests. */
+    val isAdmin: StateFlow<Boolean> = _isAdmin.asStateFlow()
+
+    private val _adminMode = MutableStateFlow(prefs.getBoolean("adminMode", false))
+    /** The "Admin mode" switch; only meaningful while [isAdmin]. */
+    val adminMode: StateFlow<Boolean> = _adminMode.asStateFlow()
+    fun setAdminMode(on: Boolean) { _adminMode.value = on; prefs.edit().putBoolean("adminMode", on).apply() }
 
     private val _profiles = MutableStateFlow<List<Profile>>(emptyList())
     val profiles: StateFlow<List<Profile>> = _profiles.asStateFlow()
@@ -99,6 +110,8 @@ class AccountRepository @Inject constructor(
         prefs.edit().clear().putString("deviceId", deviceId).apply()
         _profiles.value = emptyList()
         _session.value = null
+        _isAdmin.value = false
+        _adminMode.value = false
         ActiveProfile.id = ""
         KidsPolicy.active = false
         _gate.value = true
@@ -118,6 +131,10 @@ class AccountRepository @Inject constructor(
         val t = token ?: return
         val list = api.call("GET", "/v1/profiles", token = t)!!["profiles"]!!.jsonArray.map { it.jsonObject.toProfile() }
         setProfiles(list)
+        runCatching { api.call("GET", "/v1/me", token = t)!!["user"]!!.jsonObject["is_admin"]?.jsonPrimitive?.booleanOrNull }.getOrNull()?.let {
+            _isAdmin.value = it
+            prefs.edit().putBoolean("isAdmin", it).apply()
+        }
     }
 
     private fun setProfiles(list: List<Profile>) {

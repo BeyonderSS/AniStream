@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.anistream.core.account.ui.AccountScreen
+import com.anistream.feature.admin.AdminScreen
 import com.anistream.core.account.ui.AccountViewModel
 import com.anistream.core.account.ui.AvatarImage
 import com.anistream.core.account.ui.ProfilePickerGate
@@ -89,6 +90,7 @@ object Routes {
     const val ADDONS = "addons"
     const val LIBRARY = "library"
     const val ACCOUNT = "account?code={code}"
+    const val ADMIN = "admin"
 
     fun animeDetail(slug: String) = "anime_detail/$slug"
     fun movieDetail(id: String) = "movie_detail/${Uri.encode(id)}"
@@ -234,8 +236,10 @@ fun AniStreamNavGraph() {
                 Routes.ACCOUNT,
                 arguments = listOf(navArgument("code") { type = NavType.StringType; nullable = true; defaultValue = null })
             ) { entry ->
-                Insetted { AccountScreen(onBack = { navController.popBackStack() }, pairCode = entry.arguments?.getString("code")) }
+                Insetted { AccountScreen(onBack = { navController.popBackStack() }, pairCode = entry.arguments?.getString("code"), onAdmin = { navController.navigate(Routes.ADMIN) }) }
             }
+
+            composable(Routes.ADMIN) { Insetted { AdminScreen(onBack = { navController.popBackStack() }) } }
 
             composable(Routes.LIBRARY) {
                 Insetted {

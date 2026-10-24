@@ -2,6 +2,7 @@ package com.anistream.core.account.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.offset
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -78,9 +80,11 @@ fun AvatarImage(avatarId: String, size: Dp, modifier: Modifier = Modifier, ring:
  * Guests get a way into sign in / sign up. [pairCode] comes from a deep link (reelm://pair/<code>) and is ready to approve.
  */
 @Composable
-fun AccountScreen(onBack: () -> Unit, pairCode: String? = null, vm: AccountViewModel = hiltViewModel()) {
+fun AccountScreen(onBack: () -> Unit, pairCode: String? = null, onAdmin: () -> Unit = {}, vm: AccountViewModel = hiltViewModel()) {
     val session by vm.session.collectAsStateWithLifecycle()
     val ui by vm.ui.collectAsStateWithLifecycle()
+    val isAdmin by vm.repo.isAdmin.collectAsStateWithLifecycle()
+    val adminMode by vm.repo.adminMode.collectAsStateWithLifecycle()
     var code by rememberSaveable { mutableStateOf(pairCode.orEmpty()) }
     LaunchedEffect(session?.token) { if (session != null) vm.refresh() }
 
@@ -132,6 +136,27 @@ fun AccountScreen(onBack: () -> Unit, pairCode: String? = null, vm: AccountViewM
                 Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = Accent.live, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(Space.sm))
                 Text(it, style = AppType.body.copy(color = Accent.live))
+            }
+        }
+
+        if (isAdmin) {
+            Spacer(Modifier.height(Space.xxl))
+            Row(Modifier.fillMaxWidth().clip(Radius.lg).background(Bg.raised).padding(horizontal = Space.lg, vertical = Space.sm), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Admin mode", style = AppType.bodyStrong)
+                    Text("Show the admin dashboard", style = AppType.caption)
+                }
+                Switch(adminMode, vm.repo::setAdminMode)
+            }
+            if (adminMode) {
+                Spacer(Modifier.height(Space.sm))
+                Row(
+                    Modifier.fillMaxWidth().clip(Radius.lg).background(Bg.raised).clickable(onClick = onAdmin).padding(Space.lg),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Admin", style = AppType.bodyStrong, modifier = Modifier.weight(1f))
+                    Text("ADMIN", color = Accent.on, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(CircleShape).background(Accent.main).padding(horizontal = 8.dp, vertical = 2.dp))
+                }
             }
         }
 

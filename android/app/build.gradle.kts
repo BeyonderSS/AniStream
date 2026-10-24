@@ -105,6 +105,7 @@ dependencies {
     implementation(project(":feature:genre-browse"))
     implementation(project(":feature:movies"))
     implementation(project(":feature:livetv"))
+    implementation(project(":feature:admin"))
     "tvImplementation"(project(":feature:tv"))
 
     implementation(libs.hilt.android)
