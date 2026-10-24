@@ -178,6 +178,9 @@ html.dark {
   --accent: #272b37; --accent-foreground: #e9eaf0;
   --destructive: #f07c6c; --border: rgb(233 234 240 / 0.1); --input: rgb(233 234 240 / 0.14); --ring: #f2b45a;
   --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --sidebar: #1a1c25; --sidebar-foreground: rgb(233 234 240 / 0.78); --sidebar-primary: #f2b45a; --sidebar-primary-foreground: #1a1408;
+  --sidebar-accent: #272b37; --sidebar-accent-foreground: #e9eaf0; --sidebar-border: rgb(233 234 240 / 0.06); --sidebar-ring: #f2b45a;
+  --chart-1: #f2b45a; --chart-2: #7fd1b9; --chart-3: #9db4ff; --chart-4: #f07c6c; --chart-5: #e9eaf0;
 }
 @theme inline { --font-display: var(--font-bricolage), var(--font-figtree), sans-serif; }
 @theme inline {

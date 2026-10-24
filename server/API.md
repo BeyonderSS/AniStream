@@ -10,7 +10,8 @@ Errors: `{ "error": "message" }` with a 4xx/5xx status.
 - `POST /v1/auth/register` `{username, password}` → `{token, user:{id, username}}` (username 3–32 `[a-z0-9_]`, password ≥ 8)
 - `POST /v1/auth/login` `{username, password}` → same
 - `POST /v1/auth/logout` → `204`
-- `GET  /v1/me` → `{user:{id, username}}`
+- `GET  /v1/me` → `{user:{id, username, is_admin}}`
+- Disabled accounts get `401` on every authed route and `403 account disabled` on login.
 
 ## Profiles (max 5 per account, Netflix-style)
 Profile: `{id, name, avatar, kids:boolean, createdAt}`. `avatar` is a Fluent Emoji id like `"grinning_face"`,
@@ -51,6 +52,31 @@ Hello on connect: `{type:"hello", deviceId, deviceName, kind:"phone"|"tv"}` → 
 - Any member switching media (episode, season, movie, new title) sends `{type:"load", payload, position:0}`; the server stores
   `payload`, resets `position` to 0 and `playing` to false, stamps `at`, and broadcasts `{type:"load", payload, at, by}` to everyone
   including the sender (ignore `by == you`). Members open the payload and stay in the room; late joiners get it in `state`.
+
+## Telemetry (signed-in clients)
+- `POST /v1/telemetry` `{events:[{kind, detail}], profileId?, platform?:"phone"|"tv"|"web", appVersion?, helper?}` → `204`.
+  `kind` ∈ `play`, `play_error`, `crash`, `source_used`, `heartbeat`, `search_empty`, `update_offered`, `update_installed`.
+  `detail` is an object ≤ 4000 chars JSON (title, key, kind, episode, source, host, quality, codec, error, ttff ms, position/duration s, query, trace).
+  At most 20 events per call and 30 per user per minute (`429` beyond). Clients batch and flush every 60 s; `heartbeat` = one per minute of playback.
+- The server also logs its own events (register, login, login_failed, logout, active (once a day), profile_*, history_push {count},
+  pair_start/claim, room_create/join/load, hub_connect, handoff, admin_*) into the D1 `events` table.
+
+## Admin (Bearer token of a user with `users.is_admin = 1`, else `403`)
+- `GET /v1/admin/overview` → `{totals:{users, profiles, devices, history, activeRooms, watchingNow, onlineNow}, daily:[{day, signups, dau, wau}]×30, topTitles, sources, codecs}`
+- `GET /v1/admin/live` → `{watching:[latest heartbeat per user+device, last 2 min], rooms:[{code, title, members}]}`
+- `GET /v1/admin/engagement` → `{perUser, perProfile, heatmap:[{dow, hour, minutes}] (UTC), platforms, completion, binge}`
+- `GET /v1/admin/content` → `{watched, abandoned (<20% watched), kinds, searches (search_empty)}`
+- `GET /v1/admin/sources` → `{bySource (source, host, ok, errors, ttff), daily, alerts (last hour, ≥5 tries, <50% ok), codecs, hevcFailures, dolbyFailures, recent}`
+- `GET /v1/admin/app` → `{crashes, versions, updates, helpers}`
+- `GET /v1/admin/security` → `{failed, newDevices (first seen ≤7 d), sessions, kids}`
+- `GET /v1/admin/ops` → `{connected, cloudflare (GraphQL Analytics, cached 5 min; needs secret CF_ANALYTICS_TOKEN + var CF_ACCOUNT_ID), deploys (GitHub runs/releases, cached 10 min), limits}`
+- `GET /v1/admin/users?q=&limit=&offset=` → `{users, total}`
+- `GET /v1/admin/users/:id` → `{user, profiles, devices, history (latest 50), events (latest 50), sessions:[{id, created_at, last_used_at, device, ua}]}`
+- `GET /v1/admin/events?kind=&user=<id or username>&before=<id>&limit=` → `{events, next}` (cursor = `next` as `before`)
+- `GET /v1/admin/history?profile=<id>` → `{entries}`
+- `POST /v1/admin/users/:id/{disable|enable|revoke|reset_password|make_admin|remove_admin}` → `{ok}` (`reset_password` adds `{password}`;
+  disable/reset also sign out every session). Disable, delete and admin changes refuse your own account (`400`).
+- `DELETE /v1/admin/users/:id` → `204` (profiles, history, sessions go too). `DELETE /v1/admin/sessions/:id` → `204` (sign out one session).
 
 ## App updates
 No server needed: the app reads `https://api.github.com/repos/BeyonderSS/Reelm/releases/latest`, compares the tag

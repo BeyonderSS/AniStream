@@ -65,6 +65,10 @@ class UpdateManager @Inject constructor(
         scope.launch(Dispatchers.IO) {
             listOfNotNull(context.cacheDir, context.getExternalFilesDir(null)).forEach { File(it, "updates").deleteRecursively() }
         }
+        prefs.getInt("update_pending_to", 0).takeIf { it > 0 }?.let { to ->
+            if (versionCode >= to) com.anistream.core.account.Telemetry.track("update_installed", "to" to versionName)
+            prefs.edit().remove("update_pending_to").apply()
+        }
         val now = System.currentTimeMillis()
         if (now - prefs.getLong("update_checked_at", 0L) < EVERY_MS) return
         prefs.edit().putLong("update_checked_at", now).apply()
@@ -88,6 +92,7 @@ class UpdateManager @Inject constructor(
             return
         }
         val offer = release != null && (if (manual) release.versionCode > versionCode else shouldOffer(versionCode, release.versionCode, debuggable))
+        if (offer && release != null) com.anistream.core.account.Telemetry.track("update_offered", "to" to release.name, "from" to versionName)
         _ui.update {
             it.copy(
                 checking = false,
@@ -111,6 +116,7 @@ class UpdateManager @Inject constructor(
             _ui.update { it.copy(progress = 0f, status = null) }
             try {
                 install(download(release))
+                prefs.edit().putInt("update_pending_to", release.versionCode).apply()
                 _ui.update { it.copy(progress = null) }
             } catch (_: Exception) {
                 _ui.update { it.copy(progress = null, status = "Download failed, check your connection") }

@@ -3,6 +3,7 @@ package com.anistream.feature.player
 import com.anistream.core.common.LowEnd
 import android.content.Context
 import android.net.Uri
+import com.anistream.core.account.Telemetry
 import androidx.annotation.OptIn
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -100,6 +101,8 @@ class PlayerViewModel @Inject constructor(
     private var detail: AnimeDetail? = null
     private var pendingResume: Float? = null
     private var loadJob: Job? = null
+    /** when the current stream was handed to the player; 0 once it rendered (time to first frame) */
+    private var startedAt = 0L
 
     private val lowEnd = LowEnd.isOn(context)
 
@@ -107,7 +110,15 @@ class PlayerViewModel @Inject constructor(
         addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
-                    Player.STATE_READY -> applyResume()
+                    Player.STATE_READY -> {
+                        if (startedAt > 0) {
+                            val s = _uiState.value
+                            Telemetry.track("play", "title" to s.animeTitle, "kind" to "anime", "episode" to s.episodeNumber, "source" to "anime", "quality" to s.streamSource?.qualityLabel)
+                            Telemetry.track("source_used", "source" to "anime", "host" to s.streamSource?.m3u8Url?.let { Uri.parse(it).host }, "ttff" to System.currentTimeMillis() - startedAt)
+                            startedAt = 0
+                        }
+                        applyResume()
+                    }
                     Player.STATE_ENDED -> {
                         persist(_uiState.value.episodeNumber, 1f, push = true)
                         _uiState.update { it.copy(ended = true) }
@@ -117,9 +128,14 @@ class PlayerViewModel @Inject constructor(
 
             override fun onPlayerError(error: PlaybackException) {
                 _uiState.update { it.copy(error = "Playback failed (${error.errorCodeName})") }
+                val s = _uiState.value
+                Telemetry.track("play_error", "title" to s.animeTitle, "source" to "anime", "host" to s.streamSource?.m3u8Url?.let { Uri.parse(it).host },
+                    "quality" to s.streamSource?.qualityLabel, "error" to "${error.errorCodeName}: ${error.cause?.message ?: error.message}")
             }
         })
     }
+
+    private var ticks = 0
 
     init {
         load()
@@ -127,6 +143,10 @@ class PlayerViewModel @Inject constructor(
             while (true) {
                 delay(10_000)
                 if (player.isPlaying) saveProgress()
+                if (player.isPlaying && ++ticks % 6 == 0) _uiState.value.let { s ->
+                    Telemetry.track("heartbeat", "title" to s.animeTitle, "kind" to "anime", "episode" to s.episodeNumber, "source" to "anime",
+                        "quality" to s.streamSource?.qualityLabel, "position" to player.currentPosition / 1000, "duration" to player.duration / 1000)
+                }
             }
         }
     }
@@ -220,6 +240,7 @@ class PlayerViewModel @Inject constructor(
             .setMimeType(MimeTypes.APPLICATION_M3U8)
             .setSubtitleConfigurations(subtitles)
             .build()
+        startedAt = System.currentTimeMillis()
         player.setMediaSource(DefaultMediaSourceFactory(http).createMediaSource(item), startMs ?: 0L)
         player.prepare()
         player.playWhenReady = true
