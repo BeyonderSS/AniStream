@@ -26,6 +26,7 @@ android {
 
 // TV screens only; data and playback logic come from the phone feature modules' ViewModels.
 dependencies {
+    testImplementation(libs.junit)
     implementation(project(":domain"))
     implementation(project(":core:common"))
     implementation(project(":core:ui"))
