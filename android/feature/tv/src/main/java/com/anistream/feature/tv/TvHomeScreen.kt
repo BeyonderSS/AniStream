@@ -150,7 +150,9 @@ private fun HomeHero(hero: State<TvItem?>, filter: HomeFilter) {
         val h = hero.value
         Text(
             h?.title ?: when (filter) { HomeFilter.ALL -> "Reelm"; HomeFilter.MEDIA -> "Movies & TV"; HomeFilter.ANIME -> "Anime" },
-            style = TvType.display, maxLines = 2, overflow = TextOverflow.Ellipsis
+            style = TvType.display, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            // keep clear of the right-aligned hero poster (230dp tall at 2:3 ≈ 153dp wide, plus a gap)
+            modifier = Modifier.padding(end = 190.dp)
         )
         Spacer(Modifier.height(12.dp))
         if (h != null) MetaChips(h.meta.distinct(), maxLines = 1)
