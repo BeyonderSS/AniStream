@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Text
+import com.anistream.core.media.GuideEp
 import com.anistream.core.ui.theme.Accent
 import com.anistream.domain.model.Eps
 import com.anistream.domain.model.MediaType
@@ -45,47 +47,6 @@ import com.anistream.feature.movies.DetailEvent
 import com.anistream.feature.movies.MovieDetailViewModel
 import com.anistream.feature.movies.Resume
 import kotlinx.coroutines.delay
-
-/**
- * Backdrop + left column (title, chips, synopsis ≤ 4 lines, actions) + focusable rows below, all in one
- * LazyColumn so D-pad focus scrolls it. Chips and actions wrap (FlowRow) instead of overflowing.
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun DetailLayout(
-    backdrop: String?,
-    portrait: Boolean,
-    title: String,
-    meta: List<String>,
-    synopsis: String?,
-    note: String?,
-    actions: @Composable () -> Unit,
-    rows: androidx.compose.foundation.lazy.LazyListScope.() -> Unit
-) {
-    Box(Modifier.fillMaxSize()) {
-        ProjectorBackdrop(backdrop, portrait = portrait)
-        LazyColumn(contentPadding = PaddingValues(top = 48.dp, bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-            item {
-                Column(Modifier.padding(horizontal = Overscan).fillMaxWidth(0.7f)) {
-                    Text(title, style = TvType.headline, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Spacer(Modifier.height(14.dp))
-                    MetaChips(meta)
-                    if (!synopsis.isNullOrBlank()) {
-                        Spacer(Modifier.height(16.dp))
-                        Text(synopsis, style = TvType.body, maxLines = 4, overflow = TextOverflow.Ellipsis)
-                    }
-                    if (note != null) {
-                        Spacer(Modifier.height(10.dp))
-                        Text(note, style = TvType.body.copy(color = Accent.main))
-                    }
-                    Spacer(Modifier.height(24.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { actions() }
-                }
-            }
-            rows()
-        }
-    }
-}
 
 /** Horizontal row of pills with per-row focus restoration; [initial] is composed on entry so it can take focus. */
 @OptIn(ExperimentalComposeUiApi::class)
@@ -129,7 +90,10 @@ private fun RequestOnce(key: Any, requester: FocusRequester) {
 }
 
 @Composable
-fun TvAnimeDetailScreen(onPlay: (slug: String, episode: Int) -> Unit, onOpen: (slug: String) -> Unit, vm: AnimeDetailViewModel = hiltViewModel()) {
+fun TvAnimeDetailScreen(
+    onPlay: (slug: String, episode: Int) -> Unit, onOpen: (slug: String) -> Unit,
+    vm: AnimeDetailViewModel = hiltViewModel(), guideVm: EpisodeGuideViewModel = hiltViewModel()
+) {
     val s by vm.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.refreshHistory() }
     val a = s.anime
@@ -146,52 +110,42 @@ fun TvAnimeDetailScreen(onPlay: (slug: String, episode: Int) -> Unit, onOpen: (s
     }
     val playFocus = remember { FocusRequester() }
     RequestOnce(a.slug, playFocus)
+    // Kitsu names and stills; empty (fallback to numbered stubs) until/unless they load
+    val guide by produceState(emptyList<GuideEp>(), a.slug, episodes.size) {
+        value = guideVm.guide.anime(a.title, a.titleJapanese, a.year, episodes.size.takeIf { it > 0 } ?: a.episodes ?: 20)
+    }
+    val byNumber = guide.associateBy { it.n }
+    fun progress(n: Int) = h?.eps?.get("e$n")?.p ?: 0f
+    val stubs = episodes.map { e ->
+        val g = byNumber[e.number]
+        val p = progress(e.number)
+        Stub(
+            e.number, (g?.title ?: e.title ?: "Episode ${e.number}") + if (e.filler) " (filler)" else "", g?.still, g?.runtime, g?.overview, p,
+            done = p >= Eps.DONE || e.number < (h?.lastEpisodeWatched ?: 0)
+        )
+    }
 
-    DetailLayout(
-        backdrop = a.bannerUrl ?: a.posterUrl,
-        portrait = a.bannerUrl == null,
-        title = a.title,
-        meta = listOfNotNull(a.type, a.year?.toString(), a.status, scoreLabel(a.score), (a.episodes ?: episodes.size.takeIf { it > 0 })?.let { "$it episodes" }),
-        synopsis = a.synopsis,
-        note = s.episodesError,
+    MarqueeDetail(
+        wash = a.bannerUrl ?: a.posterUrl, poster = a.posterUrl, title = a.title,
+        meta = listOfNotNull(a.type, a.year?.toString(), a.status, scoreLabel(a.score)) + a.genres.take(3).map { it.name },
+        synopsis = a.synopsis, note = s.episodesError,
         actions = {
-            TvPill(
+            MarqueeBtn(
                 text = when {
                     resumeEp == null -> "No episodes"
-                    h != null && h.lastEpisodeWatched > 0 -> "Resume episode $resumeEp"
-                    else -> "Play episode $resumeEp"
+                    h != null && h.lastEpisodeWatched > 0 -> "Resume E$resumeEp"
+                    else -> "Play E$resumeEp"
                 },
-                onClick = { resumeEp?.let { onPlay(vm.slug, it) } },
-                enabled = resumeEp != null,
-                icon = Icons.Filled.PlayArrow, large = true,
+                sub = resumeEp?.let { leftLabel(byNumber[it]?.runtime, progress(it)) },
+                onClick = { resumeEp?.let { onPlay(vm.slug, it) } }, enabled = resumeEp != null, primary = true, icon = Icons.Filled.PlayArrow,
                 modifier = Modifier.focusRequester(playFocus)
             )
-            TvPill(
-                if (s.isFavorite) "In favourites" else "Favourite", vm::toggleFavorite,
-                icon = if (s.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, large = true, selected = s.isFavorite
-            )
-        }
-    ) {
-        if (episodes.isNotEmpty()) item {
-            val watched = h?.lastEpisodeWatched ?: 0
-            PillRow(
-                "Episodes", episodes,
-                label = { e ->
-                    val p = h?.eps?.get("e${e.number}")?.p ?: 0f
-                    (if (e.filler) "${e.number} (filler)" else e.number.toString()) + if (p in 0.02f..<Eps.DONE) " - ${(p * 100).toInt()}%" else ""
-                },
-                selected = { e -> e.number <= watched || (h?.eps?.get("e${e.number}")?.p ?: 0f) >= Eps.DONE },
-                onClick = { e -> onPlay(vm.slug, e.number) },
-                initial = episodes.indexOfFirst { it.number == resumeEp }.coerceAtLeast(0)
-            )
-        }
-        if (a.recommendations.isNotEmpty()) item {
-            val row = TvRow("More like this", a.recommendations.distinctBy { it.slug }.map { r ->
-                TvItem(key = r.slug, title = r.title, imageUrl = r.posterUrl, onClick = { onOpen(r.slug) })
-            })
-            TvCardRow(row, restoreKey = null, restoreRequester = remember { FocusRequester() }, onFocused = {})
-        }
-    }
+            FavouriteBtn(s.isFavorite, vm::toggleFavorite)
+        },
+        seasons = emptyList(), season = 0, onSeason = {},
+        seasonNote = (a.episodes ?: episodes.size).takeIf { it > 0 }?.let { "$it episodes" },
+        stubs = stubs, initial = episodes.indexOfFirst { it.number == resumeEp }.coerceAtLeast(0), onStub = { onPlay(vm.slug, it) }
+    )
 }
 
 @Composable
@@ -199,7 +153,8 @@ fun TvMovieDetailScreen(
     onPlayer: () -> Unit,
     /** (imdbId, season, episode) */
     onWebPlayer: (String, Int, Int) -> Unit,
-    vm: MovieDetailViewModel = hiltViewModel()
+    vm: MovieDetailViewModel = hiltViewModel(),
+    guideVm: EpisodeGuideViewModel = hiltViewModel()
 ) {
     val s by vm.uiState.collectAsStateWithLifecycle()
     var message by remember { mutableStateOf<String?>(null) }
@@ -224,19 +179,32 @@ fun TvMovieDetailScreen(
     val firstSeason = d.seasons.firstOrNull()?.number ?: 1
     val playFocus = remember { FocusRequester() }
     RequestOnce(d.id, playFocus)
+    val season = s.selectedSeason
+    // TMDB stills, names and runtimes for the selected season; empty falls back to numbered stubs
+    val guide by produceState(emptyList<GuideEp>(), d.id, season) {
+        value = if (series) guideVm.guide.season(d.id, d.title, d.year, season) else emptyList()
+    }
+    val byNumber = guide.associateBy { it.n }
+    fun progress(sn: Int, n: Int) = s.eps["s${sn}e$n"]?.p ?: 0f
+    val count = (d.seasons.firstOrNull { it.number == season }?.episodeCount ?: 0).takeIf { it > 0 } ?: guide.size
+    val resumeHere = r?.takeIf { it.season == season }?.episode ?: 0
+    val stubs = if (series) (1..count).map { n ->
+        val g = byNumber[n]
+        val p = progress(season, n)
+        Stub(n, g?.title ?: "Episode $n", g?.still, g?.runtime, g?.overview, p, done = p >= Eps.DONE || n < resumeHere)
+    } else emptyList()
+    val play = { sn: Int, n: Int -> if (d.playable) vm.play(sn, n) else vm.openWebPlayer(Resume(sn, n)) }
 
-    DetailLayout(
-        backdrop = d.backdropUrl ?: d.posterUrl,
-        portrait = d.backdropUrl == null,
-        title = d.title,
+    MarqueeDetail(
+        wash = d.backdropUrl ?: d.posterUrl, poster = d.posterUrl, title = d.title,
         meta = listOfNotNull(if (series) "Series" else "Movie", d.year?.toString(), d.runtime, scoreLabel(d.rating)) + d.genres.take(3),
         synopsis = d.description,
         note = message ?: if (!d.playable) "Not available to stream in the app" else null,
         actions = {
             val web = s.webFallback
             if (!d.playable && web != null) {
-                TvPill("Watch in web player", { vm.openWebPlayer(web) }, large = true, modifier = Modifier.focusRequester(playFocus))
-            } else TvPill(
+                MarqueeBtn("Watch in web player", { vm.openWebPlayer(web) }, primary = true, modifier = Modifier.focusRequester(playFocus))
+            } else MarqueeBtn(
                 text = when {
                     s.resolving -> "Finding sources…"
                     r != null && r.episode > 0 -> "Resume S${r.season} E${r.episode}"
@@ -244,37 +212,17 @@ fun TvMovieDetailScreen(
                     series -> "Play S$firstSeason E1"
                     else -> "Play"
                 },
+                sub = if (r != null && r.season == season) leftLabel(byNumber[r.episode]?.runtime, progress(r.season, r.episode)) else null,
                 onClick = { if (r != null) vm.play(r.season, r.episode) else if (series) vm.play(firstSeason, 1) else vm.play(0, 0) },
-                icon = Icons.Filled.PlayArrow, large = true,
-                modifier = Modifier.focusRequester(playFocus)
+                primary = true, icon = Icons.Filled.PlayArrow, modifier = Modifier.focusRequester(playFocus)
             )
             // streams came back empty for a playable title: offer the web player next to Play
-            if (d.playable && web != null) TvPill("Web player", { vm.openWebPlayer(web) }, large = true)
-            TvPill(
-                if (s.isFavorite) "In favourites" else "Favourite", vm::toggleFavorite,
-                icon = if (s.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, large = true, selected = s.isFavorite
-            )
-        }
-    ) {
-        if (d.audioVariants.size > 1) item {
-            PillRow("Audio", d.audioVariants, { it.label }, { it.isCurrent }, { vm.selectVariant(it.id) })
-        }
-        if (series && d.seasons.isNotEmpty()) {
-            item {
-                PillRow("Seasons", d.seasons, { "Season ${it.number}" }, { it.number == s.selectedSeason }, { vm.selectSeason(it.number) },
-                    initial = d.seasons.indexOfFirst { it.number == s.selectedSeason }.coerceAtLeast(0))
-            }
-            val count = d.seasons.firstOrNull { it.number == s.selectedSeason }?.episodeCount ?: 0
-            if (count > 0) item(key = "eps${s.selectedSeason}") {
-                val resumeHere = r?.takeIf { it.season == s.selectedSeason }?.episode ?: 0
-                PillRow(
-                    "Episodes", (1..count).toList(),
-                    { n -> val p = s.eps["s${s.selectedSeason}e$n"]?.p ?: 0f; "Episode $n" + if (p in 0.02f..<Eps.DONE) " - ${(p * 100).toInt()}%" else "" },
-                    { it < resumeHere || (s.eps["s${s.selectedSeason}e$it"]?.p ?: 0f) >= Eps.DONE },
-                    { if (d.playable) vm.play(s.selectedSeason, it) else vm.openWebPlayer(Resume(s.selectedSeason, it)) },
-                    initial = (resumeHere - 1).coerceAtLeast(0)
-                )
-            }
-        }
-    }
+            if (d.playable && web != null) MarqueeBtn("Web player", { vm.openWebPlayer(web) })
+            FavouriteBtn(s.isFavorite, vm::toggleFavorite)
+            if (d.audioVariants.size > 1) AudioSegments(d.audioVariants) { vm.selectVariant(it.id) }
+        },
+        seasons = if (series) d.seasons.map { it.number } else emptyList(), season = season, onSeason = vm::selectSeason,
+        seasonNote = if (series && count > 0) "Season $season, $count episodes" else null,
+        stubs = stubs, initial = (resumeHere - 1).coerceAtLeast(0), onStub = { play(season, it) }
+    )
 }
