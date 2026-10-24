@@ -59,7 +59,7 @@ class AccountRuntime @Inject constructor(
         scope.launch {
             combine(foreground, account.session.map { it?.activeProfile?.id }.distinctUntilChanged()) { fg, p -> fg && p != null }
                 .distinctUntilChanged()
-                .collectLatest { ok -> if (ok) runCatching { sync.pull() } }
+                .collectLatest { ok -> if (ok) runCatching { sync.pull(); sync.push() } } // push too: rows saved just before the process died
         }
         // push shortly after local writes, and when leaving the app
         scope.launch { ActiveProfile.changes.debounce(5_000).collect { runCatching { sync.push() } } }

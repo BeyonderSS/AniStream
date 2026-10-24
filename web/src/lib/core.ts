@@ -1,3 +1,4 @@
+import { epsKey, frac, mergeEps, type Eps } from "./eps";
 export const API = process.env.NEXT_PUBLIC_REELM_API_URL || "https://reelm-api.ssbeyonder.workers.dev";
 export const WS = API.replace(/^http/, "ws");
 
@@ -73,7 +74,7 @@ export const kids = {
 
 // ---- Local library: history (per profile) + favorites ----
 export type Play = { kind: "anime" | "movie" | "live"; id: string; title: string; poster?: string; ep?: number; epId?: number; season?: number; episode?: number; lang?: string; type?: string; year?: number; url?: string };
-export type Entry = { key: string; payload: Play; position: number; duration: number; updatedAt: number; deleted: boolean };
+export type Entry = { key: string; payload: Play; position: number; duration: number; updatedAt: number; deleted: boolean; /** per-episode progress merged across every row of the title */ eps?: Eps };
 export type CardData = { href: string; title: string; poster?: string; sub?: string; rating?: string; genres?: string[]; kind?: "anime" | "media"; progress?: number; onRemove?: () => void };
 
 /** Same key scheme as Android's HistoryPayload.key: one row per title, `anime:<slug>` / `media:<id>` (the row holds the latest episode). */
@@ -90,7 +91,7 @@ export const epKey = (p: Play) => p.kind === "anime" ? `anime:${p.id}:${p.ep}` :
 const legacy = (k: string) => k.startsWith("movie:") || /^media:(?!(movie|series):)/.test(k) || /^anime:[^:]+:\d+$/.test(k);
 /** `f` resumes at a fraction of the duration (synced entries from the apps store progress as 0..1000 of 1000). */
 export const watchHref = (p: Play, f = 0) => `/watch?p=${encodeURIComponent(JSON.stringify(p))}${f > 0 && f < 0.95 ? `&f=${f.toFixed(4)}` : ""}`;
-export const entryHref = (e: Entry) => watchHref(e.payload, e.duration ? e.position / e.duration : 0);
+export const entryHref = (e: Entry) => watchHref(e.payload, frac(e.position, e.duration));
 export const entrySub = (p: Play) => p.kind === "anime" ? `Episode ${p.ep}` : p.season ? `Season ${p.season}, episode ${p.episode}` : "Movie";
 
 const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
@@ -126,9 +127,9 @@ export const toggleFav = (c: CardData) => { const f = getFavs(), has = f.some((x
 const hKey = (pid: string) => `reelm.hist.${pid}`;
 const rawHist = (pid: string) => ls.get<Record<string, Entry>>(hKey(pid), {});
 /** The payload an entry carries: the web `Play` plus the fields Android's HistoryPayload.decode reads. */
-const wire = (p: Play, position: number, duration: number): Play => ({
+const wire = (p: Play, position: number, duration: number, eps?: Eps): Play => ({
   ...p, slug: p.kind === "anime" ? p.id : playKey(p).slice(6), mediaId: p.id, kind: p.kind === "anime" ? "anime" : "media", episode: p.kind === "anime" ? p.ep : p.episode,
-  progress: duration ? position / duration : 0, subtitle: entrySub(p),
+  progress: frac(position, duration), subtitle: entrySub(p), ...(eps && Object.keys(eps).length ? { eps } : {}),
 } as any);
 /** History with every payload normalized to `Play`. Rows for the same title (kind + id) collapse to the newest, so old per-episode duplicates vanish. */
 export function getHistory(pid: string): Record<string, Entry> {
@@ -138,25 +139,38 @@ export function getHistory(pid: string): Record<string, Entry> {
     if (!payload) continue;
     const k = playKey(payload);
     if (e.deleted && e.key !== k) continue; // a retired per-id key's tombstone must not shadow the canonical row
+    const eps = mergeEps(out[k]?.eps, (e.payload as any)?.eps); // title-level last-write-wins must not drop episodes
     if (!out[k] || out[k].updatedAt < e.updatedAt) out[k] = { ...e, key: k, payload };
+    out[k].eps = eps;
   }
   return out;
 }
-/** Progress (0..1) per history key, for episode grids. */
-export const progressOf = (pid: string) => Object.fromEntries(Object.values(getHistory(pid)).filter((e) => !e.deleted && e.duration).map((e) => [epKey(e.payload), Math.min(1, e.position / e.duration)]));
+/** Progress (0..1) per episode of one title (keys from epsKey: `e3`, `s1e2`), for episode grids. The latest-episode row fills in when `eps` has no entry for it. */
+export function epProgress(pid: string, p: Play): Record<string, number> {
+  const e = getHistory(pid)[playKey(p)];
+  if (!e || e.deleted) return {};
+  const out: Record<string, number> = Object.fromEntries(Object.entries(e.eps ?? {}).map(([k, v]) => [k, v.p]));
+  const k = epsKey(e.payload);
+  if (k && !(k in out) && e.duration) out[k] = frac(e.position, e.duration);
+  return out;
+}
 /** Latest entry per show, unfinished first-class citizens of Continue Watching. */
 export function continueWatching(pid: string): Entry[] {
   const seen = new Set<string>();
   return Object.values(getHistory(pid)).filter((e) => !e.deleted && e.payload.kind !== "live").sort((a, b) => b.updatedAt - a.updatedAt)
     .filter((e) => { const s = `${e.payload.kind}:${e.payload.id}`; return !seen.has(s) && !!seen.add(s); })
-    .filter((e) => !e.duration || e.position / e.duration < 0.95);
+    .filter((e) => !e.duration || frac(e.position, e.duration) < 0.95);
 }
 const push = (pid: string, token: string | undefined, entries: Entry[]) => token && entries.length
   ? Promise.all(Array.from({ length: Math.ceil(entries.length / 100) }, (_, i) => reelm(`/v1/profiles/${pid}/history`, { method: "PUT", token, json: { entries: entries.slice(i * 100, i * 100 + 100) } }))).catch(() => {})
   : Promise.resolve();
 export async function saveProgress(pid: string, token: string | undefined, p: Play, position: number, duration: number) {
   if (p.kind === "live") return;
-  const e: Entry = { key: playKey(p), payload: wire(p, position, duration), position, duration, updatedAt: Date.now(), deleted: false };
+  const key = playKey(p), cur = getHistory(pid)[key], now = Date.now(), f = frac(position, duration), k = epsKey(p);
+  // no real change (paused, or the unmount save right after the 10 s one) must not bump updatedAt: that would beat a newer write from another device
+  if (cur && !cur.deleted && epKey(cur.payload) === epKey(p) && Math.abs(frac(cur.position, cur.duration) - f) * duration < 2) return;
+  const eps = mergeEps(cur?.eps, k && f > 0 ? { [k]: { p: f, at: now } } : undefined);
+  const e: Entry = { key, payload: wire(p, position, duration, eps), position, duration, updatedAt: Math.max(now, (cur?.updatedAt ?? 0) + 1), deleted: false };
   ls.set(hKey(pid), { ...rawHist(pid), [e.key]: e });
   await push(pid, token, [e]);
 }
@@ -180,13 +194,16 @@ export async function removeHistory(pid: string, token: string | undefined, only
 export async function syncHistory(pid: string, token: string) {
   const { entries } = await reelm<{ entries: Entry[] }>(`/v1/profiles/${pid}/history?since=0`, { token });
   const h = rawHist(pid);
-  for (const e of entries) if (!h[e.key] || h[e.key].updatedAt < e.updatedAt) h[e.key] = e;
+  for (const e of entries) {
+    const cur = h[e.key], win = !cur || cur.updatedAt < e.updatedAt ? e : cur, eps = mergeEps((cur?.payload as any)?.eps, (e.payload as any)?.eps);
+    h[e.key] = Object.keys(eps).length ? { ...win, payload: { ...win.payload, eps } as any } : win;
+  }
   const out: Entry[] = [], now = Date.now();
   for (const [k, e] of Object.entries(h)) {
     const p = legacy(k) && !e.deleted && toPlay(e.payload);
     if (!p) continue;
     const c = playKey(p);
-    if (!h[c] || h[c].updatedAt < e.updatedAt) out.push(h[c] = { ...e, key: c, payload: wire(p, e.position, e.duration), updatedAt: now });
+    if (!h[c] || h[c].updatedAt < e.updatedAt) out.push(h[c] = { ...e, key: c, payload: wire(p, e.position, e.duration, (e.payload as any)?.eps), updatedAt: now });
     out.push(h[k] = { ...e, deleted: true, updatedAt: now });
   }
   ls.set(hKey(pid), h);
@@ -206,7 +223,7 @@ export function recSeeds(pid: string) {
   return {
     seeds: live.map((e) => ({
       id: e.payload.id, kind: e.payload.kind === "anime" ? "anime" : "media", title: e.payload.title, type: e.payload.type, year: e.payload.year,
-      weight: (0.3 + 0.7 * Math.min(1, e.duration ? e.position / e.duration : 0)) * 0.5 ** (Math.max(0, now - e.updatedAt) / 864e5 / 30),
+      weight: (0.3 + 0.7 * frac(e.position, e.duration)) * 0.5 ** (Math.max(0, now - e.updatedAt) / 864e5 / 30),
     })).sort((a, b) => b.weight - a.weight).slice(0, 24),
     seen: live.map((e) => e.payload.id), seenTitles: live.map((e) => e.payload.title),
   };

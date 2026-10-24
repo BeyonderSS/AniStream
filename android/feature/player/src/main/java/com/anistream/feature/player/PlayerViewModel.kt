@@ -79,6 +79,7 @@ class PlayerViewModel @Inject constructor(
     @ApplicationContext context: Context,
     private val anidb: AnidbRepository,
     private val history: WatchHistoryRepository,
+    private val sync: com.anistream.core.account.HistorySync,
     private val downloads: DownloadRepository,
     private val skipTimes: SkipTimesRepository
 ) : ViewModel() {
@@ -108,7 +109,7 @@ class PlayerViewModel @Inject constructor(
                 when (playbackState) {
                     Player.STATE_READY -> applyResume()
                     Player.STATE_ENDED -> {
-                        persist(_uiState.value.episodeNumber, 1f)
+                        persist(_uiState.value.episodeNumber, 1f, push = true)
                         _uiState.update { it.copy(ended = true) }
                     }
                 }
@@ -300,22 +301,23 @@ class PlayerViewModel @Inject constructor(
 
     fun onStop() {
         player.pause()
-        saveProgress()
+        saveProgress(push = true)
     }
 
-    private fun saveProgress() {
+    private fun saveProgress(push: Boolean = false) {
         val duration = player.duration
         if (_uiState.value.isLoading || duration == C.TIME_UNSET || duration <= 0) return
-        persist(_uiState.value.episodeNumber, (player.currentPosition.toFloat() / duration).coerceIn(0f, 1f))
+        persist(_uiState.value.episodeNumber, (player.currentPosition.toFloat() / duration).coerceIn(0f, 1f), push)
     }
 
     // outlives viewModelScope so the final save in onCleared still lands
-    private fun persist(episode: Int, fraction: Float) {
-        CoroutineScope(Dispatchers.IO).launch { history.updateProgress(animeSlug, episode, fraction) }
+    // push = leaving/finishing: sync right after the write instead of waiting for the 5 s debounce a dying process never reaches
+    private fun persist(episode: Int, fraction: Float, push: Boolean = false) {
+        CoroutineScope(Dispatchers.IO).launch { history.updateProgress(animeSlug, episode, fraction); if (push) runCatching { sync.push() } }
     }
 
     override fun onCleared() {
-        saveProgress()
+        saveProgress(push = true)
         player.release()
     }
 }

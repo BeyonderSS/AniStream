@@ -31,7 +31,7 @@ import com.anistream.core.database.entity.WatchHistoryEntity
         PlaylistEntity::class,
         RecommendationEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AniStreamDatabase : RoomDatabase() {
@@ -63,6 +63,13 @@ abstract class AniStreamDatabase : RoomDatabase() {
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `recommendations` (`kind` TEXT NOT NULL, `id` TEXT NOT NULL, `title` TEXT NOT NULL, `posterUrl` TEXT, `year` INTEGER, `rating` REAL, `mediaType` TEXT, `because` TEXT, `position` INTEGER NOT NULL, PRIMARY KEY(`kind`, `id`))")
+            }
+        }
+
+        /** v6: per-episode watch progress on history rows. */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE watch_history ADD COLUMN eps TEXT NOT NULL DEFAULT ''")
             }
         }
 

@@ -3,6 +3,8 @@ package com.anistream.core.account
 import android.content.Context
 import com.anistream.core.database.dao.WatchHistoryDao
 import com.anistream.core.database.entity.WatchHistoryEntity
+import com.anistream.domain.model.EpProgress
+import com.anistream.domain.model.Eps
 import com.anistream.domain.model.WatchHistory
 import com.anistream.domain.model.mediaSlug
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -49,7 +51,15 @@ object HistoryPayload {
         put("episode", h.lastEpisodeWatched); put("progress", h.watchProgress.toDouble())
         put("favorite", h.isFavorite); put("anidbSlug", h.anidbSlug)
         put("season", h.season); put("mediaId", h.mediaId); put("subtitle", h.subtitle)
+        if (h.eps.isNotEmpty()) put("eps", buildJsonObject { h.eps.forEach { (k, v) -> put(k, buildJsonObject { put("p", v.p.toDouble()); put("at", v.at) }) } })
     }
+
+    fun decodeEps(p: JsonObject): Map<String, EpProgress> = (p["eps"] as? JsonObject).orEmpty().mapNotNull { (k, v) ->
+        val o = v as? JsonObject ?: return@mapNotNull null
+        val pr = o["p"]?.jsonPrimitive?.doubleOrNull ?: return@mapNotNull null
+        val at = o["at"]?.jsonPrimitive?.longOrNull ?: return@mapNotNull null
+        k to EpProgress(pr.toFloat().coerceIn(0f, 1f), at)
+    }.toMap()
 
     fun decode(p: JsonObject, updatedAt: Long) = WatchHistory(
         animeSlug = str(p, "slug"), animeTitle = str(p, "title"),
@@ -62,18 +72,19 @@ object HistoryPayload {
         anidbSlug = p["anidbSlug"]?.jsonPrimitive?.contentOrNull,
         kind = str(p, "kind").ifEmpty { "anime" },
         season = p["season"]?.jsonPrimitive?.longOrNull?.toInt() ?: 0,
-        mediaId = p["mediaId"]?.jsonPrimitive?.contentOrNull, subtitle = p["subtitle"]?.jsonPrimitive?.contentOrNull
+        mediaId = p["mediaId"]?.jsonPrimitive?.contentOrNull, subtitle = p["subtitle"]?.jsonPrimitive?.contentOrNull,
+        eps = decodeEps(p)
     )
 }
 
 private fun WatchHistoryEntity.toDomain() = WatchHistory(
     animeSlug, animeTitle, malId, posterUrl, totalEpisodes, lastEpisodeWatched, watchProgress,
-    lastWatchedTimestamp, isFavorite, anidbSlug, kind, season, mediaId, subtitle
+    lastWatchedTimestamp, isFavorite, anidbSlug, kind, season, mediaId, subtitle, Eps.parse(eps)
 )
 
 private fun WatchHistory.toEntity(profileId: String, deleted: Boolean = false) = WatchHistoryEntity(
     animeSlug, animeTitle, malId, posterUrl, totalEpisodes, lastEpisodeWatched, watchProgress,
-    lastWatchedTimestamp, isFavorite, anidbSlug, kind, season, mediaId, subtitle, profileId, deleted
+    lastWatchedTimestamp, isFavorite, anidbSlug, kind, season, mediaId, subtitle, profileId, deleted, Eps.format(eps)
 )
 
 /** Pushes changed rows of the active profile and pulls what other devices wrote. Rows are keyed `<kind>:<slug>`; the entity's lastWatchedTimestamp is its updatedAt. */
@@ -103,6 +114,8 @@ class HistorySync @Inject constructor(
         val local = entries.mapNotNull { e -> localRow(profile, e.key)?.let { e.key to it.lastWatchedTimestamp } }.toMap()
         val wins = HistoryMerge.toApply(entries) { local[it] }
         wins.forEach { e -> applyEntry(profile, e) }
+        // title-level LWW must not drop episodes: every remote entry's eps fold into the local row, winner or not
+        (entries - wins.toSet()).forEach { e -> absorbEps(profile, e) }
         collapseMedia(profile)
         res["now"]?.jsonPrimitive?.longOrNull?.let { prefs.edit().putLong("since:$profile", it).apply() }
         if (wins.isNotEmpty()) _pulled.tryEmit(Unit)
@@ -126,7 +139,7 @@ class HistorySync @Inject constructor(
     private suspend fun collapseMedia(profile: String) {
         val now = System.currentTimeMillis()
         dao.liveMedia(profile).map { it.toDomain() }.filter(HistoryPayload::isLegacyMedia).groupBy { mediaSlug(it.lastEpisodeWatched > 0 || it.season > 0, it.animeTitle) }.forEach { (slug, rows) ->
-            val newest = rows.maxBy { it.lastWatchedTimestamp }
+            val newest = rows.maxBy { it.lastWatchedTimestamp }.let { n -> n.copy(eps = rows.fold(emptyMap()) { m, r -> Eps.merge(m, r.eps) }) }
             val cur = dao.getRaw(slug, profile)
             if (cur == null || cur.deleted || cur.lastWatchedTimestamp < newest.lastWatchedTimestamp)
                 dao.upsert(newest.copy(animeSlug = slug, lastWatchedTimestamp = now).toEntity(profile))
@@ -137,6 +150,7 @@ class HistorySync @Inject constructor(
     /** Continue on TV: the phone's row arrives as a payload; store it (newest wins) so the player resumes from it. */
     suspend fun applyPayload(profile: String, payload: JsonObject, progress: Float? = null): WatchHistory {
         val h = HistoryPayload.decode(payload, System.currentTimeMillis()).let { if (progress != null) it.copy(watchProgress = progress) else it }
+            .let { d -> d.copy(eps = Eps.merge(dao.getRaw(d.animeSlug, profile)?.let { Eps.parse(it.eps) }.orEmpty(), d.eps)) }
         dao.upsert(h.toEntity(profile))
         _pulled.tryEmit(Unit)
         return h
@@ -148,13 +162,20 @@ class HistorySync @Inject constructor(
     private suspend fun localRow(profile: String, key: String) = key.substringAfter(':').let { dao.getRaw(it, profile) }
 
     private suspend fun applyEntry(profile: String, e: SyncEntry) {
-        val h = HistoryPayload.decode(e.payload, e.updatedAt)
+        val h = HistoryPayload.decode(e.payload, e.updatedAt).let { d -> d.copy(eps = Eps.merge(localRow(profile, e.key)?.let { Eps.parse(it.eps) }.orEmpty(), d.eps)) }
         dao.upsert(h.toEntity(profile, e.deleted).let { if (it.animeSlug.isEmpty()) it.copy(animeSlug = e.key.substringAfter(':')) else it })
+    }
+
+    private suspend fun absorbEps(profile: String, e: SyncEntry) {
+        val cur = localRow(profile, e.key)?.takeIf { !it.deleted } ?: return
+        val have = Eps.parse(cur.eps)
+        val merged = Eps.merge(have, HistoryPayload.decodeEps(e.payload))
+        if (merged != have) dao.upsert(cur.copy(eps = Eps.format(merged))) // timestamp untouched: the remote already has these
     }
 
     private fun entryJson(h: WatchHistory, deleted: Boolean) = buildJsonObject {
         put("key", HistoryPayload.key(h)); put("payload", HistoryPayload.encode(h))
-        put("position", (h.watchProgress * 1000).toLong()); put("duration", 1000L)
+        put("position", Eps.toPermille(h.watchProgress)); put("duration", 1000L)
         put("updatedAt", h.lastWatchedTimestamp); put("deleted", deleted)
     }
 

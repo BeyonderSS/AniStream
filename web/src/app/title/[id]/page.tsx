@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Play } from "lucide-react";
 import { Chips, FavButton, mediaCard, Notice, pill } from "@/components/app";
 import { Backdrop, DetailSkeleton, EpisodeGrid } from "@/components/detail";
-import { getHistory, playKey, kids, KIDS_BLOCKED, progressOf, watchHref, type Entry, type Play as P } from "@/lib/core";
+import { getHistory, playKey, kids, KIDS_BLOCKED, epProgress, syncHistory, watchHref, type Entry, type Play as P } from "@/lib/core";
 import { useApi, useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -16,10 +16,14 @@ function Title({ id }: { id: string }) {
   const [last, setLast] = useState<Entry | null>(null), [prog, setProg] = useState<Record<string, number>>({});
   useEffect(() => {
     const pid = s.profile?.id ?? "guest";
-    const h = m && getHistory(pid)[playKey({ kind: "movie", id, title: m.title, type: m.type })];
-    setLast(h && !h.deleted ? h : null);
-    setProg(progressOf(pid));
-  }, [s.profile, id, m]);
+    const read = () => {
+      const t: P = { kind: "movie", id, title: m?.title, type: m?.type }, h = m && getHistory(pid)[playKey(t)];
+      setLast(h && !h.deleted ? h : null);
+      setProg(epProgress(pid, t));
+    };
+    read();
+    if (m && s.token) syncHistory(pid, s.token).then(read).catch(() => {}); // pick up what the TV/phone watched since this device last synced
+  }, [s.profile, s.token, id, m]);
   if (error) return <Notice title="This title didn't load" body={error}><Link href="/" className={pill.secondary}>Go home</Link></Notice>;
   if (!m) return <DetailSkeleton />;
   if (s.profile?.kids && !kids.media(m.genres, m.certification)) return <Notice title={KIDS_BLOCKED} body="Switch profile to watch this."><Link href="/profiles" className={pill.secondary}>Switch profile</Link></Notice>;
@@ -65,7 +69,7 @@ function Title({ id }: { id: string }) {
             </nav>
           </div>
           <EpisodeGrid items={[...Array(cur.episodes)].map((_, i) => ({
-            n: i + 1, href: watchHref(play(cur.season, i + 1)), progress: prog[`movie:${id}:${cur.season}:${i + 1}`],
+            n: i + 1, href: watchHref(play(cur.season, i + 1)), progress: prog[`s${cur.season}e${i + 1}`],
             current: last?.payload.season === cur.season && last?.payload.episode === i + 1,
           }))} />
         </section>

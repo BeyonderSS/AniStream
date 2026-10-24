@@ -39,6 +39,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Language
@@ -87,6 +88,7 @@ import com.anistream.core.ui.theme.Ink
 import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.Space
 import com.anistream.core.ui.theme.Motion
+import com.anistream.domain.model.Eps
 import com.anistream.domain.model.MediaDetail
 import com.anistream.domain.model.MediaType
 import kotlinx.coroutines.launch
@@ -203,6 +205,7 @@ fun MovieDetailScreen(
                                     row.forEach { ep ->
                                         EpisodeTile(
                                             number = ep,
+                                            progress = uiState.eps["s${season}e$ep"]?.p ?: 0f,
                                             next = resume != null && resume.season == season && resume.episode == ep,
                                             enabled = true,
                                             // not streamable in-app: each episode opens the web player instead
@@ -357,7 +360,7 @@ private fun Heading(text: String) {
 }
 
 @Composable
-private fun EpisodeTile(number: Int, next: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
+private fun EpisodeTile(number: Int, progress: Float, next: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -368,6 +371,12 @@ private fun EpisodeTile(number: Int, next: Boolean, enabled: Boolean, onClick: (
             .clickable(enabled = enabled, onClick = onClick)
     ) {
         Text("$number", style = AppType.bodyStrong.copy(fontFeatureSettings = "tnum", color = if (next) Accent.text else Ink.body))
+        if (progress >= Eps.DONE) {
+            Icon(Icons.Rounded.Check, contentDescription = "Watched", tint = Ink.faint, modifier = Modifier.align(Alignment.TopEnd).padding(Space.xs).size(12.dp))
+        }
+        if (progress > 0.02f && progress < Eps.DONE) {
+            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(progress).height(3.dp).background(Accent.main))
+        }
     }
 }
 

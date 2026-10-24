@@ -36,7 +36,9 @@ data class MovieDetailUiState(
     val selectedSeason: Int = 1,
     val resolving: Boolean = false,
     /** set when no in-app stream exists: the screen offers "Watch in web player" for this target */
-    val webFallback: Resume? = null
+    val webFallback: Resume? = null,
+    /** per-episode progress of this title ("s1e2" -> p/at) */
+    val eps: Map<String, com.anistream.domain.model.EpProgress> = emptyMap()
 )
 
 sealed interface DetailEvent {
@@ -106,7 +108,7 @@ class MovieDetailViewModel @Inject constructor(
             val h: WatchHistory = all
                 .filter { it.animeSlug == mediaSlug(d.type == MediaType.SERIES, d.title) || it.mediaId == d.id || it.animeSlug == d.id || it.animeSlug.startsWith(d.id + ":s") }
                 .maxByOrNull { it.lastWatchedTimestamp } ?: run {
-                _uiState.update { it.copy(resume = null) }
+                _uiState.update { it.copy(resume = null, eps = emptyMap()) }
                 return@launch
             }
             val m = KeySuffix.find(h.animeSlug)
@@ -122,7 +124,7 @@ class MovieDetailViewModel @Inject constructor(
                     else -> d.seasons.firstOrNull { it.number > season }?.let { Resume(it.number, 1) }
                 }
             }
-            _uiState.update { it.copy(resume = resume, selectedSeason = if (resume != null && resume.season > 0) resume.season else it.selectedSeason) }
+            _uiState.update { it.copy(resume = resume, eps = h.eps, selectedSeason = if (resume != null && resume.season > 0) resume.season else it.selectedSeason) }
         }
     }
 
