@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -81,6 +80,9 @@ internal fun <T> PillRow(
     }
 }
 
+/** "Crime, drama, mystery": one chip for the genres. */
+private fun genreLine(g: List<String>) = g.take(3).joinToString(", ").lowercase().replaceFirstChar { it.uppercase() }.ifEmpty { null }
+
 @Composable
 private fun RequestOnce(key: Any, requester: FocusRequester) {
     LaunchedEffect(key) {
@@ -127,7 +129,7 @@ fun TvAnimeDetailScreen(
 
     MarqueeDetail(
         wash = a.bannerUrl ?: a.posterUrl, poster = a.posterUrl, title = a.title,
-        meta = listOfNotNull(a.type, a.year?.toString(), a.status, scoreLabel(a.score)) + a.genres.take(3).map { it.name },
+        meta = listOfNotNull(a.type, a.year?.toString(), a.status, scoreLabel(a.score), genreLine(a.genres.map { it.name })),
         synopsis = a.synopsis, note = s.episodesError,
         actions = {
             MarqueeBtn(
@@ -137,14 +139,20 @@ fun TvAnimeDetailScreen(
                     else -> "Play E$resumeEp"
                 },
                 sub = resumeEp?.let { leftLabel(byNumber[it]?.runtime, progress(it)) },
-                onClick = { resumeEp?.let { onPlay(vm.slug, it) } }, enabled = resumeEp != null, primary = true, icon = Icons.Filled.PlayArrow,
+                onClick = { resumeEp?.let { onPlay(vm.slug, it) } }, enabled = resumeEp != null, primary = true,
                 modifier = Modifier.focusRequester(playFocus)
             )
             FavouriteBtn(s.isFavorite, vm::toggleFavorite)
         },
         seasons = emptyList(), season = 0, onSeason = {},
         seasonNote = (a.episodes ?: episodes.size).takeIf { it > 0 }?.let { "$it episodes" },
-        stubs = stubs, initial = episodes.indexOfFirst { it.number == resumeEp }.coerceAtLeast(0), onStub = { onPlay(vm.slug, it) }
+        stubs = stubs, initial = episodes.indexOfFirst { it.number == resumeEp }.coerceAtLeast(0), onStub = { onPlay(vm.slug, it) },
+        below = if (a.recommendations.isEmpty()) null else ({
+            val row = TvRow("More like this", a.recommendations.distinctBy { it.slug }.map { r ->
+                TvItem(key = r.slug, title = r.title, imageUrl = r.posterUrl, onClick = { onOpen(r.slug) })
+            })
+            TvCardRow(row, restoreKey = null, restoreRequester = remember { FocusRequester() }, onFocused = {}, modifier = Modifier.padding(bottom = 40.dp))
+        })
     )
 }
 
@@ -197,7 +205,7 @@ fun TvMovieDetailScreen(
 
     MarqueeDetail(
         wash = d.backdropUrl ?: d.posterUrl, poster = d.posterUrl, title = d.title,
-        meta = listOfNotNull(if (series) "Series" else "Movie", d.year?.toString(), d.runtime, scoreLabel(d.rating)) + d.genres.take(3),
+        meta = listOfNotNull(if (series) "Series" else "Movie", d.year?.toString(), d.runtime, scoreLabel(d.rating), genreLine(d.genres)),
         synopsis = d.description,
         note = message ?: if (!d.playable) "Not available to stream in the app" else null,
         actions = {
@@ -214,7 +222,7 @@ fun TvMovieDetailScreen(
                 },
                 sub = if (r != null && r.season == season) leftLabel(byNumber[r.episode]?.runtime, progress(r.season, r.episode)) else null,
                 onClick = { if (r != null) vm.play(r.season, r.episode) else if (series) vm.play(firstSeason, 1) else vm.play(0, 0) },
-                primary = true, icon = Icons.Filled.PlayArrow, modifier = Modifier.focusRequester(playFocus)
+                primary = true, modifier = Modifier.focusRequester(playFocus)
             )
             // streams came back empty for a playable title: offer the web player next to Play
             if (d.playable && web != null) MarqueeBtn("Web player", { vm.openWebPlayer(web) })
