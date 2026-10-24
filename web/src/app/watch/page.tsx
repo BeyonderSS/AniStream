@@ -134,7 +134,7 @@ function Player() {
   const onMeta = (v: HTMLVideoElement) => {
     if (p?.kind === "live") return;
     const hist = p && epKey(getHistory(pid)[playKey(p)]?.payload ?? p) === epKey(p) ? getHistory(pid)[playKey(p)] : undefined;
-    const at = keep.current || t0 || (f0 && v.duration ? f0 * v.duration : 0) || (hist && frac(hist.position, hist.duration) < 0.95 ? frac(hist.position, hist.duration) * v.duration : 0); // entry units differ (apps: permille, web: seconds), the ratio is what is shared
+    const at = keep.current || t0 || (f0 && v.duration ? f0 * v.duration : 0) || (hist && frac(hist.position, hist.duration) < 0.95 ? frac(hist.position, hist.duration) * v.duration : 0); // entries hold seconds (older app rows: permille of 1000); the ratio is what is shared
     if (at > 5) v.currentTime = at;
   };
 

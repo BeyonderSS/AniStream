@@ -50,6 +50,9 @@ sealed interface DetailEvent {
 
 private val KeySuffix = Regex(":s(\\d+)e(\\d+)$")
 
+/** History's catalog-independent media key ([mediaSlug]), not something the catalog can open directly. */
+fun isCanonicalKey(id: String) = id.startsWith("movie:") || id.startsWith("series:")
+
 @HiltViewModel
 class MovieDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -71,6 +74,7 @@ class MovieDetailViewModel @Inject constructor(
     fun load() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
+            if (isCanonicalKey(id)) id = resolveCanonical(id) ?: id
             when (val r = movies.detail(id)) {
                 is Result.Success -> {
                     val d = r.data
@@ -88,6 +92,21 @@ class MovieDetailViewModel @Inject constructor(
                 Result.Loading -> Unit
             }
         }
+    }
+
+    /**
+     * A history key ("series:breakingbad") is not a catalog id. Use the row's stored id, else find the title by name
+     * (same normalized title first, else the first result of the right type) and remember the id on the row.
+     */
+    private suspend fun resolveCanonical(key: String): String? {
+        val row = history.getBySlug(key).getOrNull()
+        row?.mediaId?.let { return it }
+        val series = key.startsWith("series:")
+        val title = row?.animeTitle ?: return null
+        val hits = movies.search(title).getOrNull().orEmpty().filter { (it.type == MediaType.SERIES) == series }
+        val hit = hits.firstOrNull { mediaSlug(series, it.title) == key } ?: hits.firstOrNull() ?: return null
+        history.save(row.copy(mediaId = hit.id))
+        return hit.id
     }
 
     /** Same title in another audio language: reload this screen with the variant's id. */

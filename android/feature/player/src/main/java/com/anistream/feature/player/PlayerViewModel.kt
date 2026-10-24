@@ -328,13 +328,13 @@ class PlayerViewModel @Inject constructor(
     private fun saveProgress(push: Boolean = false) {
         val duration = player.duration
         if (_uiState.value.isLoading || duration == C.TIME_UNSET || duration <= 0) return
-        persist(_uiState.value.episodeNumber, (player.currentPosition.toFloat() / duration).coerceIn(0f, 1f), push)
+        persist(_uiState.value.episodeNumber, (player.currentPosition.toFloat() / duration).coerceIn(0f, 1f), push, duration)
     }
 
     // outlives viewModelScope so the final save in onCleared still lands
     // push = leaving/finishing: sync right after the write instead of waiting for the 5 s debounce a dying process never reaches
-    private fun persist(episode: Int, fraction: Float, push: Boolean = false) {
-        CoroutineScope(Dispatchers.IO).launch { history.updateProgress(animeSlug, episode, fraction); if (push) runCatching { sync.push() } }
+    private fun persist(episode: Int, fraction: Float, push: Boolean = false, durationMs: Long = 0) {
+        CoroutineScope(Dispatchers.IO).launch { history.updateProgress(animeSlug, episode, fraction, durationMs); if (push) runCatching { sync.push() } }
     }
 
     override fun onCleared() {

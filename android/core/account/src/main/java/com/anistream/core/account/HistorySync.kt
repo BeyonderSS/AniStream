@@ -51,6 +51,7 @@ object HistoryPayload {
         put("episode", h.lastEpisodeWatched); put("progress", h.watchProgress.toDouble())
         put("favorite", h.isFavorite); put("anidbSlug", h.anidbSlug)
         put("season", h.season); put("mediaId", h.mediaId); put("subtitle", h.subtitle)
+        if (h.durationMs > 0) put("duration", h.durationMs / 1000) // seconds, as the web writes it
         if (h.eps.isNotEmpty()) put("eps", buildJsonObject { h.eps.forEach { (k, v) -> put(k, buildJsonObject { put("p", v.p.toDouble()); put("at", v.at) }) } })
     }
 
@@ -73,18 +74,19 @@ object HistoryPayload {
         kind = str(p, "kind").ifEmpty { "anime" },
         season = p["season"]?.jsonPrimitive?.longOrNull?.toInt() ?: 0,
         mediaId = p["mediaId"]?.jsonPrimitive?.contentOrNull, subtitle = p["subtitle"]?.jsonPrimitive?.contentOrNull,
-        eps = decodeEps(p)
+        eps = decodeEps(p),
+        durationMs = (p["duration"]?.jsonPrimitive?.longOrNull ?: 0L) * 1000
     )
 }
 
 private fun WatchHistoryEntity.toDomain() = WatchHistory(
     animeSlug, animeTitle, malId, posterUrl, totalEpisodes, lastEpisodeWatched, watchProgress,
-    lastWatchedTimestamp, isFavorite, anidbSlug, kind, season, mediaId, subtitle, Eps.parse(eps)
+    lastWatchedTimestamp, isFavorite, anidbSlug, kind, season, mediaId, subtitle, Eps.parse(eps), durationMs
 )
 
 private fun WatchHistory.toEntity(profileId: String, deleted: Boolean = false) = WatchHistoryEntity(
     animeSlug, animeTitle, malId, posterUrl, totalEpisodes, lastEpisodeWatched, watchProgress,
-    lastWatchedTimestamp, isFavorite, anidbSlug, kind, season, mediaId, subtitle, profileId, deleted, Eps.format(eps)
+    lastWatchedTimestamp, isFavorite, anidbSlug, kind, season, mediaId, subtitle, profileId, deleted, Eps.format(eps), durationMs
 )
 
 /** Pushes changed rows of the active profile and pulls what other devices wrote. Rows are keyed `<kind>:<slug>`; the entity's lastWatchedTimestamp is its updatedAt. */
@@ -139,7 +141,7 @@ class HistorySync @Inject constructor(
     private suspend fun collapseMedia(profile: String) {
         val now = System.currentTimeMillis()
         dao.liveMedia(profile).map { it.toDomain() }.filter(HistoryPayload::isLegacyMedia).groupBy { mediaSlug(it.lastEpisodeWatched > 0 || it.season > 0, it.animeTitle) }.forEach { (slug, rows) ->
-            val newest = rows.maxBy { it.lastWatchedTimestamp }.let { n -> n.copy(eps = rows.fold(emptyMap()) { m, r -> Eps.merge(m, r.eps) }) }
+            val newest = rows.maxBy { it.lastWatchedTimestamp }.let { n -> n.copy(eps = rows.fold(emptyMap()) { m, r -> Eps.merge(m, r.eps) }, mediaId = n.detailId) }
             val cur = dao.getRaw(slug, profile)
             if (cur == null || cur.deleted || cur.lastWatchedTimestamp < newest.lastWatchedTimestamp)
                 dao.upsert(newest.copy(animeSlug = slug, lastWatchedTimestamp = now).toEntity(profile))
@@ -175,7 +177,9 @@ class HistorySync @Inject constructor(
 
     private fun entryJson(h: WatchHistory, deleted: Boolean) = buildJsonObject {
         put("key", HistoryPayload.key(h)); put("payload", HistoryPayload.encode(h))
-        put("position", Eps.toPermille(h.watchProgress)); put("duration", 1000L)
+        // real seconds when the length is known (what the web writes); otherwise permille of 1000. Readers use the ratio.
+        if (h.durationMs > 0) { put("position", (h.watchProgress.coerceIn(0f, 1f) * h.durationMs / 1000).toLong()); put("duration", h.durationMs / 1000) }
+        else { put("position", Eps.toPermille(h.watchProgress)); put("duration", 1000L) }
         put("updatedAt", h.lastWatchedTimestamp); put("deleted", deleted)
     }
 

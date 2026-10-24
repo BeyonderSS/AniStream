@@ -268,7 +268,7 @@ class MediaPlayerViewModel @Inject constructor(
         history.save(historyRow(request, pendingResume ?: 0f))
     }
 
-    private fun historyRow(r: PlaybackRequest, fraction: Float) = WatchHistory(
+    private fun historyRow(r: PlaybackRequest, fraction: Float, durationMs: Long = 0) = WatchHistory(
         animeSlug = r.historyKey ?: "",
         animeTitle = r.title,
         posterUrl = r.posterUrl,
@@ -278,7 +278,8 @@ class MediaPlayerViewModel @Inject constructor(
         kind = "media",
         season = r.season,
         mediaId = r.mediaId,
-        subtitle = r.subtitle
+        subtitle = r.subtitle,
+        durationMs = durationMs
     )
 
     private fun applyResume() {
@@ -362,15 +363,15 @@ class MediaPlayerViewModel @Inject constructor(
     private fun saveProgress(push: Boolean = false) {
         val duration = player.duration
         if (_uiState.value.isLoading || duration == C.TIME_UNSET || duration <= 0) return
-        persist((player.currentPosition.toFloat() / duration).coerceIn(0f, 1f), push)
+        persist((player.currentPosition.toFloat() / duration).coerceIn(0f, 1f), push, duration)
     }
 
     // outlives viewModelScope so the final save in onCleared still lands
     // push = leaving/finishing: sync right after the write instead of waiting for the 5 s debounce a dying process never reaches
-    private fun persist(fraction: Float, push: Boolean = false) {
+    private fun persist(fraction: Float, push: Boolean = false, durationMs: Long = 0) {
         val r = _uiState.value.request ?: return
         if (r.isLive || r.historyKey == null) return
-        CoroutineScope(Dispatchers.IO).launch { history.save(historyRow(r, fraction)); if (push) runCatching { sync.push() } }
+        CoroutineScope(Dispatchers.IO).launch { history.save(historyRow(r, fraction, durationMs)); if (push) runCatching { sync.push() } }
     }
 
     override fun onCleared() {

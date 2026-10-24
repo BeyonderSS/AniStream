@@ -90,7 +90,6 @@ import com.anistream.domain.model.forYouRows
 import kotlinx.coroutines.delay
 
 private const val HERO_COUNT = 8
-private val EpisodeSuffix = Regex(":s\\d+e\\d+$")
 
 private enum class Mode { Loading, Error, Empty, Content }
 
@@ -172,7 +171,7 @@ fun MoviesHomeScreen(
                                     horizontalArrangement = Arrangement.spacedBy(Space.md)
                                 ) {
                                     items(uiState.continueWatching, key = { it.animeSlug }) { h ->
-                                        ResumeCard(h, onRemove = { viewModel.removeHistory(h.animeSlug) }, onClick = { onItemClick(h.mediaId ?: h.animeSlug.replace(EpisodeSuffix, "")) })
+                                        ResumeCard(h, onRemove = { viewModel.removeHistory(h.animeSlug) }, onClick = { onItemClick(h.detailId) })
                                     }
                                 }
                             }

@@ -105,7 +105,6 @@ import com.anistream.domain.model.forYouRows
 private const val HERO_COUNT = 8
 private const val HERO_INTERVAL_MS = 7_000
 private val TOP_BAR_HEIGHT = 56.dp
-private val EpisodeSuffix = Regex(":s\\d+e\\d+$")
 
 private enum class HomeMode { Loading, Error, Empty, Content }
 
@@ -262,7 +261,7 @@ fun HomeScreen(
                                     ) {
                                         items(uiState.continueWatching, key = { it.animeSlug }) { h ->
                                             ResumeCard(h, onRemove = { viewModel.removeHistory(h.animeSlug) }) {
-                                                if (h.kind == "media") onMediaClick(h.mediaId ?: h.animeSlug.replace(EpisodeSuffix, ""))
+                                                if (h.kind == "media") onMediaClick(h.detailId)
                                                 else onPlayEpisode(h.animeSlug, h.resumeEpisode())
                                             }
                                         }

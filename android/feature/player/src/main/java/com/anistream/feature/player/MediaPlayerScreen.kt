@@ -225,7 +225,7 @@ fun MediaPlayerScreen(
                 if (!ui.isLive) WatchTogetherSection(mediaPayload(request))
                 ui.request?.takeIf { !it.isLive && it.historyKey != null }?.let { r ->
                     com.anistream.core.account.ui.ContinueOnTvSection(
-                        history = { com.anistream.domain.model.WatchHistory(r.historyKey ?: "", r.title, posterUrl = r.posterUrl, totalEpisodes = r.seasonEpisodeCount, lastEpisodeWatched = r.episode, watchProgress = viewModel.player.progressFraction(), kind = "media", season = r.season, mediaId = r.mediaId, subtitle = r.subtitle) },
+                        history = { com.anistream.domain.model.WatchHistory(r.historyKey ?: "", r.title, posterUrl = r.posterUrl, totalEpisodes = r.seasonEpisodeCount, lastEpisodeWatched = r.episode, watchProgress = viewModel.player.progressFraction(), kind = "media", season = r.season, mediaId = r.mediaId, subtitle = r.subtitle, durationMs = viewModel.player.duration.coerceAtLeast(0)) },
                         positionMs = { viewModel.player.currentPosition },
                         onSent = { showSettings = false }
                     )

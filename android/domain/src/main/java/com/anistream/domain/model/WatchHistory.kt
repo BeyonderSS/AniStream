@@ -26,9 +26,18 @@ data class WatchHistory(
     /** e.g. "S1 · E2" */
     val subtitle: String? = null,
     /** per-episode progress ([Eps.key] -> p/at); the row itself stays "latest episode" */
-    val eps: Map<String, EpProgress> = emptyMap()
+    val eps: Map<String, EpProgress> = emptyMap(),
+    /** length of [lastEpisodeWatched] (or the movie) in ms; 0 = unknown, show percent instead of minutes left */
+    val durationMs: Long = 0
 ) {
     val nextEpisode: Int get() = lastEpisodeWatched + 1
+    /** Whole minutes left in the current episode, null when the length is unknown. */
+    val minutesLeft: Int? get() = if (durationMs > 0) Math.ceil((1 - watchProgress.coerceIn(0f, 1f)) * durationMs / 60_000.0).toInt() else null
+    /**
+     * Id that opens this row's detail page: anime slug, or the media row's catalog id ([mediaId], else a legacy
+     * catalog-id key minus its ":sXeY"). A canonical "series:…" key with no id left is resolved by MovieDetailViewModel.
+     */
+    val detailId: String get() = if (kind == "media") mediaId ?: animeSlug.replace(Regex(":s\\d+e\\d+$"), "") else animeSlug
     val isComplete: Boolean get() = totalEpisodes > 0 && lastEpisodeWatched >= totalEpisodes
 }
 

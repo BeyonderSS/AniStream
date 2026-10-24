@@ -89,7 +89,7 @@ const mediaSlug = (p: Play) => normTitle(p.title ?? "") && `${p.type === "series
 export const epKey = (p: Play) => p.kind === "anime" ? `anime:${p.id}:${p.ep}` : `movie:${p.id}:${p.season ?? 0}:${p.episode ?? 0}`;
 /** Keys the web wrote before it matched Android (per-episode); they showed up as duplicates and are retired on sync. */
 const legacy = (k: string) => k.startsWith("movie:") || /^media:(?!(movie|series):)/.test(k) || /^anime:[^:]+:\d+$/.test(k);
-/** `f` resumes at a fraction of the duration (synced entries from the apps store progress as 0..1000 of 1000). */
+/** `f` resumes at a fraction of the duration (entries hold seconds; older app rows hold permille of 1000, so only the ratio is shared). */
 export const watchHref = (p: Play, f = 0) => `/watch?p=${encodeURIComponent(JSON.stringify(p))}${f > 0 && f < 0.95 ? `&f=${f.toFixed(4)}` : ""}`;
 export const entryHref = (e: Entry) => watchHref(e.payload, frac(e.position, e.duration));
 export const entrySub = (p: Play) => p.kind === "anime" ? `Episode ${p.ep}` : p.season ? `Season ${p.season}, episode ${p.episode}` : "Movie";
@@ -126,10 +126,10 @@ export const toggleFav = (c: CardData) => { const f = getFavs(), has = f.some((x
 
 const hKey = (pid: string) => `reelm.hist.${pid}`;
 const rawHist = (pid: string) => ls.get<Record<string, Entry>>(hKey(pid), {});
-/** The payload an entry carries: the web `Play` plus the fields Android's HistoryPayload.decode reads. */
-const wire = (p: Play, position: number, duration: number, eps?: Eps): Play => ({
+/** The payload an entry carries: the web `Play` plus the fields Android's HistoryPayload.decode reads (`secs` = real length, for "N min left"). */
+const wire = (p: Play, position: number, duration: number, eps?: Eps, secs?: number): Play => ({
   ...p, slug: p.kind === "anime" ? p.id : playKey(p).slice(6), mediaId: p.id, kind: p.kind === "anime" ? "anime" : "media", episode: p.kind === "anime" ? p.ep : p.episode,
-  progress: frac(position, duration), subtitle: entrySub(p), ...(eps && Object.keys(eps).length ? { eps } : {}),
+  progress: frac(position, duration), subtitle: entrySub(p), ...(secs ? { duration: Math.round(secs) } : {}), ...(eps && Object.keys(eps).length ? { eps } : {}),
 } as any);
 /** History with every payload normalized to `Play`. Rows for the same title (kind + id) collapse to the newest, so old per-episode duplicates vanish. */
 export function getHistory(pid: string): Record<string, Entry> {
@@ -170,7 +170,7 @@ export async function saveProgress(pid: string, token: string | undefined, p: Pl
   // no real change (paused, or the unmount save right after the 10 s one) must not bump updatedAt: that would beat a newer write from another device
   if (cur && !cur.deleted && epKey(cur.payload) === epKey(p) && Math.abs(frac(cur.position, cur.duration) - f) * duration < 2) return;
   const eps = mergeEps(cur?.eps, k && f > 0 ? { [k]: { p: f, at: now } } : undefined);
-  const e: Entry = { key, payload: wire(p, position, duration, eps), position, duration, updatedAt: Math.max(now, (cur?.updatedAt ?? 0) + 1), deleted: false };
+  const e: Entry = { key, payload: wire(p, position, duration, eps, duration), position, duration, updatedAt: Math.max(now, (cur?.updatedAt ?? 0) + 1), deleted: false };
   ls.set(hKey(pid), { ...rawHist(pid), [e.key]: e });
   await push(pid, token, [e]);
 }
@@ -203,7 +203,7 @@ export async function syncHistory(pid: string, token: string) {
     const p = legacy(k) && !e.deleted && toPlay(e.payload);
     if (!p) continue;
     const c = playKey(p);
-    if (!h[c] || h[c].updatedAt < e.updatedAt) out.push(h[c] = { ...e, key: c, payload: wire(p, e.position, e.duration, (e.payload as any)?.eps), updatedAt: now });
+    if (!h[c] || h[c].updatedAt < e.updatedAt) out.push(h[c] = { ...e, key: c, payload: wire(p, e.position, e.duration, (e.payload as any)?.eps, (e.payload as any)?.duration), updatedAt: now });
     out.push(h[k] = { ...e, deleted: true, updatedAt: now });
   }
   ls.set(hKey(pid), h);

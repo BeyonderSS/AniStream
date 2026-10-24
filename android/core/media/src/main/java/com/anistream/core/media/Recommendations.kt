@@ -266,7 +266,7 @@ class RecommendationsRepositoryImpl @Inject constructor(
                 } else h.watchProgress.toDouble()
                 val media = h.kind == "media"
                 SeedRef(
-                    id = if (media) h.mediaId ?: h.animeSlug.substringBefore(":s") else h.animeSlug,
+                    id = h.detailId,
                     kind = if (media) "media" else "anime",
                     title = h.animeTitle,
                     weight = Ranking.seedWeight(completion, ageDays(h.lastWatchedTimestamp), h.animeSlug in favSlugs || h.mediaId in favSlugs)

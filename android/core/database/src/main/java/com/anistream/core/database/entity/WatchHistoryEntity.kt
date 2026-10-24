@@ -26,5 +26,7 @@ data class WatchHistoryEntity(
     @ColumnInfo(defaultValue = "''") val profileId: String = "",
     @ColumnInfo(defaultValue = "0") val deleted: Boolean = false,
     /** per-episode progress, `Eps.format` text */
-    @ColumnInfo(defaultValue = "''") val eps: String = ""
+    @ColumnInfo(defaultValue = "''") val eps: String = "",
+    /** length of [lastEpisodeWatched] (or the movie), 0 = unknown */
+    @ColumnInfo(defaultValue = "0") val durationMs: Long = 0
 )

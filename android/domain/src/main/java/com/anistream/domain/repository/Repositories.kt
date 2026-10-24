@@ -39,7 +39,7 @@ interface WatchHistoryRepository {
     suspend fun getContinueWatching(kind: String? = null): Result<List<WatchHistory>>
     suspend fun getBySlug(slug: String): Result<WatchHistory?>
     suspend fun save(history: WatchHistory): Result<Unit>
-    suspend fun updateProgress(slug: String, episode: Int, progress: Float): Result<Unit>
+    suspend fun updateProgress(slug: String, episode: Int, progress: Float, durationMs: Long = 0): Result<Unit>
     suspend fun delete(slug: String): Result<Unit>
     suspend fun clear(): Result<Unit>
 }
