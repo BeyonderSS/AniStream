@@ -62,3 +62,19 @@ describe("admin", () => {
     expect((await call(`/v1/admin/users/${u.id}`, { token: boss.token })).status).toBe(404);
   });
 });
+
+it("admin can create users and admins; non-admins can't", async () => {
+  const { SELF, env } = await import("cloudflare:test");
+  const reg = async (u: string) => (await (await SELF.fetch("https://x/v1/auth/register", { method: "POST", body: JSON.stringify({ username: u, password: "password123" }) })).json() as any);
+  const boss = await reg("boss_create"), pleb = await reg("pleb_create");
+  await env.DB.prepare("UPDATE users SET is_admin = 1 WHERE id = ?").bind(boss.user.id).run();
+  const create = (tok: string, b: object) => SELF.fetch("https://x/v1/admin/users", { method: "POST", headers: { Authorization: `Bearer ${tok}` }, body: JSON.stringify(b) });
+  expect((await create(pleb.token, { username: "nope_user", password: "password123" })).status).toBe(403);
+  const r = await create(boss.token, { username: "new_admin", password: "password123", admin: true });
+  expect(r.status).toBe(201);
+  expect(((await r.json()) as any).user.is_admin).toBe(true);
+  expect((await create(boss.token, { username: "new_admin", password: "password123" })).status).toBe(409);
+  const login = await SELF.fetch("https://x/v1/auth/login", { method: "POST", body: JSON.stringify({ username: "new_admin", password: "password123" }) });
+  const me = await (await SELF.fetch("https://x/v1/me", { headers: { Authorization: `Bearer ${((await login.json()) as any).token}` } })).json() as any;
+  expect(me.user.is_admin).toBeTruthy();
+});

@@ -8,7 +8,7 @@ import { Area, Bar, CartesianGrid, ComposedChart, Line, LineChart, XAxis, YAxis 
 import { toast } from "sonner";
 import {
   Activity, AlertTriangle, ArrowLeft, Clapperboard, Flame, KeyRound, LayoutDashboard, LogOut, Radio, RefreshCw, ScrollText, Search,
-  Server, ShieldCheck, ShieldOff, Smartphone, Trash2, Tv, UserCheck, UserX, Users, Monitor,
+  Server, ShieldCheck, ShieldOff, Smartphone, Trash2, Tv, UserCheck, UserPlus, UserX, Users, Monitor,
 } from "lucide-react";
 import { Avatar, Notice } from "@/components/app";
 import { ReelMark } from "@/components/reel";
@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { adminAct, adminGet, useAdmin } from "@/lib/admin";
+import { adminAct, adminCreate, adminGet, useAdmin } from "@/lib/admin";
 import { useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -627,6 +627,45 @@ function UserSheet({ id, onClose, onChanged }: { id: string | null; onClose: () 
   );
 }
 
+/** New account form; the same username/password rules as sign-up are enforced by the server. */
+function CreateUser({ onDone }: { onDone: () => void }) {
+  const { s } = useSession();
+  const [open, setOpen] = useState(false), [busy, setBusy] = useState(false);
+  const [f, setF] = useState({ username: "", password: "", admin: false });
+  const field = "beam h-11 w-full rounded-xl bg-white/6 px-4 text-sm outline-none placeholder:text-foreground/40";
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault(); setBusy(true);
+    try {
+      const { user } = await adminCreate(s.token, { ...f, username: f.username.trim().toLowerCase() });
+      toast.success(`${user.is_admin ? "Admin" : "User"} @${user.username} created`);
+      setOpen(false); setF({ username: "", password: "", admin: false }); onDone();
+    } catch (err: any) { toast.error(err.message ?? "Couldn't create the account"); } finally { setBusy(false); }
+  };
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="beam flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground [&_svg]:size-4"><UserPlus />New user</button>
+      <Dialog open={open} onOpenChange={(o) => !busy && setOpen(o)}>
+        <DialogContent className="rounded-[24px] border-white/8 bg-haze">
+          <DialogHeader><DialogTitle className="font-display text-xl">Create an account</DialogTitle>
+            <DialogDescription>Share the username and password with the person. They can change their profiles after signing in.</DialogDescription></DialogHeader>
+          <form onSubmit={submit} className="space-y-3">
+            <input required autoFocus value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} placeholder="Username (a-z, 0-9, _)" aria-label="Username" pattern="[A-Za-z0-9_]{3,32}" className={field} />
+            <input required type="text" minLength={8} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} placeholder="Password (8+ characters)" aria-label="Password" className={field} />
+            <label className="flex cursor-pointer items-center gap-3 rounded-xl bg-white/4 px-4 py-3 text-sm">
+              <input type="checkbox" checked={f.admin} onChange={(e) => setF({ ...f, admin: e.target.checked })} className="size-4 accent-[#F2B45A]" />
+              <span><span className="font-medium">Make this account an admin</span><span className="block text-xs text-foreground/52">Admins see this dashboard and can manage every account.</span></span>
+            </label>
+            <DialogFooter>
+              <button type="button" onClick={() => setOpen(false)} disabled={busy} className="beam h-10 rounded-full px-5 text-sm hover:bg-white/8">Cancel</button>
+              <button type="submit" disabled={busy} className="beam h-10 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-60">{busy ? "Creating" : f.admin ? "Create admin" : "Create user"}</button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function UsersPage() {
   const [q, setQ] = useState(""), [term, setTerm] = useState(""), [page, setPage] = useState(0), [open, setOpen] = useState<string | null>(null);
   useEffect(() => { const t = setTimeout(() => { setTerm(q.trim()); setPage(0); }, 250); return () => clearTimeout(t); }, [q]);
@@ -640,6 +679,7 @@ function UsersPage() {
               <label className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-foreground/44" />
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search usernames" aria-label="Search usernames" className="beam h-10 w-full rounded-full bg-white/6 pr-4 pl-10 text-sm outline-none placeholder:text-foreground/40" /></label>
               <span className="text-xs text-foreground/48">{d.total} {d.total === 1 ? "account" : "accounts"}</span>
+              <CreateUser onDone={reload} />
             </div>
             <Table>
               <TableHeader><TableRow className="border-white/6 hover:bg-transparent"><TableHead className="pl-5">Account</TableHead><TableHead className="hidden sm:table-cell">Profiles</TableHead><TableHead className="hidden md:table-cell">Sessions</TableHead><TableHead className="hidden md:table-cell">Joined</TableHead><TableHead className="pr-5 text-right">Last seen</TableHead></TableRow></TableHeader>

@@ -70,6 +70,7 @@ Hello on connect: `{type:"hello", deviceId, deviceName, kind:"phone"|"tv"}` → 
 - `GET /v1/admin/app` → `{crashes, versions, updates, helpers}`
 - `GET /v1/admin/security` → `{failed, newDevices (first seen ≤7 d), sessions, kids}`
 - `GET /v1/admin/ops` → `{connected, cloudflare (GraphQL Analytics, cached 5 min; needs secret CF_ANALYTICS_TOKEN + var CF_ACCOUNT_ID), deploys (GitHub runs/releases, cached 10 min), limits}`
+- `POST /v1/admin/users` `{username, password, admin?:boolean}` → `201 {user:{id, username, is_admin}}` (same rules as register; `409` if taken)
 - `GET /v1/admin/users?q=&limit=&offset=` → `{users, total}`
 - `GET /v1/admin/users/:id` → `{user, profiles, devices, history (latest 50), events (latest 50), sessions:[{id, created_at, last_used_at, device, ua}]}`
 - `GET /v1/admin/events?kind=&user=<id or username>&before=<id>&limit=` → `{events, next}` (cursor = `next` as `before`)

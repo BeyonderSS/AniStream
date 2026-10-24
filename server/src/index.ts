@@ -80,6 +80,15 @@ async function auth(c: Ctx): Promise<User> {
   }
   return u;
 }
+/** POST /v1/admin/users {username, password, admin?}: an admin creates an account, optionally another admin. */
+async function adminCreateUser(c: Ctx) {
+  const me = await admin(c);
+  const { username, password, admin: makeAdmin } = await body(c.req);
+  const u = await createUser(c, username, password, makeAdmin === true);
+  await logEvent(c.env, c.req, makeAdmin === true ? "admin_create_admin" : "admin_create_user", me.id, { target: u.id, username: u.username });
+  return json({ user: { ...u, is_admin: makeAdmin === true } }, 201);
+}
+
 async function admin(c: Ctx) {
   const u = await auth(c);
   return u.is_admin ? u : fail(403, "admin only");
@@ -109,17 +118,23 @@ const str = (v: unknown, max: number, what: string) =>
   typeof v === "string" && v.trim() && v.length <= max ? v.trim() : fail(400, `invalid ${what}`);
 
 // ---- handlers -----------------------------------------------------------
-async function register(c: Ctx) {
-  const { username, password } = await body(c.req);
+/** Shared by sign-up and admin "create user": validates, inserts the user and their first profile. */
+async function createUser(c: Ctx, username: unknown, password: unknown, isAdmin = false) {
   if (typeof username !== "string" || !/^[a-z0-9_]{3,32}$/.test(username)) fail(400, "username must be 3-32 chars of a-z, 0-9, _");
   if (typeof password !== "string" || password.length < 8) fail(400, "password must be at least 8 characters");
   const id = uuid(), t = now();
   try {
-    await c.env.DB.prepare("INSERT INTO users (id, username, pass, created_at) VALUES (?,?,?,?)")
-      .bind(id, username, await hashPassword(password), t).run();
+    await c.env.DB.prepare("INSERT INTO users (id, username, pass, created_at, is_admin) VALUES (?,?,?,?,?)")
+      .bind(id, username, await hashPassword(password as string), t, isAdmin ? 1 : 0).run();
   } catch { fail(409, "username taken"); }
   await c.env.DB.prepare("INSERT INTO profiles (id, user_id, name, avatar, kids, created_at) VALUES (?,?,?,?,0,?)")
     .bind(uuid(), id, username, "grinning_face", t).run();
+  return { id, username: username as string };
+}
+
+async function register(c: Ctx) {
+  const { username, password } = await body(c.req);
+  const { id } = await createUser(c, username, password);
   await logEvent(c.env, c.req, "register", id);
   return json({ token: await newSession(c.env, id, c.req), user: { id, username } }, 201);
 }
@@ -647,6 +662,7 @@ const routes: [string, RegExp, (c: Ctx) => Response | Promise<Response>][] = [
   ["GET", /^\/v1\/admin\/users$/, adminUsers],
   ["GET", /^\/v1\/admin\/users\/([^/]+)$/, adminUser],
   ["DELETE", /^\/v1\/admin\/users\/([^/]+)$/, adminDeleteUser],
+  ["POST", /^\/v1\/admin\/users$/, adminCreateUser],
   ["POST", /^\/v1\/admin\/users\/([^/]+)\/([a-z_]+)$/, adminAction],
   ["GET", /^\/v1\/admin\/events$/, adminEvents],
   ["GET", /^\/v1\/admin\/history$/, adminHistory],

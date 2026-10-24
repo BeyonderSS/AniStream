@@ -36,6 +36,9 @@ export function useAdmin<T = any>(path: string | null, every?: number) {
 }
 
 /** POST/DELETE an admin action. */
+/** POST /v1/admin/users: create an account, optionally an admin. */
+export const adminCreate = (token: string | undefined, json: { username: string; password: string; admin: boolean }) =>
+  reelm<{ user: { id: string; username: string; is_admin: boolean } }>("/v1/admin/users", { method: "POST", token, json });
 export function adminAct<T = any>(token: string | undefined, path: string, method = "POST"): Promise<T> {
   if (process.env.NODE_ENV !== "production" && fixtureMode()) return Promise.resolve({ ok: true, password: "k7mq2xp9rh4t" } as T);
   return reelm<T>(`/v1/admin/${path}`, { method, token, json: method === "POST" ? {} : undefined });
