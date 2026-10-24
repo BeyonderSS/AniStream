@@ -9,6 +9,7 @@ import "@videojs/react/video/skin.css";
 import { ArrowLeft, Check, Copy, MonitorPlay, RotateCcw, SkipForward, Users, X, Menu as MenuIcon } from "lucide-react";
 import { Avatar, pill } from "@/components/app";
 import { ReelMark } from "@/components/reel";
+import { track } from "@/lib/telemetry";
 import { deviceId, get, getHistory, epKey, playKey, proxied, reelm, saveProgress, toPlay, WS, type Play as P } from "@/lib/core";
 import { helperOld } from "@/lib/bridge";
 import { useApi, useSession } from "@/lib/session";
@@ -104,7 +105,27 @@ function Player() {
   // Dolby/DTS audio Chrome can't decode: libav.js decodes it in a worker and plays it in sync with the video
   const audioNote = useLibavAudio(video, src && !src.hls ? src.src : undefined, !!src?.dolby, `${si}${pkey}${nonce}`);
   // MovieBox often ships HEVC only; browsers without HEVC decode (most Chrome/Firefox on Linux) can't play it
+  // admin telemetry: what played, from where, how fast, and what failed
+  const info = () => {
+    let host = "";
+    try { const u = new URL(src.src, location.href); host = new URL(u.searchParams.get("u") ?? u.href).host; } catch {}
+    return { title: p?.title, key: p ? epKey(p) : undefined, kind: p?.kind, episode: p?.ep ?? p?.episode, source: p?.kind === "movie" ? src?.label.split(/[\s·(]/)[0] : p?.kind,
+      quality: src?.label, codec: src?.dolby ? `${src.codec ?? ""} dolby`.trim() : src?.codec, host };
+  };
+  const startedAt = useRef(0);
+  useEffect(() => { startedAt.current = src ? Date.now() : 0; }, [src]);
+  const onPlaying = () => {
+    if (!startedAt.current) return;
+    track("play", info());
+    track("source_used", { ...info(), ttff: Date.now() - startedAt.current });
+    startedAt.current = 0;
+  };
+  useEffect(() => {
+    const i = setInterval(() => { const v = video.current; if (src && v && !v.paused) track("heartbeat", { ...info(), position: Math.round(v.currentTime), duration: Math.round(v.duration || 0) }); }, 60_000);
+    return () => clearInterval(i);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
   const fail = (m: string) => {
+    if (src) track("play_error", { ...info(), error: m });
     const hevc = /hevc|h265/i.test(src?.codec ?? "") && !document.createElement("video").canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"');
     if (si + 1 < sources.length) setSi(si + 1); else setErr(hevc ? "hevc" : m);
   };
@@ -207,6 +228,7 @@ function Player() {
     ref: video, autoPlay: true, playsInline: true, referrerPolicy: "no-referrer", className: "size-full",
     onLoadedMetadata: (e: React.SyntheticEvent<HTMLVideoElement>) => onMeta(e.currentTarget),
     onError: () => fail("The video failed to load."),
+    onPlaying,
     onPlay: () => { if (!applying.current) sendRoom({ type: "play", position: pos() }); },
     onPause: () => { save(); if (!applying.current) sendRoom({ type: "pause", position: pos() }); },
     onSeeked: () => !applying.current && sendRoom({ type: "seek", position: pos() }),

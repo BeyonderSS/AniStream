@@ -3,7 +3,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { X, Search, Tv, Library, CalendarDays, Home, Play, Check, Plus, ChevronLeft, ChevronRight, Star, Users, Popcorn, LogOut } from "lucide-react";
+import { X, Search, Tv, Library, CalendarDays, Home, Play, Check, Plus, ChevronLeft, ChevronRight, Star, Users, Popcorn, LogOut, ShieldCheck } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { ReelMark } from "@/components/reel";
 import { avatarUrl, continueWatching, EMOJI_GROUPS, entryHref, entrySub, getFavs, kids, recSeeds, removeHistory, toggleFav, type CardData } from "@/lib/core";
@@ -26,7 +27,15 @@ export const Avatar = ({ id, size = 36, ring }: { id: string; size?: number; rin
 );
 
 const LINKS = [["/", "Home", Home], ["/search", "Search", Search], ["/live", "Live TV", Tv], ["/schedule", "Schedule", CalendarDays], ["/library", "Library", Library]] as const;
-const BARE = ["/welcome", "/signin", "/signup", "/profiles", "/watch", "/pair"];
+const BARE = ["/welcome", "/signin", "/signup", "/profiles", "/watch", "/pair", "/admin"];
+/** Admin mode: a per-browser switch, offered to admins only (the API enforces admin on every admin route). */
+export function useAdminMode() {
+  const { s } = useSession();
+  const [on, setOn] = useState(false);
+  useEffect(() => { try { setOn(localStorage.getItem("reelm.admin") === "1"); } catch {} }, []);
+  const set = (v: boolean) => { setOn(v); try { localStorage.setItem("reelm.admin", v ? "1" : "0"); } catch {} };
+  return [!!s.user?.is_admin && on, set, !!s.user?.is_admin] as const;
+}
 const useChrome = () => { const path = usePathname(), { s } = useSession(); return { path, s, show: !!s.profile && !BARE.some((p) => path.startsWith(p)) }; };
 const active = (path: string, h: string) => (h === "/" ? path === "/" : path.startsWith(h));
 
@@ -35,6 +44,7 @@ export function Nav() {
   const { set } = useSession(), router = useRouter();
   const [solid, setSolid] = useState(false), [q, setQ] = useState(""), [open, setOpen] = useState(false), [menu, setMenu] = useState(false), [code, setCode] = useState("");
   const input = useRef<HTMLInputElement>(null), menuRef = useRef<HTMLDivElement>(null);
+  const [adminOn, setAdminOn, isAdmin] = useAdminMode();
   useEffect(() => { const on = () => setSolid(scrollY > 24); on(); addEventListener("scroll", on, { passive: true }); return () => removeEventListener("scroll", on); }, []);
   useEffect(() => {
     if (!menu) return;
@@ -51,6 +61,7 @@ export function Nav() {
       <div className={cn("mx-auto flex h-14 max-w-[1500px] items-center gap-2 rounded-full pr-2 pl-4 transition-[background-color,box-shadow,backdrop-filter] duration-300 ease-dusk md:gap-4",
         solid ? "bg-slate/80 shadow-[0_12px_40px_rgb(10_12_18/0.55)] ring-1 ring-white/8 backdrop-blur-2xl backdrop-saturate-150" : "bg-transparent")}>
         <Link href="/" className="beam flex shrink-0 items-center gap-2 rounded-full pr-2 font-display text-2xl font-bold tracking-tight"><ReelMark className="size-7" />Reelm</Link>
+        {adminOn && <Link href="/admin" title="Admin mode is on" className="beam -ml-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary-foreground shadow-[0_0_18px_rgb(242_180_90/0.45)]">ADMIN</Link>}
         <nav aria-label="Main" className="hidden flex-1 items-center gap-0.5 md:flex">
           {LINKS.filter(([h]) => h !== "/search").map(([h, label]) => {
             const on = active(path, h);
@@ -61,6 +72,7 @@ export function Nav() {
               </Link>
             );
           })}
+          {adminOn && <Link href="/admin" className="beam rounded-full px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10">Admin</Link>}
         </nav>
         <div className="flex-1 md:hidden" />
         <form role="search" onSubmit={search} className={cn("relative hidden h-10 items-center rounded-full transition-[width,background-color] duration-300 ease-dusk md:flex", open ? "w-72 bg-white/10" : "w-10")}>
@@ -84,6 +96,11 @@ export function Nav() {
                 <div className="flex gap-1.5"><input id="join-room" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Room code" autoCapitalize="characters" className="beam h-9 min-w-0 flex-1 rounded-full bg-white/8 px-3 text-sm uppercase outline-none placeholder:normal-case placeholder:text-foreground/40" />
                   <button disabled={!code.trim()} className="beam h-9 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-40">Join</button></div>
               </form>
+              {isAdmin && <>
+                <div className="my-1 h-px bg-white/8" />
+                <label className={cn(item, "cursor-pointer")}><ShieldCheck className="size-4 text-foreground/60" /><span className="flex-1">Admin mode</span><Switch checked={adminOn} onCheckedChange={setAdminOn} /></label>
+                {adminOn && <Link role="menuitem" href="/admin" className={cn(item, "text-primary")}><ShieldCheck className="size-4" />Open admin</Link>}
+              </>}
               <div className="my-1 h-px bg-white/8" />
               <button role="menuitem" onClick={() => { set({}); router.replace("/welcome"); }} className={item}><LogOut className="size-4 text-foreground/60" />{s.token ? "Sign out" : "Leave guest mode"}</button>
             </div>

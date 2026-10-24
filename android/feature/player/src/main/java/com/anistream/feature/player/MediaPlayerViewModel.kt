@@ -3,6 +3,7 @@ package com.anistream.feature.player
 import com.anistream.core.common.LowEnd
 import android.content.Context
 import android.net.Uri
+import com.anistream.core.account.Telemetry
 import androidx.annotation.OptIn
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -117,6 +118,19 @@ class MediaPlayerViewModel @Inject constructor(
     private var pendingResume: Float? = null
     /** stream index that already auto-switched away after an error, so a failure chain only walks forward */
     private var fellBackFrom = -1
+    /** when the current stream was handed to the player; 0 once it rendered (time to first frame) */
+    private var startedAt = 0L
+    private var ticks = 0
+
+    /** Admin telemetry with what's playing; codec matters for the HEVC / Dolby failure counts. */
+    private fun track(kind: String, vararg extra: Pair<String, Any?>) {
+        val s = _uiState.value
+        val r = s.request ?: return
+        val stream = r.streams.getOrNull(s.streamIndex)
+        Telemetry.track(kind, "title" to r.title, "key" to r.historyKey, "kind" to if (r.isLive) "live" else if (r.season > 0) "series" else "movie",
+            "episode" to r.episode.takeIf { it > 0 }, "source" to stream?.sourceName, "quality" to stream?.qualityLabel, "codec" to stream?.codec,
+            "host" to stream?.url?.let { Uri.parse(it).host }, *extra)
+    }
 
     val player: ExoPlayer = buildPlayer(context).apply {
         addListener(object : Player.Listener {
@@ -124,6 +138,11 @@ class MediaPlayerViewModel @Inject constructor(
                 when (playbackState) {
                     Player.STATE_READY -> {
                         _uiState.update { it.copy(isLoading = false) }
+                        if (startedAt > 0) {
+                            track("play")
+                            track("source_used", "ttff" to System.currentTimeMillis() - startedAt)
+                            startedAt = 0
+                        }
                         applyResume()
                     }
                     Player.STATE_ENDED -> if (!_uiState.value.isLive) {
@@ -154,6 +173,7 @@ class MediaPlayerViewModel @Inject constructor(
                 while (true) {
                     delay(10_000)
                     if (player.isPlaying) saveProgress()
+                    if (player.isPlaying && ++ticks % 6 == 0) track("heartbeat", "position" to player.currentPosition / 1000, "duration" to player.duration / 1000)
                 }
             }
         }
@@ -183,6 +203,7 @@ class MediaPlayerViewModel @Inject constructor(
             .build()
         val source = DefaultMediaSourceFactory(http).createMediaSource(item)
         // live: no position = start at the live edge
+        startedAt = System.currentTimeMillis()
         if (request.isLive || startMs == null) player.setMediaSource(source) else player.setMediaSource(source, startMs)
         _uiState.update { it.copy(streamIndex = index, isLoading = true, error = null, ended = false) }
         applySubtitle(stream, subtitleIndex)
@@ -191,6 +212,7 @@ class MediaPlayerViewModel @Inject constructor(
     }
 
     private fun handleError(error: PlaybackException) {
+        track("play_error", "error" to "${error.errorCodeName}: ${error.cause?.message ?: error.message}")
         val s = _uiState.value
         val request = s.request ?: return
         if (s.isLive && error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {

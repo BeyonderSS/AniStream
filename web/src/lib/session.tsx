@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { get, loadSession, storeSession, type Session } from "./core";
+import { get, loadSession, reelm, storeSession, type Session } from "./core";
 
 type Ctx = { s: Session; ready: boolean; set: (s: Session) => void };
 const C = createContext<Ctx>({ s: {}, ready: false, set: () => {} });
@@ -14,6 +14,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const path = usePathname(), router = useRouter();
   useEffect(() => { setS(loadSession()); setReady(true); }, []);
   const set = (n: Session) => { storeSession(n); setS(n); };
+  // admin flag lives server-side: refresh it once per sign-in so the admin switch shows (or disappears) without a re-login
+  useEffect(() => {
+    if (!s.token || !s.user) return;
+    reelm("/v1/me", { token: s.token }).then((r) => {
+      const cur = loadSession();
+      if (cur.token === s.token && !!cur.user?.is_admin !== !!r.user?.is_admin) set({ ...cur, user: { ...cur.user!, is_admin: !!r.user.is_admin } });
+    }).catch(() => {});
+  }, [s.token]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!ready || PUBLIC.some((p) => path.startsWith(p))) return;
     if (!s.token && !s.guest) router.replace("/welcome");

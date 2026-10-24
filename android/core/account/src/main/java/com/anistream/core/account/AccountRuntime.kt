@@ -27,7 +27,8 @@ import javax.inject.Singleton
 class AccountRuntime @Inject constructor(
     private val account: AccountRepository,
     private val hub: HubClient,
-    private val sync: HistorySync
+    private val sync: HistorySync,
+    private val api: AccountApi
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val foreground = MutableStateFlow(false)
@@ -37,6 +38,13 @@ class AccountRuntime @Inject constructor(
     fun start(app: Application, kind: String) {
         if (!account.enabled || started) return
         started = true
+        Telemetry.installCrashHandler(app)
+        val version = runCatching { app.packageManager.getPackageInfo(app.packageName, 0).versionName }.getOrNull() ?: "?"
+        val flush: suspend () -> Unit = {
+            account.session.value?.let { s -> Telemetry.flush(api, s.token, s.activeProfile?.id, kind, version) }
+        }
+        scope.launch { while (true) { kotlinx.coroutines.delay(60_000); runCatching { flush() } } }
+        scope.launch { foreground.collect { fg -> if (!fg) runCatching { flush() } } }
 
         var activities = 0
         app.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
