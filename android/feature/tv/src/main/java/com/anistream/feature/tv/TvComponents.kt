@@ -135,6 +135,10 @@ data class TvItem(
     val meta: List<String> = emptyList(),
     val progress: Float? = null,
     val subtitle: String? = null,
+    /** Home hero: "Resume episode N" for history rows, null elsewhere; [onDetails] opens the detail page. */
+    val resumeLabel: String? = null,
+    val onDetails: (() -> Unit)? = null,
+    val episodeLine: String? = null,
     val onLongClick: (() -> Unit)? = null,
     val onClick: () -> Unit
 )

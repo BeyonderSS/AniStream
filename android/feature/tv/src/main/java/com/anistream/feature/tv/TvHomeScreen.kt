@@ -16,6 +16,32 @@ import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.anistream.core.ui.theme.Bg
+import com.anistream.core.ui.theme.DisplayHeavy
+import com.anistream.core.ui.theme.Ink
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
@@ -129,9 +155,10 @@ fun TvHomeScreen(filter: HomeFilter, homeVm: HomeViewModel, moviesVm: MoviesHome
                         itemsIndexed(rows, key = { _, it -> it.title }) { i, row ->
                             // rows keep the default horizontal scrolling
                             CompositionLocalProvider(LocalBringIntoViewSpec provides rowSpec) {
-                                TvCardRow(row, restoreKey, restore, onFocused = {
+                                val onF: (TvItem) -> Unit = {
                                     focused.value = it; lastFocused = it.key; focusedRow.intValue = i
-                                })
+                                }
+                            if (row.wide) TvStripRow(row, restoreKey, restore, onF) else TvCardRow(row, restoreKey, restore, onF)
                             }
                         }
                     }
@@ -141,21 +168,49 @@ fun TvHomeScreen(filter: HomeFilter, homeVm: HomeViewModel, moviesVm: MoviesHome
     }
 }
 
+/** Radial glow behind the hero, tinted with the focused poster's colour (static dusk violet on low-end). */
 @Composable
-private fun HomeBackdrop(hero: State<TvItem?>) = ProjectorBackdrop(hero.value?.imageUrl, portrait = true) // list models carry posters only
+private fun HomeBackdrop(hero: State<TvItem?>) {
+    val lowEnd = LocalLowEnd.current
+    val c = if (lowEnd) null else rememberPosterColor(hero.value?.imageUrl).value
+    val glow = lerp(Bg.base, c ?: DuskViolet, 0.5f)
+    Box(Modifier.fillMaxSize().drawBehind {
+        drawRect(Brush.radialGradient(listOf(glow, Bg.base), center = Offset(size.width * 0.75f, size.height * 0.25f), radius = size.width * 0.7f))
+    })
+}
 
+/** Marquee hero: huge title (solid lead, outlined remainder), tilted whole poster, chips and actions. */
 @Composable
 private fun HomeHero(hero: State<TvItem?>, filter: HomeFilter) {
-    Column(Modifier.fillMaxWidth().padding(start = Overscan, end = Overscan, top = 36.dp).height(176.dp)) {
-        val h = hero.value
-        Text(
-            h?.title ?: when (filter) { HomeFilter.ALL -> "Reelm"; HomeFilter.MEDIA -> "Movies & TV"; HomeFilter.ANIME -> "Anime" },
-            style = TvType.display, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            // keep clear of the right-aligned hero poster (230dp tall at 2:3 ≈ 153dp wide, plus a gap)
-            modifier = Modifier.padding(end = 190.dp)
+    val s = uiScale()
+    fun d(n: Float) = (n * s).dp
+    val h = hero.value
+    Box(Modifier.fillMaxWidth().height(d(250f))) {
+        if (h?.imageUrl != null) AsyncImage(
+            h.imageUrl, null, contentScale = ContentScale.Fit,
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = d(30f), end = Overscan + d(16f)).width(d(134f)).aspectRatio(2f / 3f)
+                .graphicsLayer { rotationZ = -3f }.background(Bg.raised, RoundedCornerShape(d(8f))).clip(RoundedCornerShape(d(8f)))
         )
-        Spacer(Modifier.height(12.dp))
-        if (h != null) MetaChips(h.meta.distinct(), maxLines = 1)
+        Column(Modifier.padding(start = Overscan, end = d(240f), top = d(28f))) {
+            val title = h?.title ?: when (filter) { HomeFilter.ALL -> "Reelm"; HomeFilter.MEDIA -> "Movies & TV"; HomeFilter.ANIME -> "Anime" }
+            val cut = listOf(":", " - ").map { title.indexOf(it) }.filter { it > 0 }.minOrNull() ?: title.length
+            val big = title.length <= 30
+            Text(
+                buildAnnotatedString {
+                    withStyle(SpanStyle(color = Ink.high)) { append(title.substring(0, cut)) }
+                    withStyle(SpanStyle(color = Color.White.copy(alpha = 0.5f), drawStyle = Stroke(2.5f))) { append(title.substring(cut)) }
+                },
+                maxLines = if (big) 2 else 3, overflow = TextOverflow.Ellipsis,
+                style = TvType.display.copy(fontFamily = DisplayHeavy, fontWeight = FontWeight.ExtraBold, fontSize = if (big) (52*s).sp else (38*s).sp, lineHeight = if (big) (54*s).sp else (40*s).sp),
+            )
+        }
+        if (h != null) Column(Modifier.align(Alignment.BottomStart).padding(start = Overscan, bottom = d(6f)), verticalArrangement = Arrangement.spacedBy(d(8f))) {
+            MetaChips(h.meta.distinct(), maxLines = 1)
+            Row(horizontalArrangement = Arrangement.spacedBy(d(14f)), verticalAlignment = Alignment.CenterVertically) {
+                TvPill(h.resumeLabel ?: "Play", h.onClick, icon = Icons.Filled.PlayArrow)
+                h.onDetails?.let { TvPill("Details", it) }
+            }
+        }
     }
 }
 
@@ -187,6 +242,14 @@ private fun buildRows(
     fun historyItem(h: WatchHistory) = TvItem(
         key = "cw|${h.animeSlug}", title = h.animeTitle, imageUrl = h.posterUrl,
         subtitle = h.subtitle ?: h.lastEpisodeWatched.takeIf { it > 0 }?.let { "Episode $it" },
+        resumeLabel = h.lastEpisodeWatched.takeIf { it > 0 }?.let { "Resume episode ${if (h.watchProgress >= 0.9f && !h.isComplete) h.nextEpisode else it}" } ?: "Resume",
+        onDetails = { nav.navigate(TvRoutes.detail(if (h.kind == "media") h.mediaId ?: h.animeSlug.substringBefore(":s") else h.animeSlug)) },
+        episodeLine = when {
+            h.kind == "media" && h.lastEpisodeWatched == 0 -> "Movie"
+            h.kind == "media" -> "Season ${h.season.coerceAtLeast(1)}, episode ${h.lastEpisodeWatched}"
+            h.totalEpisodes > 0 -> "Episode ${h.lastEpisodeWatched} of ${h.totalEpisodes}"
+            else -> "Episode ${h.lastEpisodeWatched}"
+        },
         meta = listOfNotNull(if (h.kind == "media") "Movies & TV" else "Anime", h.subtitle),
         progress = h.watchProgress,
         onLongClick = { onRemove(h) },

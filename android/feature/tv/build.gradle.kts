@@ -31,6 +31,7 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(project(":core:account"))
     implementation(project(":core:database"))
+    implementation(project(":core:media"))
     implementation(project(":feature:home"))
     implementation(project(":feature:movies"))
     implementation(project(":feature:anime-detail"))
@@ -61,4 +62,5 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
     implementation(libs.coil.compose)
+    implementation(libs.palette)
 }

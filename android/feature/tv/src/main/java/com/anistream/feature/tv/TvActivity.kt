@@ -6,6 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.wrapContentWidth
@@ -223,6 +225,9 @@ private fun TvApp() {
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().focusRequester(contentReq).focusGroup()) { host() }
         // left-edge fade under the open rail, so content it overlaps (hero titles) recedes instead of clashing; a flat
         // gradient, cheap on the Fire Stick's GPU
+        // hidden-state hint: a thin amber edge at mid-height says "press Left"
+        if (showRail && !railOpen) Box(Modifier.align(androidx.compose.ui.Alignment.CenterStart).width(4.dp).height(96.dp)
+            .background(Accent.main.copy(alpha = 0.55f), androidx.compose.foundation.shape.RoundedCornerShape(topEnd = 2.dp, bottomEnd = 2.dp)))
         androidx.compose.animation.AnimatedVisibility(showRail && railOpen, enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(ms)),
             exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(ms))) {
             androidx.compose.foundation.layout.Box(Modifier.fillMaxHeight().width(420.dp).background(

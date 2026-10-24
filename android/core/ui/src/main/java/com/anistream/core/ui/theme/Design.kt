@@ -116,6 +116,8 @@ private fun figtree(weight: Int) = Font(
 )
 
 val Display = FontFamily(bricolage(600), bricolage(700))
+/** Marquee titles (TV hero, ticket stubs). */
+val DisplayHeavy = FontFamily(bricolage(800))
 val TextFamily = FontFamily(figtree(400), figtree(500), figtree(600))
 
 /** Phone scale 30 / 22 / 16 / 13. Sentence/title case; never uppercased, never tracked. */
