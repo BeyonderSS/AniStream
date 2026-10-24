@@ -321,12 +321,16 @@ private fun Subtitles(player: Player, tweaks: PlayerTweaks, modifier: Modifier) 
             handler.removeCallbacksAndMessages(null)
         }
     }
+    val isTv = remember { ctx.packageManager.run { hasSystemFeature(PackageManager.FEATURE_LEANBACK) || hasSystemFeature("amazon.hardware.fire_tv") } }
     val scale = tweaks.subScale
     val bg = tweaks.subBackground
     AndroidView(
         factory = { view },
         update = {
             it.setFractionalTextSize(SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * scale)
+            // TVs overscan (crop the edges), which cut the bottom line of captions on the Fire TV; lift them on TV only.
+            // ponytail: fixed 12% on TV, the default 8% elsewhere; a user "caption position" setting can replace this
+            it.setBottomPaddingFraction(if (isTv) 0.12f else SubtitleView.DEFAULT_BOTTOM_PADDING_FRACTION)
             it.setStyle(
                 CaptionStyleCompat(
                     AColor.WHITE,
