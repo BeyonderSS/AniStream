@@ -239,7 +239,52 @@ html[data-splash="off"] #splash { display: none; }
 .range::-webkit-slider-runnable-track { background: transparent; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
-video::cue { background: rgb(21 23 31 / 0.72); color: #e9eaf0; font-family: var(--font-figtree), sans-serif; font-size: 1.05em; line-height: 1.35; }
+video::cue { background: rgb(21 23 31 / 0.72); color: #e9eaf0; font-family: var(--font-figtree), sans-serif; font-size: var(--cue-size, 1.05em); line-height: 1.35; }
 
 /* Reelm owns the error card (Retry/Back, source failover); hide the skin's own dialog */
 .reelm-skin .media-dialog-backdrop, .reelm-skin .media-dialog-popup { display: none !important; }
+
+/* ---- Marquee cinema: giant type with an outline tail, ticket stubs on a 35mm strip, bulbs under the current section ---- */
+:root { --ink: #eceaf2; --mute: #a3a1ae; --bulb: #ffd58a; }
+.giant { margin: 0; font-family: var(--font-bricolage), var(--font-figtree), sans-serif; font-weight: 800; line-height: 0.88; letter-spacing: -0.015em; color: var(--ink); text-wrap: balance; overflow-wrap: anywhere; }
+.hollow { color: transparent; -webkit-text-stroke: max(1px, 0.016em) rgb(236 234 242 / 0.55); }
+.bulbs { height: 5px; background: radial-gradient(circle 2px, var(--bulb) 60%, transparent 70%) 0 0 / 9px 5px repeat-x; filter: drop-shadow(0 0 4px rgb(255 213 138 / 0.9)); }
+.seg { display: inline-flex; max-width: 100%; overflow-x: auto; scrollbar-width: none; gap: 3px; padding: 3px; border-radius: 999px; background: rgb(255 255 255 / 0.07); }
+.seg > * { flex: none; padding: 6px 14px; border-radius: 999px; font-size: 14px; color: #cfcbd9; white-space: nowrap; transition: background-color 200ms, color 200ms; }
+.seg > *:hover { color: var(--ink); }
+.seg > [aria-checked="true"], .seg > [aria-selected="true"], .seg > [aria-pressed="true"], .seg > [aria-current="page"] { background: rgb(242 180 90 / 0.22); color: #f2b45a; font-weight: 600; }
+/* small option pills (filters, settings) */
+.opt { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px; background: rgb(255 255 255 / 0.07); font-size: 14px; color: #dad6e4; transition: background-color 200ms, color 200ms; }
+.opt:hover { background: rgb(255 255 255 / 0.12); }
+.opt[aria-checked="true"], .opt[aria-pressed="true"] { background: rgb(242 180 90 / 0.22); color: #f2b45a; font-weight: 600; }
+.opt.solid[aria-checked="true"], .opt.solid[aria-pressed="true"] { background: #f2b45a; color: #1a1408; }
+
+/* the film: a dark band with sprocket holes; tilted on wide screens, flat (and still scrollable) on phones */
+.strip { position: relative; background: #08080b; box-shadow: 0 -12px 36px rgb(0 0 0 / 0.5); }
+.strip::before, .strip::after { content: ""; position: absolute; inset-inline: 0; height: 12px; z-index: 1; pointer-events: none;
+  background: repeating-linear-gradient(90deg, transparent 0 11px, #2a2a30 11px 25px, transparent 25px 36px); }
+.strip::before { top: 8px; } .strip::after { bottom: 8px; }
+.strip > ol { position: relative; display: flex; gap: 16px; align-items: center; overflow-x: auto; padding: 34px 16px; scrollbar-width: none; }
+.strip > ol::-webkit-scrollbar { display: none; }
+@media (min-width: 768px) { .strip { transform: rotate(-1.2deg); margin-inline: -2vw; } .strip > ol { padding: 36px calc(2vw + 40px); min-height: 252px; } }
+
+/* ticket stub: the whole poster (2:3 = a third of a 2:1 ticket), notches at the perforation, details on the stub */
+.ticket { --w: 280px; position: relative; display: flex; flex: none; width: var(--w); height: calc(var(--w) * 0.5); border-radius: 12px; overflow: hidden; background: #14151c;
+  transition: width 220ms var(--ease-dusk), height 220ms var(--ease-dusk);
+  -webkit-mask: radial-gradient(circle 9px at calc(var(--w) / 3) 0, #0000 98%, #000) top / 100% 51% no-repeat, radial-gradient(circle 9px at calc(var(--w) / 3) 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
+          mask: radial-gradient(circle 9px at calc(var(--w) / 3) 0, #0000 98%, #000) top / 100% 51% no-repeat, radial-gradient(circle 9px at calc(var(--w) / 3) 100%, #0000 98%, #000) bottom / 100% 51% no-repeat; }
+.epstub { --w: 240px; position: relative; display: flex; flex-direction: column; flex: none; width: var(--w); border-radius: 12px; overflow: hidden;
+  background: linear-gradient(160deg, #262330, #101016); transition: width 220ms var(--ease-dusk); }
+@media (min-width: 768px) {
+  .ticket { --w: 300px; } .strip .ticket:is(:hover, :focus-within) { --w: 360px; }
+  .epstub { --w: 260px; } .epstub:is(:hover, :focus-within) { --w: 310px; }
+}
+.ticket::after, .epstub::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 5; transition: box-shadow 200ms var(--ease-dusk); }
+.epstub[data-current]::after { box-shadow: inset 0 0 0 2px rgb(242 180 90 / 0.55); }
+.ticket:is(:hover, :focus-within)::after, .epstub:is(:hover, :focus-within)::after { box-shadow: inset 0 0 0 3px #f2b45a; }
+textarea.giant:focus-visible { outline: none; }
+/* each stub takes its light from its own poster: the art, blurred to a wash */
+.ticket .tint { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(1.8); filter: blur(26px) saturate(1.5); opacity: 0.5; }
+.ticket .shade { position: absolute; inset: 0; background: linear-gradient(135deg, rgb(20 21 28 / 0.15), rgb(16 17 24 / 0.75)); }
+.track-bar { height: 4px; border-radius: 99px; background: rgb(236 234 242 / 0.16); overflow: hidden; }
+.track-bar > i { display: block; height: 100%; border-radius: 99px; background: #f2b45a; }

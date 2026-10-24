@@ -3,11 +3,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { X, Search, Tv, Library, CalendarDays, Home, Play, Check, Plus, ChevronLeft, ChevronRight, Star, Users, Popcorn, LogOut, ShieldCheck } from "lucide-react";
+import { X, Search, Tv, Library, CalendarDays, Home, Play, Heart, ChevronLeft, ChevronRight, Star, Users, Popcorn, LogOut, ShieldCheck } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { ReelMark } from "@/components/reel";
-import { avatarUrl, continueWatching, EMOJI_GROUPS, entryHref, entrySub, getFavs, kids, recSeeds, removeHistory, toggleFav, type CardData } from "@/lib/core";
+import { frac } from "@/lib/eps";
+import { avatarUrl, continueWatching, EMOJI_GROUPS, entryHref, entrySub, getFavs, kids, recSeeds, removeHistory, toggleFav, type CardData, type Entry } from "@/lib/core";
 import { useApi, useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -57,22 +58,23 @@ export function Nav() {
   const search = (e: React.FormEvent) => { e.preventDefault(); if (q.trim()) router.push(`/search?q=${encodeURIComponent(q.trim())}`); setOpen(false); setQ(""); };
   const item = "beam flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-white/8";
   return (
-    <header className="sticky top-0 z-40 h-16 px-3 pt-3 md:h-20 md:px-6">
-      <div className={cn("mx-auto flex h-14 max-w-[1500px] items-center gap-2 rounded-full pr-2 pl-4 transition-[background-color,box-shadow,backdrop-filter] duration-300 ease-dusk md:gap-4",
-        solid ? "bg-slate/80 shadow-[0_12px_40px_rgb(10_12_18/0.55)] ring-1 ring-white/8 backdrop-blur-2xl backdrop-saturate-150" : "bg-transparent")}>
-        <Link href="/" className="beam flex shrink-0 items-center gap-2 rounded-full pr-2 font-display text-2xl font-bold tracking-tight"><ReelMark className="size-7" />Reelm</Link>
-        {adminOn && <Link href="/admin" title="Admin mode is on" className="beam -ml-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary-foreground shadow-[0_0_18px_rgb(242_180_90/0.45)]">ADMIN</Link>}
-        <nav aria-label="Main" className="hidden flex-1 items-center gap-0.5 md:flex">
+    <header className="sticky top-0 z-40 h-16 md:h-20">
+      {/* the marquee front: dark at the top, fading into the art; solid once you scroll */}
+      <div aria-hidden className={cn("absolute inset-0 transition-[background-color,backdrop-filter] duration-300 ease-dusk", solid ? "bg-[#0a0a0f]/85 backdrop-blur-xl" : "bg-gradient-to-b from-[#0a0a0f]/90 to-transparent")} />
+      <div className="relative mx-auto flex h-full max-w-[1500px] items-center gap-2 px-4 md:gap-8 md:px-10">
+        <Link href="/" className="beam flex shrink-0 items-center gap-2 rounded-full pr-2 font-display text-2xl font-extrabold tracking-tight text-primary"><ReelMark className="size-7" />Reelm</Link>
+        {adminOn && <Link href="/admin" title="Admin mode is on" className="beam -ml-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary-foreground shadow-[0_0_18px_rgb(242_180_90/0.45)] md:-ml-6">ADMIN</Link>}
+        <nav aria-label="Main" className="hidden flex-1 items-center gap-7 md:flex">
           {LINKS.filter(([h]) => h !== "/search").map(([h, label]) => {
             const on = active(path, h);
             return (
-              <Link key={h} href={h} aria-current={on ? "page" : undefined} className={cn("beam relative rounded-full px-4 py-2 text-sm font-medium transition-colors", on ? "text-primary-foreground" : "text-foreground/64 hover:text-foreground")}>
-                {on && <motion.span layoutId="nav-lamp" transition={{ type: "spring", stiffness: 420, damping: 34 }} className="absolute inset-0 -z-10 rounded-full bg-primary shadow-[0_0_24px_rgb(242_180_90/0.45)]" />}
+              <Link key={h} href={h} aria-current={on ? "page" : undefined} className={cn("beam relative rounded-md py-1 font-display text-[17px] font-semibold transition-colors", on ? "text-foreground" : "text-[#bdb9c9] hover:text-foreground")}>
                 {label}
+                {on && <motion.span layoutId="nav-bulbs" transition={{ type: "spring", stiffness: 420, damping: 34 }} className="bulbs absolute inset-x-0 -bottom-2" />}
               </Link>
             );
           })}
-          {adminOn && <Link href="/admin" className="beam rounded-full px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10">Admin</Link>}
+          {adminOn && <Link href="/admin" className="beam rounded-md py-1 font-display text-[17px] font-semibold text-primary">Admin</Link>}
         </nav>
         <div className="flex-1 md:hidden" />
         <form role="search" onSubmit={search} className={cn("relative hidden h-10 items-center rounded-full transition-[width,background-color] duration-300 ease-dusk md:flex", open ? "w-72 bg-white/10" : "w-10")}>
@@ -152,7 +154,7 @@ export function PosterCard({ c, wide, fill }: { c: CardData; wide?: boolean; fil
   return (
     <div className={cn("group/rm relative shrink-0 snap-start", fill ? "w-full" : wide ? "w-64 sm:w-72" : "w-32 sm:w-40 lg:w-44")}>
     <Link href={c.href} className="group block w-full rounded-xl outline-none">
-      <div className={cn("beam relative overflow-hidden rounded-xl bg-slate shadow-[0_8px_24px_rgb(10_12_18/0.5)] group-focus-visible:shadow-[0_0_0_2px_#f2b45a,0_0_28px_rgb(242_180_90/0.35)]", wide ? "aspect-video" : "aspect-[2/3]")}>
+      <div className={cn("beam relative overflow-hidden rounded-xl bg-slate shadow-[0_8px_24px_rgb(10_12_18/0.5)] outline-offset-3 group-hover:outline-2 group-hover:outline-primary group-focus-visible:outline-2 group-focus-visible:outline-primary", wide ? "aspect-video" : "aspect-[2/3]")}>
         <Img src={c.poster} className="size-full object-cover transition-transform duration-500 ease-dusk group-hover:scale-[1.06]" />
         {c.rating && <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-dusk/80 px-2 py-0.5 text-[11px] font-semibold backdrop-blur"><Star className="size-3 fill-primary text-primary" />{c.rating}</span>}
         {/* hover preview: the lamp comes on over the poster */}
@@ -188,7 +190,7 @@ export function Rail({ title, items, wide, action }: { title: string; items: Car
           <button aria-label={`Scroll ${title} forward`} onClick={() => nudge(1)} className="beam grid size-8 place-items-center rounded-full bg-white/8 hover:bg-white/14"><ChevronRight className="size-4" /></button>
         </div>
       </div>
-      <div ref={ref} className="no-scrollbar flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pt-1 pb-3 md:scroll-px-10 md:gap-4 md:px-10">{items.map((c) => <PosterCard key={c.href} c={c} wide={wide} />)}</div>
+      <div ref={ref} className="no-scrollbar flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pt-2 pb-3 md:scroll-px-10 md:gap-4 md:px-10">{items.map((c) => <PosterCard key={c.href} c={c} wide={wide} />)}</div>
     </BlurFade>
   );
 }
@@ -239,17 +241,64 @@ export const mediaCard = (m: any): CardData => ({
   sub: [m.type === "series" ? "Series" : "Movie", m.year].filter(Boolean).join(", "), rating: m.rating ? String(m.rating) : undefined, genres: m.genres, kind: "media",
 });
 
-export function ContinueRow() {
+/** Marquee type: the name solid, the rest in outline. Splits at a colon or dash ("Code Geass: Lelouch…"), or after the first word with `word`. */
+export function Marquee({ text, word, as: T = "h1", className }: { text: string; word?: boolean; as?: "h1" | "h2" | "p"; className?: string }) {
+  const m = text.match(/^(.+?)(?:\s*[:：]\s+|\s+[-–—]\s+)(.+)$/), sp = text.indexOf(" ");
+  const [a, b] = m ? [m[1], m[2]] : word && sp > 0 ? [text.slice(0, sp), text.slice(sp + 1)] : [text, ""];
+  return <T aria-label={text} className={cn("giant", className)}><span aria-hidden>{a}{b && <> <span className="hollow">{b}</span></>}</span></T>;
+}
+
+/** "9 min left" / "1 h 6 min left" as [number, unit]. Web rows store seconds; rows synced from the apps store 0..1000, so no minutes for those.
+ *  ponytail: the 1000 check guesses the unit; read a real duration once synced rows carry one. */
+export function timeLeft(position: number, duration: number): [string, string] | null {
+  if (!duration || duration === 1000 || duration < position) return null;
+  const m = Math.max(1, Math.round((duration - position) / 60));
+  return [m >= 60 ? `${Math.floor(m / 60)} h ${m % 60}` : String(m), "min left"];
+}
+
+/** Ticket stub for a history row: the whole poster, a perforation, then title, episode, minutes left and progress, tinted by its own poster. */
+export function Stub({ e, onRemove }: { e: Entry; onRemove?: () => void }) {
+  const title = e.payload.title || "Untitled", sub = entrySub(e.payload), left = timeLeft(e.position, e.duration), f = frac(e.position, e.duration);
+  return (
+    <li className="ticket group">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {e.payload.poster && <img src={e.payload.poster} alt="" aria-hidden referrerPolicy="no-referrer" className="tint" />}
+      <i className="shade" />
+      <Img src={e.payload.poster} className="relative h-full w-1/3 flex-none object-cover" />
+      <div className="relative flex min-w-0 flex-1 flex-col gap-1 border-l-2 border-dashed border-white/25 py-3 pr-3 pl-4">
+        <p className="line-clamp-2 font-display text-[19px] leading-[1.02] font-extrabold text-balance transition-[font-size] duration-200 md:group-hover:text-[22px]">{title}</p>
+        <p className="truncate text-[13px] text-[#dad6e4]">{sub}</p>
+        <div className="mt-auto flex items-baseline justify-between gap-2 text-xs text-[#bdb9c9]">
+          <span className="font-semibold text-primary opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">Resume</span>
+          {left && <span><b className="font-display text-base font-extrabold text-foreground">{left[0]}</b> {left[1]}</span>}
+        </div>
+        <div className="track-bar"><i style={{ width: `${Math.max(3, f * 100)}%` }} /></div>
+      </div>
+      <Link href={entryHref(e)} aria-label={`Resume ${title}, ${sub}`} className="absolute inset-0 z-10 outline-none" />
+      {onRemove && <button type="button" aria-label={`Remove ${title} from history`} onClick={onRemove}
+        className="absolute top-2 right-2 z-20 grid size-7 place-items-center rounded-full bg-dusk/80 text-foreground backdrop-blur transition-opacity hover:bg-dusk focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"><X className="size-4" /></button>}
+    </li>
+  );
+}
+
+/** Continue watching rows for the current profile, newest first; `reload` after a removal. */
+export function useContinue() {
   const { s } = useSession();
-  const [items, setItems] = useState<CardData[]>([]);
-  const load = () => {
-    if (!s.profile) return;
-    const pid = s.profile.id;
-    setItems(continueWatching(pid).map((e) => ({ href: entryHref(e), title: e.payload.title || "Untitled", poster: e.payload.poster, sub: entrySub(e.payload), progress: e.duration ? e.position / e.duration : 0,
-      onRemove: () => removeHistory(pid, s.token, e.payload).then(load) })));
-  };
+  const [items, setItems] = useState<Entry[]>([]);
+  const load = () => { if (s.profile) setItems(continueWatching(s.profile.id)); };
   useEffect(load, [s.profile]); // eslint-disable-line react-hooks/exhaustive-deps
-  return <Rail title="Continue watching" items={items} wide />;
+  const remove = (e: Entry) => removeHistory(s.profile!.id, s.token, e.payload).then(load);
+  return [items, remove] as const;
+}
+
+/** Continue watching as ticket stubs running along the 35mm strip. */
+export function ContinueStrip({ items, onRemove }: { items: Entry[]; onRemove: (e: Entry) => void }) {
+  if (!items.length) return null;
+  return (
+    <section aria-label="Continue watching" className="strip">
+      <ol>{items.map((e) => <Stub key={e.key} e={e} onRemove={() => onRemove(e)} />)}</ol>
+    </section>
+  );
 }
 
 /** "Recommended for you": TMDB + hianime picks ranked server-side (/api/recs) from this profile's history; kids profiles only see kid-safe picks. */
@@ -273,7 +322,7 @@ export function RecommendedRow() {
 export function FavButton({ c }: { c: CardData }) {
   const [on, setOn] = useState(false);
   useEffect(() => setOn(getFavs().some((f) => f.href === c.href)), [c.href]);
-  return <button type="button" aria-pressed={on} className={pill.secondary} onClick={() => setOn(toggleFav(c))}>{on ? <Check /> : <Plus />}{on ? "In library" : "Add to library"}</button>;
+  return <button type="button" aria-pressed={on} className={pill.secondary} onClick={() => setOn(toggleFav(c))}><Heart className={cn(on && "fill-primary text-primary")} />{on ? "Saved to library" : "Favourite"}</button>;
 }
 
 export function AvatarPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
