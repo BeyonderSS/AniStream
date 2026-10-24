@@ -51,7 +51,7 @@ class SearchViewModel @Inject constructor(
 
     private val prefs = context.getSharedPreferences("search_prefs", Context.MODE_PRIVATE)
 
-    private val _uiState = MutableStateFlow(SearchUiState())
+    private val _uiState = MutableStateFlow(SearchUiState(recentSearches = prefs.getString(KEY_RECENTS, null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty()))
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
@@ -108,8 +108,9 @@ class SearchViewModel @Inject constructor(
                         isLoading = false,
                         page = 1,
                         endReached = result.data.isEmpty(),
-                        recentSearches = (listOf(query.trim()) + s.recentSearches.filterNot { it.equals(query.trim(), true) }).take(10)
-                    )
+                        // typing "d", "de", "dea" must not leave three recents: drop earlier prefixes of this query
+                        recentSearches = (listOf(query.trim()) + s.recentSearches.filterNot { query.trim().startsWith(it, ignoreCase = true) }).take(10)
+                    ).also { saveRecents(it.recentSearches) }
                 }
                 is Result.Error -> _uiState.update { it.copy(isLoading = false, error = result.message ?: "Search failed") }
                 is Result.Loading -> {}
@@ -148,9 +149,17 @@ class SearchViewModel @Inject constructor(
 
     fun onRecentSearchClick(query: String) = onQueryChange(query)
 
-    fun onRemoveRecent(query: String) = _uiState.update { it.copy(recentSearches = it.recentSearches - query) }
+    fun onRemoveRecent(query: String) {
+        _uiState.update { it.copy(recentSearches = it.recentSearches - query) }
+        saveRecents(_uiState.value.recentSearches)
+    }
 
-    fun onClearRecents() = _uiState.update { it.copy(recentSearches = emptyList()) }
+    fun onClearRecents() {
+        _uiState.update { it.copy(recentSearches = emptyList()) }
+        saveRecents(emptyList())
+    }
+
+    private fun saveRecents(list: List<String>) = prefs.edit().putString(KEY_RECENTS, list.joinToString("\n")).apply()
 }
 
 private fun MediaItem.asCard() = AnimeSearchResult(
@@ -163,3 +172,4 @@ private fun MediaItem.asCard() = AnimeSearchResult(
 )
 
 private const val KEY_SCOPE = "scope"
+private const val KEY_RECENTS = "recents"
