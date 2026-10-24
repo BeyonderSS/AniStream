@@ -52,6 +52,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.width
@@ -135,7 +136,7 @@ private fun TvApp() {
     LaunchedEffect(Unit) {
         acct.hub.handoffs.collect { h ->
             val row = acct.applyHandoff(h) ?: return@collect
-            if (row.kind == "media") nav.navigate(TvRoutes.movie(row.mediaId ?: row.animeSlug.substringBefore(":s")))
+            if (row.kind == "media") nav.navigate(TvRoutes.movie(row.detailId))
             else nav.navigate(TvRoutes.player(row.animeSlug, row.lastEpisodeWatched.coerceAtLeast(1)))
         }
     }
@@ -226,49 +227,49 @@ private fun TvApp() {
         // left-edge fade under the open rail, so content it overlaps (hero titles) recedes instead of clashing; a flat
         // gradient, cheap on the Fire Stick's GPU
         // hidden-state hint: a thin amber edge at mid-height says "press Left"
-        if (showRail && !railOpen) Box(Modifier.align(androidx.compose.ui.Alignment.CenterStart).width(4.dp).height(96.dp)
+        if (showRail && !railOpen) Box(Modifier.align(androidx.compose.ui.Alignment.TopStart).padding(top = (540 * 0.28f).dp).width(4.8.dp).height((540 * 0.32f).dp)
             .background(Accent.main.copy(alpha = 0.55f), androidx.compose.foundation.shape.RoundedCornerShape(topEnd = 2.dp, bottomEnd = 2.dp)))
         androidx.compose.animation.AnimatedVisibility(showRail && railOpen, enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(ms)),
             exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(ms))) {
-            androidx.compose.foundation.layout.Box(Modifier.fillMaxHeight().width(420.dp).background(
-                androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(androidx.compose.ui.graphics.Color(0xF015171F), androidx.compose.ui.graphics.Color(0x0015171F)))))
+            androidx.compose.foundation.layout.Box(Modifier.fillMaxHeight().width(150.dp).background(
+                androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(androidx.compose.ui.graphics.Color(0xE60B0C11), androidx.compose.ui.graphics.Color(0x000B0C11)))))
         }
         androidx.compose.animation.AnimatedVisibility(
             visible = showRail && railOpen,
-            modifier = Modifier.align(androidx.compose.ui.Alignment.CenterStart),
+            // centred at 42% of the height, as in the mockup
+            modifier = Modifier.align(androidx.compose.ui.BiasAlignment(-1f, -0.16f)),
             enter = androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(ms)) { -it } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(ms)),
             exit = androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(ms)) { -it } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(ms))
         ) {
-            // 32dp start keeps the rounded edge inside TV overscan
             Column(
                 Modifier
-                    .padding(start = 32.dp)
+                    .padding(start = 23.dp)
                     .focusGroup()
                     // nothing focusable to the right of an icon in the hero band: hand focus to the content explicitly
                     .onKeyEvent { e -> if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionRight) { runCatching { contentReq.requestFocus() }; true } else false }
                     .onFocusChanged { railFocused = it.hasFocus }
                     .background(IslandFill, IslandShape)
                     .border(1.dp, IslandEdge, IslandShape)
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .padding(horizontal = 7.7.dp, vertical = 11.5.dp),
+                verticalArrangement = Arrangement.spacedBy(10.6.dp)
             ) {
                 entries.forEach { r ->
                     val selected = current == r.route
                     val profile = if (r.route == TvRoutes.ACCOUNT) session?.activeProfile else null
                     val label = (profile?.name ?: r.label) + if (profile?.kids == true) " · Kids" else ""
                     var focused by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-                    androidx.compose.foundation.layout.Box(Modifier.size(38.dp)) {
+                    androidx.compose.foundation.layout.Box(Modifier.size(32.6.dp)) {
                         // focused = amber ring + lighter surface; selected (current screen) = soft amber fill + amber icon
                         androidx.tv.material3.Surface(
                             onClick = { if (r.route == TvRoutes.ACCOUNT) acct.repo.openGate() else nav.navigateTop(r.route) },
-                            modifier = Modifier.size(38.dp)
+                            modifier = Modifier.size(32.6.dp)
                                 .then(if (selected) Modifier.focusRequester(selectedReq) else Modifier)
                                 .onFocusChanged { focused = it.isFocused },
                             shape = androidx.tv.material3.ClickableSurfaceDefaults.shape(androidx.compose.foundation.shape.CircleShape),
                             colors = androidx.tv.material3.ClickableSurfaceDefaults.colors(
-                                containerColor = if (selected) Color(0x33F2B45A) else Color.Transparent,
+                                containerColor = if (selected) Color(0x4DF2B45A) else Color.Transparent,
                                 contentColor = Ink.body,
-                                focusedContainerColor = if (selected) Color(0x4DF2B45A) else Bg.overlay,
+                                focusedContainerColor = if (selected) Color(0x4DF2B45A) else Color.Transparent,
                                 focusedContentColor = Ink.high
                             ),
                             border = androidx.tv.material3.ClickableSurfaceDefaults.border(
@@ -280,17 +281,17 @@ private fun TvApp() {
                             androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
                                 if (profile != null) coil.compose.AsyncImage(
                                     com.anistream.core.account.FluentEmojis.urlFor(profile.avatar), contentDescription = "Switch profile, watching as ${profile.name}",
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier.size(20.dp)
                                 )
-                                else Icon(r.icon, contentDescription = r.label, modifier = Modifier.size(22.dp), tint = if (selected) Accent.main else LocalContentColor.current)
+                                else Icon(r.icon, contentDescription = r.label, modifier = Modifier.size(18.dp), tint = if (selected) Accent.main else LocalContentColor.current)
                             }
                         }
                         // label chip beside the focused icon; offset, so it never changes the pill's width
                         if (focused) Text(
-                            label, maxLines = 1, style = TvType.body.copy(color = Ink.high),
+                            label, maxLines = 1, style = TvType.body.copy(color = Ink.high, fontSize = 13.4.sp, lineHeight = 18.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
                             modifier = Modifier.align(androidx.compose.ui.Alignment.CenterStart).offset(x = 50.dp)
                                 .wrapContentWidth(unbounded = true, align = androidx.compose.ui.Alignment.Start)
-                                .background(Bg.overlay, Radius.pill).padding(horizontal = 14.dp, vertical = 6.dp)
+                                .background(Color(0xFF232634), Radius.pill).padding(horizontal = 12.5.dp, vertical = 4.8.dp)
                         )
                     }
                 }
@@ -301,9 +302,9 @@ private fun TvApp() {
 
 private val IslandShape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
 private val IslandFill = androidx.compose.ui.graphics.Brush.verticalGradient(
-    listOf(Color(0xD9272B37), Color(0xC71D2029))
+    listOf(Color(0xEB1A1B26), Color(0xEB1A1B26))
 )
-private val IslandEdge = Color(0x29FFFFFF)
+private val IslandEdge = Color(0x14FFFFFF)
 
 private fun NavHostController.navigateTop(route: String) = navigate(route) {
     popUpTo(graph.findStartDestination().id) { saveState = true }

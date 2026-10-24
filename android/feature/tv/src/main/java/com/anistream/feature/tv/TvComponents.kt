@@ -71,8 +71,8 @@ import com.anistream.core.ui.theme.Motion
 import com.anistream.core.ui.theme.Radius
 import com.anistream.core.ui.theme.TextFamily
 
-/** 58dp overscan-safe horizontal margin (DESIGN-REELM.md). */
-val Overscan = 58.dp
+/** 48dp (5% of a 960dp screen) overscan-safe horizontal margin, as in the TV mockups. */
+val Overscan = 48.dp
 
 /** TV scale for 3 m viewing: 48 / 32 / 22 / 18. */
 object TvType {
@@ -134,6 +134,8 @@ data class TvItem(
     val imageUrl: String?,
     val meta: List<String> = emptyList(),
     val progress: Float? = null,
+    /** whole minutes left of [progress]; null = length unknown (the stub shows percent) */
+    val minutesLeft: Int? = null,
     val subtitle: String? = null,
     /** Home hero: "Resume episode N" for history rows, null elsewhere; [onDetails] opens the detail page. */
     val resumeLabel: String? = null,

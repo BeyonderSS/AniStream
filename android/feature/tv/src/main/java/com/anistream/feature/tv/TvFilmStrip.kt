@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
@@ -51,6 +52,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
@@ -102,8 +106,8 @@ internal fun uiScale() = androidx.compose.ui.platform.LocalConfiguration.current
 /** Rounded ticket with a half-circle notch top and bottom on the perforation line (1/3 of the width). */
 private class TicketShape(val s: Float) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        val r = 7 * s * density.density
-        val body = Path().apply { addRoundRect(RoundRect(Rect(Offset.Zero, size), CornerRadius(9 * s * density.density))) }
+        val r = 6.7f * s * density.density
+        val body = Path().apply { addRoundRect(RoundRect(Rect(Offset.Zero, size), CornerRadius(8.6f * s * density.density))) }
         val x = size.width / 3
         val holes = Path().apply {
             addOval(Rect(x - r, -r, x + r, r)); addOval(Rect(x - r, size.height - r, x + r, size.height + r))
@@ -121,11 +125,11 @@ private fun Ticket(item: TvItem, onFocused: () -> Unit, modifier: Modifier = Mod
     val ticket = remember(s) { TicketShape(s) }
     var focused by remember { mutableStateOf(false) }
     val color by rememberPosterColor(item.imageUrl)
-    val w = if (focused) d(273f) else d(221f)
+    val w = if (focused) d(249.6f) else d(201.6f)
     Surface(
         onClick = item.onClick,
         onLongClick = item.onLongClick,
-        modifier = modifier.width(w).height(w / 2).alpha(if (focused) 1f else 0.72f)
+        modifier = modifier.width(w).height(w / 2)
             .onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocused() },
         shape = ClickableSurfaceDefaults.shape(ticket),
         colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, focusedContainerColor = Color.Transparent),
@@ -136,29 +140,35 @@ private fun Ticket(item: TvItem, onFocused: () -> Unit, modifier: Modifier = Mod
             Modifier.fillMaxSize().background(tint(color ?: DuskViolet, 0.42f, 0.14f)).drawWithContent {
                 drawContent()
                 // dashed perforation; amber inset edge when focused (outer half is clipped by the shape)
-                drawLine(Color.White.copy(alpha = 0.28f), Offset(size.width / 3, 0f), Offset(size.width / 3, size.height), d(1.5f).toPx(),
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(d(5f).toPx(), d(4f).toPx())))
-                if (focused) drawPath((ticket.createOutline(size, layoutDirection, this) as Outline.Generic).path, Accent.main, style = Stroke(d(5f).toPx()))
+                drawLine(Color.White.copy(alpha = 0.28f), Offset(size.width / 3, 0f), Offset(size.width / 3, size.height), d(1.4f).toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(d(4f).toPx(), d(4f).toPx())))
+                if (focused) drawPath((ticket.createOutline(size, layoutDirection, this) as Outline.Generic).path, Accent.main, style = Stroke(d(4.8f).toPx()))
             }
         ) {
             Box(Modifier.width(w / 3).fillMaxSize()) {
-                if (item.imageUrl != null) AsyncImage(item.imageUrl, item.title, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+                if (item.imageUrl != null) AsyncImage(item.imageUrl, item.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             }
-            Column(Modifier.weight(1f).fillMaxSize().padding(start = d(12f), end = d(10f), top = d(10f), bottom = d(9f)), verticalArrangement = Arrangement.spacedBy(d(3f))) {
+            Column(Modifier.weight(1f).fillMaxSize().padding(start = d(13.4f), end = d(11.5f), top = d(10.6f), bottom = d(9.6f)), verticalArrangement = Arrangement.spacedBy(d(3.4f))) {
+                val t = if (focused) 19.2f else 14.9f
                 Text(item.title, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    style = TvType.title.copy(fontFamily = DisplayHeavy, fontWeight = FontWeight.ExtraBold, fontSize = if (focused) (21*s).sp else (17*s).sp, lineHeight = if (focused) (22*s).sp else (18*s).sp))
-                item.episodeLine?.let { Text(it, maxLines = 1, style = TvType.body.copy(fontSize = (12*s).sp, lineHeight = (15*s).sp, color = Color(0xFFDAD6E4))) }
+                    style = TvType.title.copy(fontFamily = DisplayHeavy, fontWeight = FontWeight.ExtraBold, fontSize = (t * s).sp, lineHeight = (t * 1.02f * s).sp))
+                item.episodeLine?.let { Text(it, maxLines = 1, style = TvType.body.copy(fontSize = (9.8f * s).sp, lineHeight = (13f * s).sp, color = Color(0xFFDAD6E4))) }
                 Spacer(Modifier.weight(1f))
+                val small = TvType.body.copy(fontSize = (9.1f * s).sp, lineHeight = (13f * s).sp, color = Color(0xFFBDB9C9))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-                    item.progress?.let { p ->
-                        // ponytail: no duration in WatchHistory, so percent watched instead of "N min left"
-                        Text("${(p * 100).toInt()}% watched", maxLines = 1, style = TvType.body.copy(fontSize = (12*s).sp, lineHeight = (15*s).sp, color = Color(0xFFBDB9C9)))
-                    }
-                    if (focused) Text("OK to resume", maxLines = 1, style = TvType.body.copy(fontSize = (12*s).sp, lineHeight = (15*s).sp, color = Accent.main, fontWeight = FontWeight.SemiBold))
+                    Text(if (focused) "OK to resume" else "", maxLines = 1, style = small.copy(color = Accent.main, fontWeight = FontWeight.SemiBold))
+                    val left = item.minutesLeft
+                    if (left != null) Text(buildAnnotatedString {
+                        withStyle(SpanStyle(fontFamily = DisplayHeavy, fontWeight = FontWeight.ExtraBold, fontSize = (13f * s).sp, color = Ink.high)) {
+                            append(if (left >= 60) "${left / 60} h" + (if (left % 60 > 0) " ${left % 60}" else "") else "$left")
+                        }
+                        append(if (left >= 60 && left % 60 == 0) " left" else " min left")
+                    }, maxLines = 1, style = small)
+                    else item.progress?.let { p -> Text("${(p * 100).toInt()}% watched", maxLines = 1, style = small) }
                 }
                 item.progress?.let { p ->
-                    Box(Modifier.fillMaxWidth().height(d(3f)).background(Color.White.copy(alpha = 0.16f), androidx.compose.foundation.shape.CircleShape)) {
-                        Box(Modifier.fillMaxWidth(p.coerceIn(0f, 1f)).height(d(3f)).background(Accent.main, androidx.compose.foundation.shape.CircleShape))
+                    Box(Modifier.fillMaxWidth().height(d(2.9f)).background(Color.White.copy(alpha = 0.16f), androidx.compose.foundation.shape.CircleShape)) {
+                        Box(Modifier.fillMaxWidth(p.coerceIn(0f, 1f)).height(d(2.9f)).background(Accent.main, androidx.compose.foundation.shape.CircleShape))
                     }
                 }
             }
@@ -169,35 +179,37 @@ private fun Ticket(item: TvItem, onFocused: () -> Unit, modifier: Modifier = Mod
 /** Continue watching as a black 35mm strip (static -1.2 degree tilt, sprockets drawn once) of ticket stubs. */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun TvStripRow(row: TvRow, restoreKey: String?, restoreRequester: FocusRequester, onFocused: (TvItem) -> Unit, modifier: Modifier = Modifier) {
+fun TvStripRow(row: TvRow, restoreKey: String?, restoreRequester: FocusRequester, onFocused: (TvItem) -> Unit, modifier: Modifier = Modifier, up: FocusRequester? = null) {
     val s = uiScale()
     fun d(n: Float) = (n * s).dp
+    // no row label: the strip itself says "continue watching" (as in the mockup)
     Column(modifier) {
-        Text(row.title, style = TvType.title, modifier = Modifier.padding(start = Overscan, bottom = d(2f)))
-        Box(Modifier.fillMaxWidth().height(d(194f)), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth().height(d(186f)), contentAlignment = Alignment.Center) {
             // wider than the screen so the tilt never shows the strip's ends
             Box(
-                Modifier.requiredWidth(d(1040f)).height(d(184f)).graphicsLayer { rotationZ = -1.2f }
+                Modifier.requiredWidth(d(1040f)).height(d(177.6f)).graphicsLayer { rotationZ = -1.2f }
                     .background(Color(0xFF08080B))
                     .drawBehind {
                         val hole = Color(0xFF2A2A30)
-                        val hw = d(12f).toPx(); val hh = d(10f).toPx(); val y = d(6f).toPx(); val cr = CornerRadius(d(2.5f).toPx())
+                        val hw = d(11.5f).toPx(); val hh = d(10.6f).toPx(); val y = d(5.8f).toPx(); val cr = CornerRadius(d(1f).toPx())
                         var x = d(4f).toPx()
                         while (x < size.width) {
                             drawRoundRect(hole, Offset(x, y), Size(hw, hh), cr)
                             drawRoundRect(hole, Offset(x, size.height - y - hh), Size(hw, hh), cr)
-                            x += d(29f).toPx()
+                            x += d(28.8f).toPx()
                         }
                     }
             ) {
                 LazyRow(
                     modifier = Modifier.fillMaxSize().focusRestorer(),
                     contentPadding = PaddingValues(horizontal = Overscan + d(40f)),
-                    horizontalArrangement = Arrangement.spacedBy(d(12f)),
+                    horizontalArrangement = Arrangement.spacedBy(d(11.5f)),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     items(row.items, key = { it.key }) { item ->
-                        Ticket(item, { onFocused(item) }, if (item.key == restoreKey) Modifier.focusRequester(restoreRequester) else Modifier)
+                        // the strip is tilted, so plain focus search would read the next (higher) stub as "up"
+                        val m = if (up != null) Modifier.focusProperties { this.up = up } else Modifier
+                        Ticket(item, { onFocused(item) }, if (item.key == restoreKey) m.focusRequester(restoreRequester) else m)
                     }
                 }
             }

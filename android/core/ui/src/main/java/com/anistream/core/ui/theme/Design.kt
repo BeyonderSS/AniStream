@@ -104,9 +104,9 @@ fun Modifier.amberGlow(shape: Shape = Radius.pill, elevation: Dp = 16.dp): Modif
     shadow(elevation, shape, clip = false, ambientColor = Accent.glow, spotColor = Accent.main)
 
 @OptIn(ExperimentalTextApi::class)
-private fun bricolage(weight: Int) = Font(
+private fun bricolage(weight: Int, width: Float = 92f) = Font(
     R.font.bricolage_grotesque, FontWeight(weight),
-    variationSettings = FontVariation.Settings(FontVariation.weight(weight), FontVariation.width(92f))
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight), FontVariation.width(width))
 )
 
 @OptIn(ExperimentalTextApi::class)
@@ -117,7 +117,7 @@ private fun figtree(weight: Int) = Font(
 
 val Display = FontFamily(bricolage(600), bricolage(700))
 /** Marquee titles (TV hero, ticket stubs). */
-val DisplayHeavy = FontFamily(bricolage(800))
+val DisplayHeavy = FontFamily(bricolage(800, width = 100f))
 val TextFamily = FontFamily(figtree(400), figtree(500), figtree(600))
 
 /** Phone scale 30 / 22 / 16 / 13. Sentence/title case; never uppercased, never tracked. */

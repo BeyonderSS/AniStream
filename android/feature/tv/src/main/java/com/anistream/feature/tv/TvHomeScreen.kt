@@ -46,6 +46,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.draw.clipToBounds
@@ -60,6 +66,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -108,16 +115,11 @@ fun TvHomeScreen(filter: HomeFilter, homeVm: HomeViewModel, moviesVm: MoviesHome
     }
     var lastFocused by rememberSaveable { mutableStateOf<String?>(null) }
     val restore = remember { FocusRequester() }
+    val heroReq = remember { FocusRequester() }
     // read without observing: only matters when the screen is (re)built, and writing it on each move must not recompose this
     val last = Snapshot.withoutReadObservation { lastFocused }
     val restoreKey = last?.takeIf { k -> rows.any { r -> r.items.any { it.key == k } } } ?: rows.firstOrNull()?.items?.firstOrNull()?.key
     val hasRows = rows.isNotEmpty()
-    LaunchedEffect(hasRows) {
-        if (hasRows) {
-            withFrameNanos { }
-            runCatching { restore.requestFocus() }
-        }
-    }
 
     // The focused row snaps to the top of the rows area (never a half-cut row under the hero):
     // the column's own bring-into-view is turned off and we scroll by row index instead.
@@ -132,35 +134,52 @@ fun TvHomeScreen(filter: HomeFilter, homeVm: HomeViewModel, moviesVm: MoviesHome
         }
     }
     val rowSpec = LocalBringIntoViewSpec.current
+    // Continue watching arrives after the catalog rows; LazyColumn would keep the old first row in view (by key) and
+    // leave the strip scrolled off above, so go back to the top while focus is still up there
+    val firstRow = rows.firstOrNull()?.title
+    // (and focus follows: the restore target is recomputed for the new first row)
+    LaunchedEffect(hasRows, firstRow) {
+        if (hasRows && focusedRow.intValue <= 0) {
+            listState.scrollToItem(0)
+            withFrameNanos { }
+            runCatching { restore.requestFocus() }
+        }
+    }
+
+    // the hero stands tall over Continue watching (as in the mockup) and gives the lower rows room once focus goes down
+    val tall = remember(rows) { derivedStateOf { focusedRow.intValue <= 0 && rows.firstOrNull()?.wide == true } }
 
     Box(Modifier.fillMaxSize()) {
         HomeBackdrop(hero)
         Column(Modifier.fillMaxSize()) {
-            HomeHero(hero, filter)
+            HomeHero(hero, filter, tall, heroReq)
             when {
                 rows.isEmpty() && (anime.isLoading || media.isLoading) -> TvMessage("Loading…")
                 rows.isEmpty() -> TvMessage(anime.error ?: media.error ?: "Nothing here yet") {
                     TvPill("Retry", onClick = { homeVm.loadContent(); moviesVm.load() })
                 }
                 else -> CompositionLocalProvider(LocalBringIntoViewSpec provides NoVerticalBringIntoView) {
+                    val rowItem: @Composable (Int, TvRow) -> Unit = { i, row ->
+                        // rows keep the default horizontal scrolling
+                        CompositionLocalProvider(LocalBringIntoViewSpec provides rowSpec) {
+                            val onF: (TvItem) -> Unit = {
+                                focused.value = it; lastFocused = it.key; focusedRow.intValue = i
+                            }
+                            if (row.wide) TvStripRow(row, restoreKey, restore, onF, up = heroReq) else TvCardRow(row, restoreKey, restore, onF)
+                        }
+                    }
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.clipToBounds(),
                         contentPadding = PaddingValues(bottom = 40.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
+                        // first row right under the hero, "Surprise me" below it (row i >= 1 sits at list index i + lead)
+                        item(key = rows[0].title) { rowItem(0, rows[0]) }
                         if (pool.isNotEmpty()) item(key = "surprise") {
-                            TvPill("Surprise me", onClick = { pool.random().onClick() }, modifier = Modifier.padding(start = Overscan))
+                            TvPill("Surprise me", onClick = { pool.random().onClick() }, modifier = Modifier.padding(start = Overscan, top = (12 * uiScale()).dp))
                         }
-                        itemsIndexed(rows, key = { _, it -> it.title }) { i, row ->
-                            // rows keep the default horizontal scrolling
-                            CompositionLocalProvider(LocalBringIntoViewSpec provides rowSpec) {
-                                val onF: (TvItem) -> Unit = {
-                                    focused.value = it; lastFocused = it.key; focusedRow.intValue = i
-                                }
-                            if (row.wide) TvStripRow(row, restoreKey, restore, onF) else TvCardRow(row, restoreKey, restore, onF)
-                            }
-                        }
+                        itemsIndexed(rows.drop(1), key = { _, it -> it.title }) { i, row -> rowItem(i + 1, row) }
                     }
                 }
             }
@@ -168,55 +187,79 @@ fun TvHomeScreen(filter: HomeFilter, homeVm: HomeViewModel, moviesVm: MoviesHome
     }
 }
 
-/** Radial glow behind the hero, tinted with the focused poster's colour (static dusk violet on low-end). */
+/** The mockups' night: the TV frame behind every marquee screen. */
+internal val Night = Color(0xFF0B0C11)
+
+/** Elliptical glow (70 x 45 % of the width) up and right, tinted with the focused poster's colour (static dusk violet on low-end). */
 @Composable
 private fun HomeBackdrop(hero: State<TvItem?>) {
     val lowEnd = LocalLowEnd.current
     val c = if (lowEnd) null else rememberPosterColor(hero.value?.imageUrl).value
-    val glow = lerp(Bg.base, c ?: DuskViolet, 0.5f)
+    val glow = lerp(Night, c ?: DuskViolet, 0.5f)
     Box(Modifier.fillMaxSize().drawBehind {
-        drawRect(Brush.radialGradient(listOf(glow, Bg.base), center = Offset(size.width * 0.75f, size.height * 0.25f), radius = size.width * 0.7f))
+        drawRect(Night)
+        val center = Offset(size.width * 0.75f, size.height * 0.25f)
+        scale(1f, 45f / 70f, pivot = center) {
+            drawRect(Brush.radialGradient(0f to glow, 0.7f to Night, center = center, radius = size.width * 0.7f), Offset(0f, -size.height), Size(size.width, size.height * 3))
+        }
     })
 }
 
-/** Marquee hero: huge title (solid lead, outlined remainder), tilted whole poster, chips and actions. */
+/** Marquee hero: giant title (solid name, outlined subtitle), tilted whole poster, chips and the amber Resume pill. */
 @Composable
-private fun HomeHero(hero: State<TvItem?>, filter: HomeFilter) {
+private fun HomeHero(hero: State<TvItem?>, filter: HomeFilter, tall: State<Boolean>, focus: FocusRequester) {
     val s = uiScale()
     fun d(n: Float) = (n * s).dp
     val h = hero.value
-    Box(Modifier.fillMaxWidth().height(d(250f))) {
+    val stroke = with(LocalDensity.current) { d(1.15f).toPx() }
+    Box(Modifier.fillMaxWidth().height(d(if (tall.value) 330f else 250f))) {
         if (h?.imageUrl != null) AsyncImage(
-            h.imageUrl, null, contentScale = ContentScale.Fit,
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = d(30f), end = Overscan + d(16f)).width(d(134f)).aspectRatio(2f / 3f)
-                .graphicsLayer { rotationZ = -3f }.background(Bg.raised, RoundedCornerShape(d(8f))).clip(RoundedCornerShape(d(8f)))
+            h.imageUrl, null, contentScale = ContentScale.Crop,
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = d(48f), end = d(57.6f)).width(d(134.4f)).aspectRatio(2f / 3f)
+                .graphicsLayer { rotationZ = -3f; shadowElevation = d(18f).toPx(); shape = RoundedCornerShape(d(7.7f)); clip = true }
+                .background(Bg.raised)
         )
-        Column(Modifier.padding(start = Overscan, end = d(240f), top = d(28f))) {
-            val title = h?.title ?: when (filter) { HomeFilter.ALL -> "Reelm"; HomeFilter.MEDIA -> "Movies & TV"; HomeFilter.ANIME -> "Anime" }
-            val cut = listOf(":", " - ").map { title.indexOf(it) }.filter { it > 0 }.minOrNull() ?: title.length
-            val big = title.length <= 30
-            Text(
-                buildAnnotatedString {
-                    withStyle(SpanStyle(color = Ink.high)) { append(title.substring(0, cut)) }
-                    withStyle(SpanStyle(color = Color.White.copy(alpha = 0.5f), drawStyle = Stroke(2.5f))) { append(title.substring(cut)) }
-                },
-                maxLines = if (big) 2 else 3, overflow = TextOverflow.Ellipsis,
-                style = TvType.display.copy(fontFamily = DisplayHeavy, fontWeight = FontWeight.ExtraBold, fontSize = if (big) (52*s).sp else (38*s).sp, lineHeight = if (big) (54*s).sp else (40*s).sp),
-            )
-        }
-        if (h != null) Column(Modifier.align(Alignment.BottomStart).padding(start = Overscan, bottom = d(6f)), verticalArrangement = Arrangement.spacedBy(d(8f))) {
-            MetaChips(h.meta.distinct(), maxLines = 1)
-            Row(horizontalArrangement = Arrangement.spacedBy(d(14f)), verticalAlignment = Alignment.CenterVertically) {
-                TvPill(h.resumeLabel ?: "Play", h.onClick, icon = Icons.Filled.PlayArrow)
-                h.onDetails?.let { TvPill("Details", it) }
+        val title = h?.title ?: when (filter) { HomeFilter.ALL -> "Reelm"; HomeFilter.MEDIA -> "Movies & TV"; HomeFilter.ANIME -> "Anime" }
+        val cut = listOf(":", " - ").map { title.indexOf(it) }.filter { it > 0 }.minOrNull() ?: title.length
+        val rest = title.substring(cut).trimStart(':', '-', ' ')
+        val big = title.length <= 40
+        Text(
+            buildAnnotatedString {
+                withStyle(SpanStyle(color = Ink.high)) { append(title.substring(0, cut).trim()) }
+                if (rest.isNotEmpty()) withStyle(SpanStyle(color = Color(0x80ECEAF2), drawStyle = Stroke(stroke))) { append(" $rest") }
+            },
+            maxLines = 2, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = Overscan, top = d(17f)).width(d(662f)),
+            style = TvType.display.copy(
+                fontFamily = DisplayHeavy, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.015).em, lineBreak = LineBreak.Heading,
+                fontSize = ((if (big) 73f else 56f) * s).sp, lineHeight = ((if (big) 62.7f else 48.2f) * s).sp
+            ),
+        )
+        if (h != null) Column(Modifier.align(Alignment.BottomStart).padding(start = Overscan, bottom = d(30f)), verticalArrangement = Arrangement.spacedBy(d(9.6f))) {
+            Row(horizontalArrangement = Arrangement.spacedBy(d(5.8f))) {
+                h.meta.distinct().filter { it.isNotBlank() }.take(5).forEach {
+                    Text(it, maxLines = 1, style = TvType.body.copy(fontSize = (10.1f * s).sp, lineHeight = (14f * s).sp, color = Color(0xFFD9D6E2)),
+                        modifier = Modifier.background(Color.White.copy(alpha = 0.09f), RoundedCornerShape(50)).padding(horizontal = d(8.6f), vertical = d(2.9f)))
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(d(7.7f)), verticalAlignment = Alignment.CenterVertically) {
+                MarqueeBtn(h.resumeLabel ?: "Play", h.onClick, primary = true, modifier = Modifier.focusRequester(focus))
+                h.onDetails?.let { MarqueeBtn("Details", it) }
             }
         }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
-private val NoVerticalBringIntoView = object : BringIntoViewSpec {
+internal val NoVerticalBringIntoView = object : BringIntoViewSpec {
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float) = 0f
+}
+
+private fun episodeLine(h: WatchHistory) = when {
+    h.kind == "media" && h.lastEpisodeWatched == 0 -> "Movie"
+    h.kind == "media" -> "Season ${h.season.coerceAtLeast(1)}, episode ${h.lastEpisodeWatched}"
+    h.totalEpisodes > 0 -> "Episode ${h.lastEpisodeWatched} of ${h.totalEpisodes}"
+    else -> "Episode ${h.lastEpisodeWatched}"
 }
 
 private fun buildRows(
@@ -243,19 +286,15 @@ private fun buildRows(
         key = "cw|${h.animeSlug}", title = h.animeTitle, imageUrl = h.posterUrl,
         subtitle = h.subtitle ?: h.lastEpisodeWatched.takeIf { it > 0 }?.let { "Episode $it" },
         resumeLabel = h.lastEpisodeWatched.takeIf { it > 0 }?.let { "Resume episode ${if (h.watchProgress >= 0.9f && !h.isComplete) h.nextEpisode else it}" } ?: "Resume",
-        onDetails = { nav.navigate(TvRoutes.detail(if (h.kind == "media") h.mediaId ?: h.animeSlug.substringBefore(":s") else h.animeSlug)) },
-        episodeLine = when {
-            h.kind == "media" && h.lastEpisodeWatched == 0 -> "Movie"
-            h.kind == "media" -> "Season ${h.season.coerceAtLeast(1)}, episode ${h.lastEpisodeWatched}"
-            h.totalEpisodes > 0 -> "Episode ${h.lastEpisodeWatched} of ${h.totalEpisodes}"
-            else -> "Episode ${h.lastEpisodeWatched}"
-        },
-        meta = listOfNotNull(if (h.kind == "media") "Movies & TV" else "Anime", h.subtitle),
+        onDetails = { nav.navigate(if (h.kind == "media") TvRoutes.movie(h.detailId) else TvRoutes.anime(h.animeSlug)) },
+        episodeLine = episodeLine(h),
+        meta = listOfNotNull(if (h.kind == "media") (if (h.season > 0 || h.lastEpisodeWatched > 0) "Series" else "Movie") else "Anime", episodeLine(h)),
         progress = h.watchProgress,
+        minutesLeft = h.minutesLeft,
         onLongClick = { onRemove(h) },
         // anime resumes straight into the player; media goes through detail, where Resume is the first focus
         onClick = {
-            if (h.kind == "media") nav.navigate(TvRoutes.movie(h.mediaId ?: h.animeSlug.substringBefore(":s")))
+            if (h.kind == "media") nav.navigate(TvRoutes.movie(h.detailId))
             else nav.navigate(TvRoutes.player(h.animeSlug, if (h.watchProgress >= 0.9f && !h.isComplete) h.nextEpisode else h.lastEpisodeWatched.coerceAtLeast(1)))
         }
     )
