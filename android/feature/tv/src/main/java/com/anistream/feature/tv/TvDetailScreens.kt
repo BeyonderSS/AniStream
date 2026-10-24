@@ -54,6 +54,7 @@ import kotlinx.coroutines.delay
 @Composable
 private fun DetailLayout(
     backdrop: String?,
+    portrait: Boolean,
     title: String,
     meta: List<String>,
     synopsis: String?,
@@ -62,7 +63,7 @@ private fun DetailLayout(
     rows: androidx.compose.foundation.lazy.LazyListScope.() -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
-        ProjectorBackdrop(backdrop)
+        ProjectorBackdrop(backdrop, portrait = portrait)
         LazyColumn(contentPadding = PaddingValues(top = 48.dp, bottom = 48.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
             item {
                 Column(Modifier.padding(horizontal = Overscan).fillMaxWidth(0.7f)) {
@@ -148,6 +149,7 @@ fun TvAnimeDetailScreen(onPlay: (slug: String, episode: Int) -> Unit, onOpen: (s
 
     DetailLayout(
         backdrop = a.bannerUrl ?: a.posterUrl,
+        portrait = a.bannerUrl == null,
         title = a.title,
         meta = listOfNotNull(a.type, a.year?.toString(), a.status, scoreLabel(a.score), (a.episodes ?: episodes.size.takeIf { it > 0 })?.let { "$it episodes" }),
         synopsis = a.synopsis,
@@ -225,6 +227,7 @@ fun TvMovieDetailScreen(
 
     DetailLayout(
         backdrop = d.backdropUrl ?: d.posterUrl,
+        portrait = d.backdropUrl == null,
         title = d.title,
         meta = listOfNotNull(if (series) "Series" else "Movie", d.year?.toString(), d.runtime, scoreLabel(d.rating)) + d.genres.take(3),
         synopsis = d.description,

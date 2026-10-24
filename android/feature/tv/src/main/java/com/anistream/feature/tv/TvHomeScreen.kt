@@ -142,7 +142,7 @@ fun TvHomeScreen(filter: HomeFilter, homeVm: HomeViewModel, moviesVm: MoviesHome
 }
 
 @Composable
-private fun HomeBackdrop(hero: State<TvItem?>) = ProjectorBackdrop(hero.value?.imageUrl)
+private fun HomeBackdrop(hero: State<TvItem?>) = ProjectorBackdrop(hero.value?.imageUrl, portrait = true) // list models carry posters only
 
 @Composable
 private fun HomeHero(hero: State<TvItem?>, filter: HomeFilter) {

@@ -37,6 +37,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
@@ -147,7 +148,7 @@ data class TvRow(val title: String, val items: List<TvItem>, val wide: Boolean =
  * (left for the text column, bottom for the rows).
  */
 @Composable
-fun ProjectorBackdrop(url: String?, modifier: Modifier = Modifier) {
+fun ProjectorBackdrop(url: String?, modifier: Modifier = Modifier, portrait: Boolean = false) {
     val lowEnd = LocalLowEnd.current
     // low-end: a quick 150 ms alpha fade (cheap; the old snap felt like a flicker)
     val spec = when {
@@ -158,7 +159,17 @@ fun ProjectorBackdrop(url: String?, modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize()) {
         Crossfade(targetState = url, animationSpec = spec, label = "projector") { u ->
             if (u != null) {
-                AsyncImage(model = u, contentDescription = null, contentScale = ContentScale.Crop, alpha = 0.6f, modifier = Modifier.fillMaxSize())
+                if (portrait) {
+                    // a poster is not a backdrop: never crop it full-bleed. Whole poster, right-aligned, over a darkened
+                    // scaled copy (skipped on low-end; no blur anywhere, it is too costly on API 22).
+                    Box(Modifier.fillMaxSize()) {
+                        if (!lowEnd) AsyncImage(model = u, contentDescription = null, contentScale = ContentScale.Crop, alpha = 0.22f, modifier = Modifier.fillMaxSize())
+                        AsyncImage(
+                            model = u, contentDescription = null, contentScale = ContentScale.Fit, alpha = 0.9f,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(top = 28.dp, end = Overscan).height(230.dp).aspectRatio(2f / 3f).clip(Radius.md)
+                        )
+                    }
+                } else AsyncImage(model = u, contentDescription = null, contentScale = ContentScale.Crop, alpha = 0.6f, modifier = Modifier.fillMaxSize())
             }
         }
         if (lowEnd) {

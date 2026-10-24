@@ -6,7 +6,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -27,14 +34,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.tv.material3.Border
 import androidx.tv.material3.Glow
 import androidx.tv.material3.LocalContentColor
-import androidx.tv.material3.NavigationDrawerItemDefaults
 import com.anistream.core.ui.theme.Accent
 import com.anistream.core.ui.theme.Bg
 import com.anistream.core.ui.theme.Ink
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import com.anistream.core.ui.theme.Radius
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -48,8 +61,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.tv.material3.Icon
-import androidx.tv.material3.NavigationDrawer
-import androidx.tv.material3.NavigationDrawerItem
 import androidx.tv.material3.Text
 import com.anistream.feature.home.HomeViewModel
 import com.anistream.feature.movies.MoviesHomeViewModel
@@ -184,58 +195,94 @@ private fun TvApp() {
         }
     }
 
-    // Icons only; the drawer expands with labels while it holds focus. Hidden (not removed) on detail/player
-    // screens so the NavHost keeps its place in the composition.
-    NavigationDrawer(
-        drawerContent = {
-            // Floating glass island: translucent gradient + hairline highlight (real blur isn't available on API 22).
-            if (showRail) androidx.compose.foundation.layout.Box(
-                // 32dp start keeps the rounded edge inside TV overscan
-                Modifier.fillMaxHeight().padding(start = 32.dp, top = 27.dp, bottom = 27.dp),
-                contentAlignment = androidx.compose.ui.Alignment.CenterStart
-            ) { Column(
+    // Floating glass pill over the content, no background column. Hidden while focus is in the content
+    // (full width); pressing Left from the leftmost item slides it in, icons only, with a label chip
+    // beside the focused icon. Hidden (not removed) on detail/player screens so the NavHost keeps its place.
+    var railOpen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+        var railFocused by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val fm = androidx.compose.ui.platform.LocalFocusManager.current
+    val contentReq = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
+    val selectedReq = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
+    val ms = if (LocalReduceMotion.current) 0 else 180
+    // focus hops between rail items drop hasFocus for an instant: close only if it is still gone a frame later
+    LaunchedEffect(railFocused) {
+        if (!railFocused && railOpen) { androidx.compose.runtime.withFrameNanos { }; androidx.compose.runtime.withFrameNanos { }; if (!railFocused && railOpen) railOpen = false }
+    }
+    LaunchedEffect(railOpen) {
+        if (railOpen) { androidx.compose.runtime.withFrameNanos { }; runCatching { selectedReq.requestFocus() } }
+    }
+    androidx.compose.foundation.layout.Box(
+        // Left with nothing further left in the content: reveal the rail (and cancel the move)
+        // Left from the leftmost content item (no focus target further left) reveals the rail
+        Modifier.fillMaxSize().onKeyEvent { e ->
+            if (showRail && !railOpen && e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft && !fm.moveFocus(FocusDirection.Left)) { railOpen = true; true } else false
+        }
+    ) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().focusRequester(contentReq).focusGroup()) { host() }
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showRail && railOpen,
+            modifier = Modifier.align(androidx.compose.ui.Alignment.CenterStart),
+            enter = androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(ms)) { -it } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(ms)),
+            exit = androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(ms)) { -it } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(ms))
+        ) {
+            // 32dp start keeps the rounded edge inside TV overscan
+            Column(
                 Modifier
-                    .clip(IslandShape)
-                    .background(IslandFill)
+                    .padding(start = 32.dp)
+                    .focusGroup()
+                    // nothing focusable to the right of an icon in the hero band: hand focus to the content explicitly
+                    .onKeyEvent { e -> if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionRight) { runCatching { contentReq.requestFocus() }; true } else false }
+                    .onFocusChanged { railFocused = it.hasFocus }
+                    .background(IslandFill, IslandShape)
                     .border(1.dp, IslandEdge, IslandShape)
-                    .padding(horizontal = 8.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp, androidx.compose.ui.Alignment.CenterVertically)
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 entries.forEach { r ->
                     val selected = current == r.route
                     val profile = if (r.route == TvRoutes.ACCOUNT) session?.activeProfile else null
-                    // focused = amber ring + lighter surface; selected (current screen) = soft amber fill + amber icon
-                    NavigationDrawerItem(
-                        selected = selected,
-                        onClick = { if (r.route == TvRoutes.ACCOUNT) acct.repo.openGate() else nav.navigateTop(r.route) },
-                        colors = NavigationDrawerItemDefaults.colors(
-                            containerColor = Color.Transparent,
-                            contentColor = Ink.body,
-                            inactiveContentColor = Ink.body,
-                            focusedContainerColor = Bg.overlay,
-                            focusedContentColor = Ink.high,
-                            selectedContainerColor = Color(0x33F2B45A),
-                            selectedContentColor = Ink.high,
-                            focusedSelectedContainerColor = Color(0x4DF2B45A),
-                            focusedSelectedContentColor = Ink.high
-                        ),
-                        border = NavigationDrawerItemDefaults.border(
-                            focusedBorder = Border(BorderStroke(3.dp, Accent.main)),
-                            focusedSelectedBorder = Border(BorderStroke(3.dp, Accent.main))
-                        ),
-                        glow = NavigationDrawerItemDefaults.glow(focusedGlow = Glow.None, focusedSelectedGlow = Glow.None),
-                        leadingContent = {
-                            if (profile != null) coil.compose.AsyncImage(
-                                com.anistream.core.account.FluentEmojis.urlFor(profile.avatar), contentDescription = "Switch profile, watching as ${profile.name}",
-                                modifier = Modifier.size(24.dp)
-                            )
-                            else Icon(r.icon, contentDescription = r.label, tint = if (selected) Accent.main else LocalContentColor.current)
+                    val label = (profile?.name ?: r.label) + if (profile?.kids == true) " · Kids" else ""
+                    var focused by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                    androidx.compose.foundation.layout.Box(Modifier.size(38.dp)) {
+                        // focused = amber ring + lighter surface; selected (current screen) = soft amber fill + amber icon
+                        androidx.tv.material3.Surface(
+                            onClick = { if (r.route == TvRoutes.ACCOUNT) acct.repo.openGate() else nav.navigateTop(r.route) },
+                            modifier = Modifier.size(38.dp)
+                                .then(if (selected) Modifier.focusRequester(selectedReq) else Modifier)
+                                .onFocusChanged { focused = it.isFocused },
+                            shape = androidx.tv.material3.ClickableSurfaceDefaults.shape(androidx.compose.foundation.shape.CircleShape),
+                            colors = androidx.tv.material3.ClickableSurfaceDefaults.colors(
+                                containerColor = if (selected) Color(0x33F2B45A) else Color.Transparent,
+                                contentColor = Ink.body,
+                                focusedContainerColor = if (selected) Color(0x4DF2B45A) else Bg.overlay,
+                                focusedContentColor = Ink.high
+                            ),
+                            border = androidx.tv.material3.ClickableSurfaceDefaults.border(
+                                focusedBorder = Border(FocusRing, shape = androidx.compose.foundation.shape.CircleShape)
+                            ),
+                            scale = androidx.tv.material3.ClickableSurfaceDefaults.scale(focusedScale = 1f),
+                            glow = androidx.tv.material3.ClickableSurfaceDefaults.glow(focusedGlow = Glow.None)
+                        ) {
+                            androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                                if (profile != null) coil.compose.AsyncImage(
+                                    com.anistream.core.account.FluentEmojis.urlFor(profile.avatar), contentDescription = "Switch profile, watching as ${profile.name}",
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                else Icon(r.icon, contentDescription = r.label, modifier = Modifier.size(22.dp), tint = if (selected) Accent.main else LocalContentColor.current)
+                            }
                         }
-                    ) { Text((profile?.name ?: r.label) + if (profile?.kids == true) " · Kids" else "") }
+                        // label chip beside the focused icon; offset, so it never changes the pill's width
+                        if (focused) Text(
+                            label, maxLines = 1, style = TvType.body.copy(color = Ink.high),
+                            modifier = Modifier.align(androidx.compose.ui.Alignment.CenterStart).offset(x = 50.dp)
+                                .wrapContentWidth(unbounded = true, align = androidx.compose.ui.Alignment.Start)
+                                .background(Bg.overlay, Radius.pill).padding(horizontal = 14.dp, vertical = 6.dp)
+                        )
+                    }
                 }
-            } }
+            }
         }
-    ) { host() }
+    }
 }
 
 private val IslandShape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
